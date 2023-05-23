@@ -15,5 +15,5 @@ lazy val root = project
 
 lazy val app = (project in file("app"))
   .settings(
-    assembly / mainClass := Some("com.davisuga.ScalaHttpFunction")
+    assembly / mainClass := Some("com.programandonocosmos.ScalaHttpFunction")
   )
