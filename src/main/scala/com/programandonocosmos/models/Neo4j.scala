@@ -1,142 +1,128 @@
 package com.programandonocosmos.models
+import cats.Apply.ops.toAllApplyOps
 import cats.effect._
 import cats.implicits.toTraverseOps
 import com.programandonocosmos.adapters.*
 import com.programandonocosmos.domain.*
 import com.programandonocosmos.models.DocDB
+import com.programandonocosmos.utils.|>
 import org.neo4j.cypherdsl.core.Cypher
+import org.neo4j.cypherdsl.core.Node
 import org.neo4j.driver.*
 import org.neo4j.driver._
 
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
 import scala.util.Try
-import com.programandonocosmos.utils.|>
 
 object Queries:
-  val pageNode = Cypher.node("Page")
-  val folderNode = Cypher.node("Folder")
+  val documentTypeName = "Document"
+  val documentNode = Cypher.node(documentTypeName)
+  val mentionsRelationshipName = "MENTIONS"
 
-  def newPageNode(page: Page, name: String = "p") =
-    pageNode
-      .named(name)
-      .withProperties(
-        "uid",
-        Cypher.literalOf(page.id),
-        "name",
-        Cypher.literalOf(page.name),
-        "content",
-        Cypher.literalOf(page.content),
-        "url",
-        Cypher.literalOf(page.url)
-      )
+  def mentionsRelationship(from: Node, to: Node) =
+    from.relationshipTo(to, mentionsRelationshipName)
 
-  def newFolderNode(folder: Folder, name: String = "f") =
-    folderNode
-      .named(name)
-      .withProperties(
-        "uid",
-        Cypher.literalOf(folder.id),
-        "name",
-        Cypher.literalOf(folder.name),
-        "url",
-        Cypher.literalOf(folder.url)
-      )
-  def containsRelation(contains: Contains) =
-    folderNode
-      .withProperties("uid", Cypher.literalOf(contains.folderId))
-      .relationshipTo(
-        Cypher
-          .node("Page")
-          .withProperties("uid", Cypher.literalOf(contains.pageId)),
-        "CONTAINS"
-      )
-  def addFolder(folder: Folder) =
-    Cypher
-      .create(newFolderNode(folder))
-      .build()
-      .getCypher()
-  def addPage(page: Page) =
-    Cypher
-      .create(newPageNode(page))
-      .build()
-      .getCypher()
-  def addContains(contains: Contains) =
-    Cypher
-      .merge(containsRelation(contains))
-      .build()
-      .getCypher()
-  def getPagesByIds(ids: List[ID]) =
-    val pageNodes = pageNode.named("p")
-    Cypher
-      .`match`(pageNodes)
-      .where(
-        pageNodes
-          .property("uid")
-          .in(Cypher.listOf(ids.map(id => Cypher.literalOf(id)).asJava))
-      )
-      .returning(pageNodes)
-      .build()
-      .getCypher()
-
-  def addPages(pages: List[Page]) =
-    Cypher
-      .create(pages.map(page => newPageNode(page)).asJava)
-      .build()
-      .getCypher()
-
-  def addFolders(folders: List[Folder]) =
-    Cypher
-      .create(folders.map(folder => newFolderNode(folder)).asJava)
-      .build()
-      .getCypher()
-
-  def addContainsRelations(relations: List[(Page, Folder)]) =
+  def addDocument(page: Document) =
     Cypher
       .create(
-        relations.map { (page, folder) =>
-          newFolderNode(folder)
-            .relationshipTo(
-              newPageNode(page),
-              "CONTAINS"
-            )
-        }.asJava
+        documentNode.withProperties(
+          "uid",
+          Cypher.literalOf(page.uid.toString()),
+          "name",
+          Cypher.literalOf(page.name),
+          "content",
+          Cypher.literalOf(page.content),
+          "url",
+          Cypher.literalOf(page.url),
+          "numberOfWords",
+          Cypher.literalOf(page.numberOfWords)
+        )
       )
       .build()
       .getCypher()
 
-def mapRecordToPage(record: Record) =
-  Page(
-    record.get("p.uid").asString(),
-    record.get("p.name").asString(),
-    record.get("p.content").asString(),
-    record.get("p.url").asString()
+  def addMentions(mentions: Mentions) =
+    val from = documentNode.named("from")
+    val to = documentNode.named("to")
+    Cypher
+      .`match`(from)
+      .where(
+        from
+          .property("uid")
+          .isEqualTo(Cypher.literalOf(mentions.from.toString()))
+      )
+      .`match`(to)
+      .where(
+        to.property("uid").isEqualTo(Cypher.literalOf(mentions.to.toString()))
+      )
+      .create(mentionsRelationship(from, to))
+      .build()
+      .getCypher()
+
+  def getDocumentsByIds(ids: List[UID]) =
+    val nodes = documentNode.named("doc")
+    Cypher
+      .`match`(nodes)
+      .where(
+        nodes
+          .property("uid")
+          .in(
+            Cypher.listOf(ids.map(id => Cypher.literalOf(id.toString())).asJava)
+          )
+      )
+      .returning(nodes)
+      .build()
+      .getCypher()
+
+  def getDocumentById(id: UID) =
+    val node = documentNode.named("doc")
+    Cypher
+      .`match`(node)
+      .where(node.property("uid").isEqualTo(Cypher.literalOf(id.toString())))
+      .returning(node)
+      .build()
+      .getCypher()
+
+  def getDocumentMentions(id: UID) =
+    val from = documentNode
+      .named("from")
+
+    val to = documentNode.named("to")
+    Cypher
+      .`match`(
+        mentionsRelationship(
+          from.withProperties("uid", Cypher.literalOf(id.toString())),
+          to
+        )
+      )
+      .returning(to)
+      .build()
+      .getCypher()
+
+def mapToDocument(r: Record): Document =
+  val node = r.get("doc").asNode()
+  Document(
+    UUID.fromString(node.get("uid").asString()),
+    node.get("name").asString(),
+    node.get("content").asString(),
+    node.get("url").asString(),
+    node.get("numberOfWords").asInt()
   )
 
 class Neo4j(runQuery: Neo4jQueryRunner) extends DocDB[IO]:
+  def addDocument(page: Document): IO[Unit] =
+    Queries.addDocument(page) |> runQuery map (_._2.void)
 
-  def addPages(pages: List[Page]): IO[Unit] =
-    pages |> Queries.addPages |> runQueryAnDiscard
+  def addMentions(contains: Mentions): IO[Unit] =
+    Queries.addMentions(contains) |> runQuery map (_._2.void)
 
-  def addFolders(folders: List[Folder]): IO[Unit] =
-    folders |> Queries.addFolders |> runQueryAnDiscard
+  def getDocumentsByIds(ids: List[UID]): IO[List[Document]] =
+    Queries.getDocumentsByIds(ids) |> runQuery map (_._2.map(mapToDocument))
 
-  def linkPageToFolder(relation: Contains): IO[Unit] =
-    relation |> Queries.addContains |> runQueryAnDiscard
+  def getDocumentById(id: UID): IO[Document] =
+    Queries.getDocumentById(id) |> runQuery map (_._2.map(mapToDocument).head)
 
-  def addContainsRelations(contains: List[(Page, Folder)]): IO[Unit] =
-    contains |> Queries.addContainsRelations |> runQueryAnDiscard
-
-  def runQueryAnDiscard(query: String) = runQuery(query).void
-
-  def addPage(page: Page) =
-    page |> Queries.addPage |> runQueryAnDiscard
-
-  def addFolder(folder: Folder) =
-    folder |> Queries.addFolder |> runQueryAnDiscard
-
-  def addContains(contains: Contains) =
-    contains |> Queries.addContains |> runQueryAnDiscard
-
-  def getPagesById(ids: List[ID]) =
-    ids |> Queries.getPagesByIds |> runQuery map (_.map(mapRecordToPage))
+  def getDocumentMentions(id: UID): IO[List[Document]] =
+    Queries.getDocumentMentions(id) |> runQuery map (_._2.map(mapToDocument))
