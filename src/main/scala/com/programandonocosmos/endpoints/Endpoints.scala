@@ -1,0 +1,21 @@
+package com.programandonocosmos.endpoints
+import cats.effect.IO
+import com.programandonocosmos.domain.*
+import com.programandonocosmos.models.DocDB
+import io.circe.generic.auto._
+import sttp.tapir._
+import sttp.tapir.generic.auto._
+import sttp.tapir.json.circe._
+
+import java.util.UUID
+type PublicEndpoint[I, E, O, -R] = Endpoint[Unit, I, E, O, R]
+
+val searchEndpoint: PublicEndpoint[String, String, List[Document], Any] =
+  endpoint
+    .name("Search")
+    .description("Search for documents in the knowledge base")
+    .in("search")
+    .in(query[String]("query"))
+    .out(jsonBody[List[Document]])
+    .errorOut(stringBody)
+
