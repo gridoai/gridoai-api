@@ -19,3 +19,10 @@ val searchEndpoint: PublicEndpoint[String, String, List[Document], Any] =
     .out(jsonBody[List[Document]])
     .errorOut(stringBody)
 
+val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
+  endpoint
+    .name("Health Check")
+    .description("Check if the service is up")
+    .in("health")
+    .out(stringBody)
+
