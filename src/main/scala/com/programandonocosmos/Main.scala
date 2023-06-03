@@ -27,13 +27,20 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
 class ScalaHttpFunction extends HttpFunction {
-  def service(request: HttpRequest, response: HttpResponse) =
-    Neo4jAsync.resourceWithCredentials.use { runner =>
-      given docDb: DocDB[IO] = Neo4j(runner)
-      IO.pure(Http4sCloudFunction(HttpApp).service(request, response))
-    }
+  // Lazy-initialized resource for the Neo4j connection
+  private lazy val neo4jResource =
+    Neo4jAsync.resourceWithCredentials
+
+  // Create the Neo4j runner once and reuse it for each function call
+  private val neo4jRunner = neo4jResource.use(IO.pure).unsafeRunSync()
+
+  def service(request: HttpRequest, response: HttpResponse): Unit =
+    given docDb: DocDB[IO] = Neo4j(neo4jRunner)
+
+    // Handle the request using the shared Neo4j connection
+    val httpService =
+      Http4sCloudFunction(HttpApp).service(request, response)
 }
 
 object Main extends IOApp {
