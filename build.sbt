@@ -19,7 +19,8 @@ lazy val root = project
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % "1.5.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-core" % "1.5.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.5.0",
-    libraryDependencies += "de.killaitis" %% "http4s-cloud-functions" % "0.4.3"
+    libraryDependencies += "de.killaitis" %% "http4s-cloud-functions" % "0.4.3",
+    libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test"
   )
 enablePlugins(JavaServerAppPackaging)
 
