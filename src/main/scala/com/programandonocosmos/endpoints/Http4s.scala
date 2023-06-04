@@ -32,8 +32,13 @@ def healthCheckEndpointGet: HttpRoutes[IO] =
     healthCheckEndpoint.serverLogic(_ => IO.pure(Right("OK")))
   )
 
-def endpoints(implicit db: DocDB[IO]) =
-  searchEndpointGet <+> healthCheckEndpointGet
+def createEndpoint(implicit db: DocDB[IO]): HttpRoutes[IO] =
+  Http4sServerInterpreter[IO]().toRoutes(
+    createDocumentEndpoint.serverLogic(createDoc _)
+  )
+
+def endpoints(implicit db: DocDB[IO]): HttpRoutes[IO] =
+  searchEndpointGet <+> healthCheckEndpointGet <+> createEndpoint
 
 def HttpApp(implicit db: DocDB[IO]): HttpApp[IO] =
   Router(
