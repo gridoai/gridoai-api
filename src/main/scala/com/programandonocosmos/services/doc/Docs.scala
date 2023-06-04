@@ -30,3 +30,11 @@ def searchDoc(
     }
   }
 }
+def createDoc(
+    document: Document
+)(implicit db: DocDB[IO]): IO[Either[String, Unit]] = {
+  db.addDocument(document).attempt.map {
+    case Right(_)  => Right(())
+    case Left(err) => Left(err.getMessage)
+  }
+}
