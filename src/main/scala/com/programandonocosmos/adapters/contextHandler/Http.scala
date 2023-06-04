@@ -1,6 +1,7 @@
 package com.programandonocosmos.adapters.contextHandler
 import cats.effect.IO
 import com.programandonocosmos.adapters.*
+import com.programandonocosmos.mock.mockedDoc
 import com.programandonocosmos.utils.*
 import io.circe._
 import io.circe.generic.auto._
@@ -11,7 +12,6 @@ import sttp.client3._
 import sttp.client3._
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
 import sttp.model.StatusCode
-import com.programandonocosmos.mock.mockedDoc
 
 val contextHandlerEndpoint = sys.env.getOrElse(
   "CONTEXT_HANDLER_ENDPOINT",
@@ -37,11 +37,6 @@ trait DocumentApiClient:
 object DocumentApiClientHttp extends DocumentApiClient:
   val Http = HttpClient(contextHandlerEndpoint)
 
-  if (isHostReachable(contextHandlerEndpoint)) != true then
-    throw new Exception(
-      "Context Handler is not reachable"
-    )
-
   def write(
       uid: String,
       text: String
@@ -62,7 +57,6 @@ object DocumentApiClientHttp extends DocumentApiClient:
     Http
       .get(f"/neardocs?text=$text")
       .sendReq()
-      .trace("Response: ")
       .map(_.body.trace.flatMap(decode[MessageResponse[DocResponse]]))
 
 object MockDocumentApiClient extends DocumentApiClient:
