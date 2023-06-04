@@ -28,24 +28,18 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 class ScalaHttpFunction extends HttpFunction {
-  // Lazy-initialized resource for the Neo4j connection
-  private lazy val neo4jResource =
+  def service(request: HttpRequest, response: HttpResponse) =
     Neo4jAsync.resourceWithCredentials
-
-  // Create the Neo4j runner once and reuse it for each function call
-  private val neo4jRunner = neo4jResource.use(IO.pure).unsafeRunSync()
-
-  def service(request: HttpRequest, response: HttpResponse): Unit =
-    given docDb: DocDB[IO] = Neo4j(neo4jRunner)
-
-    // Handle the request using the shared Neo4j connection
-    val httpService =
-      Http4sCloudFunction(HttpApp).service(request, response)
+      .use { runner =>
+        given docDb: DocDB[IO] = Neo4j(runner)
+        IO.pure(Http4sCloudFunction(HttpApp).service(request, response))
+      }
+      .unsafeRunSync()
 }
-
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
     Neo4jAsync.resourceWithCredentials.use { runner =>
+      generateYamlSpec()
       given docDb: DocDB[IO] = Neo4j(runner)
       EmberServerBuilder
         .default[IO]
