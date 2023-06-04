@@ -1,13 +1,26 @@
+import sbt._
 import sbtassembly.MergeStrategy
+
+import scala.sys.process._
+
 val http4sVersion = "0.23.19"
 val scala3Version = "3.2.2"
 val circeVersion = "0.14.1"
+
+val deploy = Command.command("deploy") { (state: State) =>
+  "assembly" :: state
+  "rm target/scala-3.2.2/api_3-0.1.0-SNAPSHOT.jar".!
+  "gcloud functions deploy api --gen2 --region=us-west1 --entry-point=com.programandonocosmos.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.2.2/".!
+  state
+}
+
 lazy val root = project
   .in(file("."))
   .settings(
     name := "API",
     version := "0.1.0-SNAPSHOT",
     scalaVersion := scala3Version,
+    commands += deploy,
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "com.google.cloud.functions" % "functions-framework-api" % "1.0.4" % "provided",
     libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "5.8.0",
@@ -23,6 +36,11 @@ lazy val root = project
     libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test"
   )
 enablePlugins(JavaServerAppPackaging)
+
+libraryDependencies ++= Seq(
+  "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.5.0",
+  "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % "0.4.0"
+)
 
 libraryDependencies ++= Seq(
   "io.circe" %% "circe-core",
