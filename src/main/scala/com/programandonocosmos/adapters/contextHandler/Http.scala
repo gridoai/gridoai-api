@@ -3,15 +3,15 @@ import cats.effect.IO
 import com.programandonocosmos.adapters.*
 import com.programandonocosmos.mock.mockedDoc
 import com.programandonocosmos.utils.*
-import io.circe._
-import io.circe.generic.auto._
-import io.circe.generic.auto._
-import io.circe.parser._
-import io.circe.syntax._
-import sttp.client3._
-import sttp.client3._
+import io.circe.*
+import io.circe.generic.auto.*
+import io.circe.generic.semiauto.*
+import io.circe.parser.*
+import io.circe.syntax.*
+import sttp.client3.*
+import sttp.client3.*
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
-import sttp.model.StatusCode
+import sttp.model.{Header, StatusCode}
 
 val contextHandlerEndpoint = sys.env.getOrElse(
   "CONTEXT_HANDLER_ENDPOINT",
@@ -22,6 +22,7 @@ case class MessageResponse[T](message: T)
 
 type DocResponseItem = (String, Float)
 type DocResponse = List[DocResponseItem]
+case class NewDocBody(uid: String, text: String)
 trait DocumentApiClient:
   def write(
       uid: String,
@@ -43,7 +44,8 @@ object DocumentApiClientHttp extends DocumentApiClient:
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]] =
     Http
       .post("/write")
-      .body(Map("uid" -> uid, "text" -> text))
+      .body(NewDocBody(uid, text).asJson.toString)
+      .contentType("application/json")
       .sendReq()
       .map(_.body.flatMap(decode[MessageResponse[List[Float]]]))
 
@@ -60,11 +62,11 @@ object DocumentApiClientHttp extends DocumentApiClient:
       .map(_.body.trace.flatMap(decode[MessageResponse[DocResponse]]))
 
 object MockDocumentApiClient extends DocumentApiClient:
-  val mockResponse: MessageResponse[List[Float]] = MessageResponse(
+  private val mockResponse: MessageResponse[List[Float]] = MessageResponse(
     List(1.0f, 2.0f, 3.0f)
   )
   val mockDocResponse: MessageResponse[DocResponse] = MessageResponse(
-    List((mockedDoc.uid.toString(), 0.5f), (mockedDoc.uid.toString(), 0.3f))
+    List((mockedDoc.uid.toString, 0.5f), (mockedDoc.uid.toString, 0.3f))
   )
 
   override def write(
