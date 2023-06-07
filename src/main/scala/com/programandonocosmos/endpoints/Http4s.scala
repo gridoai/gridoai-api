@@ -38,7 +38,7 @@ def createEndpoint(implicit db: DocDB[IO]): HttpRoutes[IO] =
   )
 
 def endpoints(implicit db: DocDB[IO]): HttpRoutes[IO] =
-  searchEndpointGet <+> healthCheckEndpointGet <+> createEndpoint
+  searchEndpointGet <+> healthCheckEndpointGet <+> createEndpoint <+> fileUploadEndpoint
 
 def HttpApp(implicit db: DocDB[IO]): HttpApp[IO] =
   Router(
