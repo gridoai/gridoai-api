@@ -23,7 +23,6 @@ def makeQueryRunner(driver: Driver)(implicit ec: ExecutionContext) =
   (query: String) =>
     IO.fromFuture(IO {
       val session = driver.session(classOf[AsyncSession])
-      println(s"Running query: $query")
       for
         stmtResult <- session.runAsync(query).toScala
         records <- stmtResult
