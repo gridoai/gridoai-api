@@ -39,7 +39,7 @@ class ScalaHttpFunction extends HttpFunction {
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
     Neo4jAsync.resourceWithCredentials.use { runner =>
-      generateYamlSpec()
+
       given docDb: DocDB[IO] = Neo4j(runner)
       EmberServerBuilder
         .default[IO]
