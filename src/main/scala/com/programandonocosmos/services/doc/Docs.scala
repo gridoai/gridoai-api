@@ -21,11 +21,7 @@ def searchDoc(
     case Right(response) =>
       val ids = response.message.map(_._1.pipe(UUID.fromString))
       println(f"Searching ids: $ids")
-      db.getDocumentsByIds(ids).attempt.map {
-        case Right(docs) => Right(docs)
-        case Left(err)   => Left(err.getMessage) // Map the error to a string
-      }
-
+      db.getDocumentsByIds(ids).attempt.map(_.left.map(_.toString))
     case Left(df: io.circe.Error) =>
       IO.pure(Left("Parsing error: " + df.getMessage))
     case Left(other) => IO.pure(Left(other.toString))
@@ -40,6 +36,6 @@ def createDoc(
     DocumentApiClient.write(document.uid.toString, document.content)
   ).parTupled.map {
     case (_, Right(_)) => Right(())
-    case (_, Left(e)) => Left(e.toString)
+    case (_, Left(e))  => Left(e.toString)
   }
 }
