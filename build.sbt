@@ -4,7 +4,7 @@ import sbtassembly.MergeStrategy
 import scala.sys.process._
 
 val http4sVersion = "0.23.19"
-val scala3Version = "3.2.2"
+val scala3Version = "3.3.0"
 val circeVersion = "0.14.1"
 
 val deploy = Command.command("deploy") { (state: State) =>
@@ -33,9 +33,10 @@ lazy val root = project
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-core" % "1.5.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.5.0",
     libraryDependencies += "de.killaitis" %% "http4s-cloud-functions" % "0.4.3",
-    libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test"
+    libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test",
+    libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28"
   )
-enablePlugins(JavaServerAppPackaging)
+  .enablePlugins(GraalVMNativeImagePlugin)
 
 libraryDependencies ++= Seq(
   "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.5.0",
