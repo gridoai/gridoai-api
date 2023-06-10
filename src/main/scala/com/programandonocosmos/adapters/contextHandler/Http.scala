@@ -1,5 +1,7 @@
 package com.programandonocosmos.adapters.contextHandler
+import cats.TraverseFilter.ops.toAllTraverseFilterOps
 import cats.effect.IO
+import cats.syntax.all.toFunctorFilterOps
 import com.programandonocosmos.adapters.*
 import com.programandonocosmos.mock.mockedDoc
 import com.programandonocosmos.utils.*
@@ -11,7 +13,8 @@ import io.circe.syntax.*
 import sttp.client3.*
 import sttp.client3.*
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
-import sttp.model.{Header, StatusCode}
+import sttp.model.Header
+import sttp.model.StatusCode
 
 val contextHandlerEndpoint = sys.env.getOrElse(
   "CONTEXT_HANDLER_ENDPOINT",
@@ -60,6 +63,15 @@ object DocumentApiClientHttp extends DocumentApiClient:
       .get(f"/neardocs?text=$text")
       .sendReq()
       .map(_.body.trace.flatMap(decode[MessageResponse[DocResponse]]))
+      .map(
+        _.map(res =>
+          val docsWithoutUnrelated = res.message.filter(x => x._2 > 1.9f)
+          keepTotalWordsUnderN(
+            docsWithoutUnrelated,
+            8000
+          )
+        ).map(MessageResponse.apply)
+      )
 
 object MockDocumentApiClient extends DocumentApiClient:
   private val mockResponse: MessageResponse[List[Float]] = MessageResponse(
@@ -84,5 +96,5 @@ object MockDocumentApiClient extends DocumentApiClient:
     IO.pure(Right(mockDocResponse))
 
 val DocumentApiClient =
-  if (sys.env.get("ENV") == Some("TEST")) then MockDocumentApiClient
+  if sys.env.get("ENV").contains("TEST") then MockDocumentApiClient
   else DocumentApiClientHttp
