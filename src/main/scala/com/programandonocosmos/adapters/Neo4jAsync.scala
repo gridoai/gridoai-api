@@ -14,7 +14,7 @@ val NEO4J_USER = sys.env.getOrElse("NEO4J_USER", "neo4j")
 val NEO4J_PASSWORD = sys.env.getOrElse("NEO4J_PASSWORD", "password")
 // TODO: Map n4j exceptions to our own error types
 import scala.concurrent.Future
-import scala.util.{Try, Success, Failure}
+import scala.util.{Failure, Success, Try}
 import org.neo4j.driver.summary.ResultSummary
 
 type Neo4jQueryRunner = String => IO[(ResultSummary, List[Record])]

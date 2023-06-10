@@ -9,9 +9,9 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 val catsBackend =
-  ((HttpClientCatsBackend
+  HttpClientCatsBackend
     .resource[IO]()
-    .use(IO.pure)))
+    .use(IO.pure)
 
 def sendRequest[T] = (r: Request[T, Any]) => catsBackend.flatMap(r.send)
 
