@@ -1,17 +1,16 @@
 package com.programandonocosmos.services.doc
 
 import cats.effect.IO
-import com.programandonocosmos.adapters.contextHandler.{
-  DocumentApiClient,
-  MessageResponse
-}
+import cats.syntax.parallel.*
+import com.programandonocosmos.adapters.contextHandler.DocumentApiClient
+import com.programandonocosmos.adapters.contextHandler.MessageResponse
 import com.programandonocosmos.domain.Document
 import com.programandonocosmos.domain.UID
 import com.programandonocosmos.models.DocDB
 
 import java.util.UUID
+
 import util.chaining.scalaUtilChainingOps
-import cats.syntax.parallel.*
 
 def searchDoc(
     x: String
@@ -32,10 +31,11 @@ def createDoc(
 )(implicit db: DocDB[IO]): IO[Either[String, Unit]] = {
   println("Creating doc... ")
   (
-    db.addDocument(document),
+    db.addDocument(document).attempt,
     DocumentApiClient.write(document.uid.toString, document.content)
   ).parTupled.map {
-    case (_, Right(_)) => Right(())
-    case (_, Left(e))  => Left(e.toString)
+    case (Right(()), Right(_)) => Right(())
+    case (_, Left(e))          => Left(e.toString)
+    case (Left(e), Right(_))   => Left(e.toString)
   }
 }
