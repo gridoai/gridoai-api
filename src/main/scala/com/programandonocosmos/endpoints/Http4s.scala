@@ -14,6 +14,7 @@ import io.circe.DecodingFailure
 import org.http4s.HttpApp
 import org.http4s.HttpRoutes
 import org.http4s.server.Router
+import org.http4s.server.middleware.CORS
 import sttp.tapir._
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
@@ -42,5 +43,5 @@ def endpoints(implicit db: DocDB[IO]): HttpRoutes[IO] =
 
 def HttpApp(implicit db: DocDB[IO]): HttpApp[IO] =
   Router(
-    "/" -> endpoints
+    "/" -> CORS.policy.withAllowOriginAll(endpoints)
   ).orNotFound
