@@ -9,8 +9,8 @@ val circeVersion = "0.14.1"
 
 val deploy = Command.command("deploy") { (state: State) =>
   "assembly" :: state
-  "rm target/scala-3.2.2/api_3-0.1.0-SNAPSHOT.jar".!
-  "gcloud functions deploy api --gen2 --region=us-west1 --entry-point=com.programandonocosmos.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.2.2/".!
+  "rm target/scala-3.3.0/api_3-0.1.0-SNAPSHOT.jar".!
+  "gcloud functions deploy api --region=us-west1 --entry-point=com.programandonocosmos.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.3.0/".!
   state
 }
 
