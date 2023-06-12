@@ -65,10 +65,11 @@ object DocumentApiClientHttp extends DocumentApiClient:
       .map(_.body.trace.flatMap(decode[MessageResponse[DocResponse]]))
       .map(
         _.map(res =>
-          val docsWithoutUnrelated = res.message.filter(x => x._2 > 1.9f)
+          val docsWithoutUnrelated = res.message.filter(x => x._2 < 1.9f)
+          println("Found near docs: " + docsWithoutUnrelated)
           keepTotalWordsUnderN(
             docsWithoutUnrelated,
-            8000
+            10_000
           )
         ).map(MessageResponse.apply)
       )
