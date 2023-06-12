@@ -21,3 +21,9 @@ case class Mentions(
     from: UID,
     to: UID
 )
+
+case class DocCreationPayload(
+    name: String,
+    content: String,
+    url: Option[String] = None
+)
