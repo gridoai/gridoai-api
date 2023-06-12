@@ -4,8 +4,7 @@ import cats.effect.IO
 import cats.syntax.parallel.*
 import com.programandonocosmos.adapters.contextHandler.DocumentApiClient
 import com.programandonocosmos.adapters.contextHandler.MessageResponse
-import com.programandonocosmos.domain.Document
-import com.programandonocosmos.domain.UID
+import com.programandonocosmos.domain._
 import com.programandonocosmos.models.DocDB
 
 import java.util.UUID
@@ -26,10 +25,18 @@ def searchDoc(
     case Left(other) => IO.pure(Left(other.toString))
   }
 }
+
 def createDoc(
-    document: Document
+    docInput: DocCreationPayload
 )(implicit db: DocDB[IO]): IO[Either[String, Unit]] = {
   println("Creating doc... ")
+  val document = Document(
+    UUID.randomUUID(),
+    docInput.name,
+    docInput.content,
+    docInput.url.getOrElse(docInput.name),
+    docInput.content.split(" ").length
+  )
   (
     db.addDocument(document).attempt,
     DocumentApiClient.write(document.uid.toString, document.content)
