@@ -5,8 +5,10 @@ import cats.implicits.*
 import com.programandonocosmos.adapters.PdfBoxParser
 import com.programandonocosmos.adapters.PdfParser
 import com.programandonocosmos.domain.Document
+import com.programandonocosmos.domain._
 import com.programandonocosmos.models.DocDB
 import com.programandonocosmos.services.doc.createDoc
+import com.programandonocosmos.utils.trace
 import fs2.io.file.Files
 import fs2.io.file.Path
 import org.apache.pdfbox.pdmodel.*
@@ -28,34 +30,43 @@ enum FileUploadError:
 import FileUploadError._
 
 def extractBytes(m: Multipart[IO]): IO[Array[Byte]] =
+  println("Extracting bytes from multipart...")
   m.parts
     .traverse(_.body.compile.to(Array))
     .map(_.flatten.toArray)
 
-def loadAndExtractText(
+def loadAndExtractText(fileType: String = "pdf")(
     byteArray: Array[Byte]
 ): IO[Either[PdfParsingError, String]] =
-  PdfBoxParser
-    .load(byteArray)
-    .flatMap(doc => PdfBoxParser.getText(doc).map(text => (doc, text)))
-    .flatMap((doc, text) => PdfBoxParser.close(doc).map(_ => text))
-    .attempt
-    .map(_.left.map(t => PdfParsingError(t.getMessage)))
+  println("Loading and extracting text from PDF...")
+  fileType match
+    case "pdf" =>
+      PdfBoxParser
+        .load(byteArray)
+        .trace("Loaded PDF")
+        .flatMap(doc => PdfBoxParser.getText(doc).map(text => (doc, text)))
+        .flatMap((doc, text) =>
+          PdfBoxParser.close(doc).trace("Parsed PDF").map(_ => text)
+        )
+        .attempt
+        .map(_.left.map(t => PdfParsingError(t.getMessage)))
+    case extension =>
+      println("Unknown file type: " + extension)
+      IO.pure(Right(byteArray.map(_.toChar).mkString))
 
 def createAndStoreDocument(filename: String, text: String)(implicit
     db: DocDB[IO]
 ): IO[Either[DocumentCreationError, Unit]] =
+  println("Creating and storing document...")
   createDoc(
-    Document(
-      UUID.randomUUID(),
+    DocCreationPayload(
       filename,
-      text,
-      filename,
-      text.length
+      text
     )
-  ).map:
-    case Right(_) => Right(())
-    case Left(e)  => Left(DocumentCreationError(e))
+  ).trace("Finished doc creation")
+    .map:
+      case Right(_) => Right(())
+      case Left(e)  => Left(DocumentCreationError(e))
 
 def mapToResponse(result: Either[FileUploadError, Unit]): IO[Response[IO]] =
   result match
@@ -77,7 +88,9 @@ def fileUploadEndpoint(implicit db: DocDB[IO]) =
     case req @ POST -> Root / "upload" / filename =>
       req.decode[Multipart[IO]]: m =>
         extractBytes(m)
-          .flatMap(loadAndExtractText)
+          .flatMap(
+            loadAndExtractText(Try(filename.split('.').last).getOrElse(""))
+          )
           .flatMap:
             case Right(text) => createAndStoreDocument(filename, text)
             case Left(error) => IO.pure(Left(error))

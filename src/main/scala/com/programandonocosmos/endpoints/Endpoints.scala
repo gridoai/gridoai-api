@@ -26,12 +26,13 @@ val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
     .in("health")
     .out(stringBody)
 
-val createDocumentEndpoint: PublicEndpoint[Document, String, Unit, Any] =
+val createDocumentEndpoint
+    : PublicEndpoint[DocCreationPayload, String, Unit, Any] =
   endpoint
     .name("Create Document")
     .description("Create a document in the knowledge base")
     .post
     .in("document")
-    .in(jsonBody[Document])
+    .in(jsonBody[DocCreationPayload])
     .out(emptyOutput)
     .errorOut(stringBody)
