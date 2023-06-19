@@ -13,6 +13,7 @@ import com.programandonocosmos.adapters.Neo4jAsync
 import com.programandonocosmos.domain.Document
 import com.programandonocosmos.domain.Mentions
 import com.programandonocosmos.endpoints.*
+import com.programandonocosmos.endpoints.getSchema
 import com.programandonocosmos.models.DocDB
 import com.programandonocosmos.models.Neo4j
 import de.killaitis.http4s.*
@@ -38,17 +39,23 @@ class ScalaHttpFunction extends HttpFunction {
 }
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
-    Neo4jAsync.resourceWithCredentials.use { runner =>
+    if args get 0 contains "openapi" then
+      import java.io._
+      val bw = BufferedWriter(FileWriter(File("openapi.yaml")))
+      bw.write(getSchema)
+      bw.close()
+      IO.pure(ExitCode.Success)
+    else
+      Neo4jAsync.resourceWithCredentials.use { runner =>
+        given docDb: DocDB[IO] = Neo4j(runner)
+        EmberServerBuilder
+          .default[IO]
+          .withHost(ipv4"0.0.0.0")
+          .withPort(port"8080")
+          .withHttpApp(HttpApp)
+          .build
+          .use(_ => IO.never)
+          .as(ExitCode.Success)
 
-      given docDb: DocDB[IO] = Neo4j(runner)
-      EmberServerBuilder
-        .default[IO]
-        .withHost(ipv4"0.0.0.0")
-        .withPort(port"8080")
-        .withHttpApp(HttpApp)
-        .build
-        .use(_ => IO.never)
-        .as(ExitCode.Success)
-
-    }
+      }
 }
