@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.Sync
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.text.PDFTextStripper
-
+import com.programandonocosmos.utils.trace
 trait PdfParser[F[_]]:
   def load(bytes: Array[Byte]): F[PDDocument]
   def getText(doc: PDDocument): F[String]
@@ -22,3 +22,10 @@ object PdfBoxParser extends PdfParser[IO]:
 
   def close(doc: PDDocument) =
     Sync[IO].delay(doc.close())
+
+def parsePdf(content: Array[Byte]) = PdfBoxParser
+  .load(content)
+  .flatMap(doc => PdfBoxParser.getText(doc).map(text => (doc, text)))
+  .flatMap((doc, text) =>
+    PdfBoxParser.close(doc).trace("Parsed PDF").map(_ => text)
+  )
