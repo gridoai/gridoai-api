@@ -23,13 +23,20 @@ val contextHandlerEndpoint = sys.env.getOrElse(
 
 case class MessageResponse[T](message: T)
 
-type DocResponseItem = (String, Float)
+case class DocResponseItem(
+    uid: String,
+    distance: Float,
+    content: String,
+    path: Option[String] = None
+)
+
 type DocResponse = List[DocResponseItem]
-case class NewDocBody(uid: String, text: String)
+case class NewDocBody(uid: String, content: String, path: String)
 trait DocumentApiClient:
   def write(
       uid: String,
-      text: String
+      text: String,
+      path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]]
 
   def delete(uid: String): IO[StatusCode]
@@ -43,11 +50,12 @@ object DocumentApiClientHttp extends DocumentApiClient:
 
   def write(
       uid: String,
-      text: String
+      text: String,
+      path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]] =
     Http
       .post("/write")
-      .body(NewDocBody(uid, text).asJson.toString)
+      .body(NewDocBody(uid, text, path).asJson.toString)
       .contentType("application/json")
       .sendReq()
       .map(_.body.flatMap(decode[MessageResponse[List[Float]]]))
@@ -79,12 +87,16 @@ object MockDocumentApiClient extends DocumentApiClient:
     List(1.0f, 2.0f, 3.0f)
   )
   val mockDocResponse: MessageResponse[DocResponse] = MessageResponse(
-    List((mockedDoc.uid.toString, 0.5f), (mockedDoc.uid.toString, 0.3f))
+    List(
+      DocResponseItem(mockedDoc.uid.toString, 0.5f, ""),
+      DocResponseItem(mockedDoc.uid.toString, 0.3f, "")
+    )
   )
 
   override def write(
       uid: String,
-      text: String
+      text: String,
+      path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]] =
     IO.pure(Right(mockResponse))
 
