@@ -32,9 +32,12 @@ lazy val root = project
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % "1.5.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-core" % "1.5.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.5.0",
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.5.5",
+    libraryDependencies += "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % "0.4.0",
     libraryDependencies += "de.killaitis" %% "http4s-cloud-functions" % "0.4.3",
     libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test",
-    libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28"
+    libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28",
+    libraryDependencies += "com.google.auth" % "google-auth-library-oauth2-http" % "1.3.0"
   )
   .enablePlugins(GraalVMNativeImagePlugin)
 
@@ -42,7 +45,10 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.5.0",
   "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % "0.4.0"
 )
-
+libraryDependencies ++= Seq(
+  "org.apache.poi" % "poi" % "5.2.0",
+  "org.apache.poi" % "poi-ooxml" % "5.2.0"
+)
 libraryDependencies ++= Seq(
   "io.circe" %% "circe-core",
   "io.circe" %% "circe-generic",
