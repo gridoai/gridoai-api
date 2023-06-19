@@ -1,8 +1,8 @@
-package com.programandonocosmos.models
+package com.gridoai.models
 
-import com.programandonocosmos.domain.Document
-import com.programandonocosmos.domain.Mentions
-import com.programandonocosmos.domain.UID
+import com.gridoai.domain.Document
+import com.gridoai.domain.Mentions
+import com.gridoai.domain.UID
 
 trait DocDB[F[_]]:
   def addDocument(doc: Document): F[Unit]

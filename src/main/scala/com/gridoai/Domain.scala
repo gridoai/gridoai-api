@@ -1,4 +1,4 @@
-package com.programandonocosmos.domain
+package com.gridoai.domain
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
@@ -27,3 +27,8 @@ case class DocCreationPayload(
     content: String,
     url: Option[String] = None
 )
+
+enum MessageFrom:
+  case Bot, User
+
+case class Message(from: MessageFrom, message: String)

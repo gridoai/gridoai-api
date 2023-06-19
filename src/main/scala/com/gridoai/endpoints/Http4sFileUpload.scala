@@ -1,14 +1,14 @@
-package com.programandonocosmos.endpoints
+package com.gridoai.endpoints
 
 import cats.effect.*
 import cats.implicits.*
-import com.programandonocosmos.adapters.PdfBoxParser
-import com.programandonocosmos.adapters.PdfParser
-import com.programandonocosmos.domain.Document
-import com.programandonocosmos.domain._
-import com.programandonocosmos.models.DocDB
-import com.programandonocosmos.services.doc.createDoc
-import com.programandonocosmos.utils.trace
+import com.gridoai.adapters.PdfBoxParser
+import com.gridoai.adapters.PdfParser
+import com.gridoai.domain.Document
+import com.gridoai.domain._
+import com.gridoai.models.DocDB
+import com.gridoai.services.doc.createDoc
+import com.gridoai.utils.trace
 import fs2.io.file.Files
 import fs2.io.file.Path
 import org.apache.pdfbox.pdmodel.*
@@ -83,7 +83,7 @@ def mapToResponse(result: Either[FileUploadError, Unit]): IO[Response[IO]] =
         "An unknown error occurred while processing the request."
       )
 
-def fileUploadEndpoint(implicit db: DocDB[IO]) =
+def fileUploadRoute(implicit db: DocDB[IO]) =
   HttpRoutes.of[IO]:
     case req @ POST -> Root / "upload" / filename =>
       req.decode[Multipart[IO]]: m =>

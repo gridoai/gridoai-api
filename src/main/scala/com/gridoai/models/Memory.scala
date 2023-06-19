@@ -1,8 +1,8 @@
-package com.programandonocosmos.models
+package com.gridoai.models
 
 import cats.effect.IO
-import com.programandonocosmos.domain._
-import com.programandonocosmos.mock.mockedDoc
+import com.gridoai.domain._
+import com.gridoai.mock.mockedDoc
 
 import java.util.UUID
 import scala.collection.mutable.ListBuffer

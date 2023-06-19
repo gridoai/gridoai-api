@@ -1,4 +1,4 @@
-package com.programandonocosmos.adapters
+package com.gridoai.adapters
 import cats.effect.IO
 import sttp.client3._
 import sttp.client3.httpclient.cats.HttpClientCatsBackend

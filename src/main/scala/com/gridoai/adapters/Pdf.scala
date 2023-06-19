@@ -1,4 +1,4 @@
-package com.programandonocosmos.adapters
+package com.gridoai.adapters
 
 import cats.effect.IO
 import cats.effect.Sync
