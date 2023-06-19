@@ -10,7 +10,7 @@ val circeVersion = "0.14.1"
 val deploy = Command.command("deploy") { (state: State) =>
   "assembly" :: state
   "rm target/scala-3.3.0/api_3-0.1.0-SNAPSHOT.jar".!
-  "gcloud functions deploy api --region=us-west1 --entry-point=com.programandonocosmos.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.3.0/".!
+  "gcloud functions deploy api --region=us-west1 --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.3.0/".!
   state
 }
 
@@ -34,7 +34,8 @@ lazy val root = project
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.5.0",
     libraryDependencies += "de.killaitis" %% "http4s-cloud-functions" % "0.4.3",
     libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test",
-    libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28"
+    libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28",
+    libraryDependencies += "com.google.auth" % "google-auth-library-oauth2-http" % "1.3.0"
   )
   .enablePlugins(GraalVMNativeImagePlugin)
 
@@ -55,7 +56,7 @@ libraryDependencies ++= Seq(
 )
 lazy val app = (project in file("app"))
   .settings(
-    assembly / mainClass := Some("com.programandonocosmos.ScalaHttpFunction")
+    assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")
   )
 
 assemblyMergeStrategy in assembly := {

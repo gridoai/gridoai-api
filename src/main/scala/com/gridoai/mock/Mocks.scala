@@ -1,6 +1,6 @@
-package com.programandonocosmos.mock
+package com.gridoai.mock
 
-import com.programandonocosmos.domain.Document
+import com.gridoai.domain.Document
 
 import java.util.UUID
 

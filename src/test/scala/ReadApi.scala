@@ -1,9 +1,9 @@
 import cats.effect.IO
 import cats.effect.SyncIO
-import com.programandonocosmos.endpoints.*
-import com.programandonocosmos.models.DocDB
-import com.programandonocosmos.models.MockDocDB
-import com.programandonocosmos.utils.|>
+import com.gridoai.endpoints.*
+import com.gridoai.models.DocDB
+import com.gridoai.models.MockDocDB
+import com.gridoai.utils.|>
 import fs2.Stream
 import fs2.text.utf8Decode
 import munit.CatsEffectSuite

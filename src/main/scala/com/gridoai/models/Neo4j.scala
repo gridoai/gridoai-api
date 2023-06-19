@@ -1,11 +1,11 @@
-package com.programandonocosmos.models
+package com.gridoai.models
 import cats.Apply.ops.toAllApplyOps
 import cats.effect._
 import cats.implicits.toTraverseOps
-import com.programandonocosmos.adapters.*
-import com.programandonocosmos.domain.*
-import com.programandonocosmos.models.DocDB
-import com.programandonocosmos.utils.|>
+import com.gridoai.adapters.*
+import com.gridoai.domain.*
+import com.gridoai.models.DocDB
+import com.gridoai.utils.|>
 import org.neo4j.cypherdsl.core.Cypher
 import org.neo4j.cypherdsl.core.Node
 import org.neo4j.driver.*

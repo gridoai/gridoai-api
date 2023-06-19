@@ -1,4 +1,4 @@
-package com.programandonocosmos.utils
+package com.gridoai.utils
 
 def keepTotalWordsUnderN(
     list: List[(String, Float)],

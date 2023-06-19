@@ -1,7 +1,7 @@
-package com.programandonocosmos.endpoints
+package com.gridoai.endpoints
 import cats.effect.IO
-import com.programandonocosmos.domain.*
-import com.programandonocosmos.models.DocDB
+import com.gridoai.domain.*
+import com.gridoai.models.DocDB
 import io.circe.generic.auto._
 import sttp.tapir._
 import sttp.tapir.generic.auto._
@@ -35,4 +35,14 @@ val createDocumentEndpoint
     .in("document")
     .in(jsonBody[DocCreationPayload])
     .out(emptyOutput)
+    .errorOut(stringBody)
+
+val askEndpoint: PublicEndpoint[List[Message], String, String, Any] =
+  endpoint
+    .name("Ask to LLM")
+    .description("Ask something based on knowledge base")
+    .post
+    .in("ask")
+    .in(jsonBody[List[Message]])
+    .out(stringBody)
     .errorOut(stringBody)

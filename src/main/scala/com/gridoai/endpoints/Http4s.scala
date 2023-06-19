@@ -1,15 +1,15 @@
-package com.programandonocosmos.endpoints
+package com.gridoai.endpoints
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.implicits.catsSyntaxApplicativeId
 import cats.implicits.toSemigroupKOps
-import com.programandonocosmos.adapters.Neo4jAsync
-import com.programandonocosmos.adapters.contextHandler.*
-import com.programandonocosmos.domain.Document
-import com.programandonocosmos.models.DocDB
-import com.programandonocosmos.models.Neo4j
-import com.programandonocosmos.services.doc.*
+import com.gridoai.adapters.Neo4jAsync
+import com.gridoai.adapters.contextHandler.*
+import com.gridoai.domain.Document
+import com.gridoai.models.DocDB
+import com.gridoai.models.Neo4j
+import com.gridoai.services.doc.*
 import io.circe.DecodingFailure
 import org.http4s.HttpApp
 import org.http4s.HttpRoutes
@@ -23,25 +23,30 @@ import java.util.UUID
 import util.chaining.scalaUtilChainingOps
 import concurrent.ExecutionContext.Implicits.global
 
-def searchEndpointGet(implicit db: DocDB[IO]): HttpRoutes[IO] =
+def searchRoute(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(
     searchEndpoint.serverLogic(searchDoc _)
   )
 
-def healthCheckEndpointGet: HttpRoutes[IO] =
+def healthCheckRoute: HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(
     healthCheckEndpoint.serverLogic(_ => IO.pure(Right("OK")))
   )
 
-def createEndpoint(implicit db: DocDB[IO]): HttpRoutes[IO] =
+def createRoute(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(
     createDocumentEndpoint.serverLogic(createDoc _)
   )
 
-def endpoints(implicit db: DocDB[IO]): HttpRoutes[IO] =
-  searchEndpointGet <+> healthCheckEndpointGet <+> createEndpoint <+> fileUploadEndpoint
+def askRoute(implicit db: DocDB[IO]): HttpRoutes[IO] =
+  Http4sServerInterpreter[IO]().toRoutes(
+    askEndpoint.serverLogic(ask _)
+  )
 
-def HttpApp(implicit db: DocDB[IO]): HttpApp[IO] =
+def routes(implicit db: DocDB[IO]): HttpRoutes[IO] =
+  searchRoute <+> healthCheckRoute <+> createRoute <+> askRoute <+> fileUploadRoute
+
+def httpApp(implicit db: DocDB[IO]): HttpApp[IO] =
   Router(
-    "/" -> CORS.policy.withAllowOriginAll(endpoints)
+    "/" -> CORS.policy.withAllowOriginAll(routes)
   ).orNotFound
