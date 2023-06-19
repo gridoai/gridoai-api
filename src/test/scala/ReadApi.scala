@@ -1,18 +1,20 @@
 import cats.effect.IO
 import cats.effect.SyncIO
+import com.gridoai.domain.*
 import com.gridoai.endpoints.*
 import com.gridoai.models.DocDB
 import com.gridoai.models.MockDocDB
 import com.gridoai.utils.|>
-import com.gridoai.domain.*
 import fs2.Stream
 import fs2.text.utf8Decode
+import io.circe.generic.auto.*
 import munit.CatsEffectSuite
+import org.http4s.EntityBody
+import org.http4s.EntityEncoder
 import org.http4s.Method
 import org.http4s.Request
-import org.http4s.EntityBody
-import org.http4s.implicits.uri
 import org.http4s.circe.*
+import org.http4s.implicits.uri
 
 def streamToString(stream: Stream[IO, Byte]): IO[String] = {
   stream.through(utf8Decode).compile.toList.map(_.mkString)
@@ -51,6 +53,9 @@ class ExampleSuite extends CatsEffectSuite {
   }
 
   test("Ask LLM") {
+    given listMessageEncoder: EntityEncoder[IO, List[Message]] =
+      jsonEncoderOf[IO, List[Message]]
+
     routes.orNotFound
       .run(
         Request[IO](
