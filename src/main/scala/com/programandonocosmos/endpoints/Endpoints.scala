@@ -3,14 +3,35 @@ import cats.effect.IO
 import com.programandonocosmos.domain.*
 import com.programandonocosmos.models.DocDB
 import io.circe.generic.auto._
+import sttp.model.Part
 import sttp.tapir._
 import sttp.tapir.generic.auto._
 import sttp.tapir.json.circe._
 
+import java.io.File
 import java.util.UUID
+
 type PublicEndpoint[I, E, O, -R] = Endpoint[Unit, I, E, O, R]
 
-val searchEndpoint: PublicEndpoint[String, String, List[Document], Any] =
+case class FileUpload(files: List[Part[File]])
+enum FileFormats:
+  case PDF, PPTX, DOCX
+
+enum FileUploadError:
+  case FileParseError(format: FileFormats, m: String)
+  case DocumentCreationError(m: String)
+  case UnknownError(m: String)
+
+val fileUploadEndpoint: PublicEndpoint[FileUpload, String, List[
+  Either[FileUploadError, Unit]
+], Any] =
+  endpoint.post
+    .in("upload")
+    .in(multipartBody[FileUpload])
+    .errorOut(stringBody)
+    .out(jsonBody[List[Either[FileUploadError, Unit]]])
+
+val searchEndpoint =
   endpoint
     .name("Search")
     .description("Search for documents in the knowledge base")
@@ -36,3 +57,11 @@ val createDocumentEndpoint
     .in(jsonBody[DocCreationPayload])
     .out(emptyOutput)
     .errorOut(stringBody)
+
+val getSchema =
+  import sttp.apispec.openapi.OpenAPI
+  import sttp.tapir._
+  import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
+  import sttp.apispec.openapi.circe.yaml._
+
+  OpenAPIDocsInterpreter().toOpenAPI(searchEndpoint, "GridoAI", "1.0").toYaml

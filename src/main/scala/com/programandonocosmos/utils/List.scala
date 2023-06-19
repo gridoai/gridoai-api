@@ -1,14 +1,15 @@
 package com.programandonocosmos.utils
+import com.programandonocosmos.adapters.contextHandler.DocResponseItem
 
 def keepTotalWordsUnderN(
-    list: List[(String, Float)],
+    list: List[DocResponseItem],
     N: Int
-): List[(String, Float)] =
+): List[DocResponseItem] =
   list
-    .foldLeft((0, List.empty[(String, Float)])) {
-      case ((accTotal, accList), (word, score)) =>
-        val newTotal = accTotal + word.length
-        if (newTotal <= N) (newTotal, (word, score) :: accList)
+    .foldLeft((0, List.empty[DocResponseItem])) {
+      case ((accTotal, accList), item) =>
+        val newTotal = accTotal + item.content.length
+        if (newTotal <= N) (newTotal, item :: accList)
         else (accTotal, accList)
     }
     ._2

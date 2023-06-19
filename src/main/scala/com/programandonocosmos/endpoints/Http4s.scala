@@ -23,6 +23,29 @@ import java.util.UUID
 import util.chaining.scalaUtilChainingOps
 import concurrent.ExecutionContext.Implicits.global
 
+val aiPluginService =
+  import cats.effect._
+  import org.http4s._
+  import org.http4s.dsl.io._
+  import org.http4s.implicits._
+  import org.http4s.server.staticcontent.resourceServiceBuilder
+  import concurrent.ExecutionContext.Implicits.global
+
+  HttpRoutes.of[IO] {
+    case request @ GET -> Root / ".well-known" / "ai-plugin.json" =>
+      StaticFile
+        .fromResource(
+          "./assets/ai-plugin.json",
+          Some(request)
+        )
+        .getOrElseF(NotFound())
+    case request @ GET -> Root / "openapi.yaml" =>
+      println("a")
+      StaticFile
+        .fromResource("./assets/openapi.yaml", Some(request))
+        .getOrElseF(NotFound())
+  }
+
 def searchEndpointGet(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(
     searchEndpoint.serverLogic(searchDoc _)
@@ -38,8 +61,16 @@ def createEndpoint(implicit db: DocDB[IO]): HttpRoutes[IO] =
     createDocumentEndpoint.serverLogic(createDoc _)
   )
 
+def uploadFileEndpoint(implicit db: DocDB[IO]): HttpRoutes[IO] =
+  Http4sServerInterpreter[IO]().toRoutes(
+    fileUploadEndpoint.serverLogic(files =>
+      println(files)
+      uploadDocuments(files).map(Right(_))
+    )
+  )
+
 def endpoints(implicit db: DocDB[IO]): HttpRoutes[IO] =
-  searchEndpointGet <+> healthCheckEndpointGet <+> createEndpoint <+> fileUploadEndpoint
+  searchEndpointGet <+> healthCheckEndpointGet <+> createEndpoint <+> uploadFileEndpoint
 
 def HttpApp(implicit db: DocDB[IO]): HttpApp[IO] =
   Router(
