@@ -53,11 +53,14 @@ def extractText(
   val body = Files.readAllBytes(file.body.toPath)
   val name = file.fileName
   println("file name: " + name)
+  println("file content type: " + file.contentType)
   file.contentType match
     case Some("application/pdf") =>
       parsePdf(body).attempt
         .map(_.left.map(t => FileParseError(FileFormats.PDF, t.getMessage)))
-    case Some("doc") =>
+    case Some(
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ) =>
       parseDocx(body).toEither.left
         .map(e => FileParseError(FileFormats.DOCX, e.getMessage))
         .pure[IO]
@@ -67,7 +70,10 @@ def extractText(
       parsePptx(body).toEither.left
         .map(e => FileParseError(FileFormats.PPTX, e.getMessage))
         .pure[IO]
-    case _ => IO.pure(Left(UnknownError("Unknown file format")))
+    case Some("text/plain") => IO.pure(Right(String(body)))
+    case Some(otherFormat) =>
+      IO.pure(Left(UnknownError(s"Unknown file format ${otherFormat}")))
+    case None => IO.pure(Left(UnknownError("Unknown file format")))
 
 def uploadDocuments(
     source: FileUpload
@@ -87,6 +93,8 @@ def uploadDocuments(
 
         case (_, Left(e: FileUploadError)) =>
           IO.pure(Left(e))
+        case (None, _) =>
+          IO.pure(Left(UnknownError("File extension not known")))
 
 def createDoc(
     docInput: DocCreationPayload
