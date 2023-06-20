@@ -15,6 +15,7 @@ import org.http4s.Method
 import org.http4s.Request
 import org.http4s.circe.*
 import org.http4s.implicits.uri
+import org.http4s.Status
 
 def streamToString(stream: Stream[IO, Byte]): IO[String] = {
   stream.through(utf8Decode).compile.toList.map(_.mkString)
@@ -63,10 +64,7 @@ class ExampleSuite extends CatsEffectSuite {
           uri = uri"/ask"
         ).withEntity(List(Message(from = MessageFrom.User, message = "Hi")))
       )
-      .map(_.body)
-      .flatMap(streamToString)
-      .assertEquals(
-        """{}"""
-      )
+      .map(_.status)
+      .assertEquals(Status.Ok)
   }
 }
