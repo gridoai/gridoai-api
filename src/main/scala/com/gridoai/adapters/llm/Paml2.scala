@@ -8,7 +8,7 @@ import io.circe.syntax.*
 import scala.concurrent.{Future, ExecutionContext}
 import scala.util.{Success, Failure}
 import java.time.Instant
-import com.google.auth.oauth2.{GoogleCredentials, AccessToken}
+import com.google.auth.oauth2.GoogleCredentials
 import cats.effect.IO
 import com.gridoai.adapters.*
 import com.gridoai.domain.*
@@ -16,8 +16,6 @@ import com.gridoai.domain.*
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
 val modelId = "chat-bison@001"
-val token =
-  GoogleCredentials.getApplicationDefault().getAccessToken().getTokenValue()
 
 case class PalmMessage(`type`: String, message: String)
 case class Data(instances: List[Instance], parameters: Parameters)
@@ -39,9 +37,12 @@ case class Palm2Response(predictions: List[Predictions])
 
 object Paml2Client extends LLM[IO]:
   val Http = HttpClient(apiEndpoint)
+  var credentials = GoogleCredentials.getApplicationDefault()
 
   def getAccessToken() =
-    GoogleCredentials.getApplicationDefault().getAccessToken().getTokenValue()
+    credentials.refreshIfExpired()
+    var token = credentials.getAccessToken()
+    token.getTokenValue()
 
   def call(data: Data): IO[Either[String, Palm2Response]] =
     val token = getAccessToken()
