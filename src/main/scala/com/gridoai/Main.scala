@@ -12,7 +12,7 @@ import com.gridoai.domain.Document
 import com.gridoai.domain.Mentions
 import com.gridoai.endpoints.*
 import com.gridoai.models.DocDB
-import com.gridoai.models.Neo4j
+import com.gridoai.models.MockDocDB
 import de.killaitis.http4s.*
 import io.circe.*
 import io.circe.generic.auto.*
@@ -30,7 +30,7 @@ class ScalaHttpFunction extends HttpFunction {
   def service(request: HttpRequest, response: HttpResponse) =
     Neo4jAsync.resourceWithCredentials
       .use { runner =>
-        given docDb: DocDB[IO] = Neo4j(runner)
+        given docDb: DocDB[IO] = MockDocDB
         IO.pure(Http4sCloudFunction(httpApp).service(request, response))
       }
       .unsafeRunSync()
@@ -40,7 +40,8 @@ object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
     Neo4jAsync.resourceWithCredentials.use { runner =>
 
-      given docDb: DocDB[IO] = Neo4j(runner)
+      given docDb: DocDB[IO] = MockDocDB
+
       EmberServerBuilder
         .default[IO]
         .withHost(ipv4"0.0.0.0")
