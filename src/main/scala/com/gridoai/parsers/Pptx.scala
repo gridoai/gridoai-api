@@ -1,6 +1,6 @@
-package com.programandonocosmos.adapters
+package com.gridoai.adapters
 
-import com.programandonocosmos.utils.trace
+import com.gridoai.utils.trace
 import org.apache.poi.xslf.usermodel.XMLSlideShow
 import org.apache.poi.xslf.usermodel.XSLFSlide
 import org.apache.poi.xslf.usermodel.XSLFTextShape

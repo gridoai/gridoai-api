@@ -1,5 +1,5 @@
-import com.programandonocosmos.domain.*
-import com.programandonocosmos.models.Queries
+import com.gridoai.domain.*
+import com.gridoai.models.Queries
 
 import java.util.UUID
 // For more information on writing tests, see

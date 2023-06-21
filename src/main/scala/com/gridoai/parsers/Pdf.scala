@@ -1,10 +1,10 @@
-package com.programandonocosmos.adapters
+package com.gridoai.adapters
 
 import cats.effect.IO
 import cats.effect.Sync
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.text.PDFTextStripper
-import com.programandonocosmos.utils.trace
+import com.gridoai.utils.trace
 trait PdfParser[F[_]]:
   def load(bytes: Array[Byte]): F[PDDocument]
   def getText(doc: PDDocument): F[String]

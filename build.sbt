@@ -8,9 +8,9 @@ val scala3Version = "3.3.0"
 val circeVersion = "0.14.1"
 
 val deploy = Command.command("deploy") { (state: State) =>
-  "assembly" :: state
-  "rm target/scala-3.3.0/api_3-0.1.0-SNAPSHOT.jar".!
-  "gcloud functions deploy api --region=us-west1 --entry-point=com.programandonocosmos.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.3.0/".!
+  "sbt assembly".!
+  "gcloud functions deploy api --region=us-west1 --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.3.0/".!
+  "rm target/scala-3.3.0/*-SNAPSHOT.jar".!
   state
 }
 
@@ -57,11 +57,12 @@ libraryDependencies ++= Seq(
 
 libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-ember-server" % http4sVersion,
+  "org.http4s" %% "http4s-circe" % http4sVersion,
   "org.http4s" %% "http4s-dsl" % http4sVersion
 )
 lazy val app = (project in file("app"))
   .settings(
-    assembly / mainClass := Some("com.programandonocosmos.ScalaHttpFunction")
+    assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")
   )
 
 assemblyMergeStrategy in assembly := {

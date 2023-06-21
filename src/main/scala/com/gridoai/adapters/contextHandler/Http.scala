@@ -1,10 +1,10 @@
-package com.programandonocosmos.adapters.contextHandler
+package com.gridoai.adapters.contextHandler
 import cats.TraverseFilter.ops.toAllTraverseFilterOps
 import cats.effect.IO
 import cats.syntax.all.toFunctorFilterOps
-import com.programandonocosmos.adapters.*
-import com.programandonocosmos.mock.mockedDoc
-import com.programandonocosmos.utils.*
+import com.gridoai.adapters.*
+import com.gridoai.mock.mockedDoc
+import com.gridoai.utils.*
 import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.generic.semiauto.*

@@ -1,5 +1,5 @@
-package com.programandonocosmos.utils
-import com.programandonocosmos.adapters.contextHandler.DocResponseItem
+package com.gridoai.utils
+import com.gridoai.adapters.contextHandler.DocResponseItem
 
 def keepTotalWordsUnderN(
     list: List[DocResponseItem],

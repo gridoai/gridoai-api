@@ -1,17 +1,19 @@
-package com.programandonocosmos.services.doc
+package com.gridoai.services.doc
 
 import cats.data.EitherT
 import cats.effect.IO
 import cats.implicits._
 import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.parallel.*
-import com.programandonocosmos.adapters.PdfBoxParser
-import com.programandonocosmos.adapters.contextHandler.DocumentApiClient
-import com.programandonocosmos.adapters.contextHandler.MessageResponse
-import com.programandonocosmos.domain._
-import com.programandonocosmos.endpoints.FileUpload
-import com.programandonocosmos.models.DocDB
-import com.programandonocosmos.utils.trace
+import com.gridoai.adapters.PdfBoxParser
+import com.gridoai.adapters.contextHandler.DocumentApiClient
+import com.gridoai.adapters.contextHandler.MessageResponse
+import com.gridoai.adapters.llm.*
+import com.gridoai.domain._
+import com.gridoai.domain.*
+import com.gridoai.endpoints.FileUpload
+import com.gridoai.models.DocDB
+import com.gridoai.utils.trace
 
 import java.util.UUID
 
@@ -42,14 +44,16 @@ def searchDoc(x: String)(using
           ))
       )
   }
-import com.programandonocosmos.endpoints._
+import com.gridoai.endpoints._
 
 import FileUploadError._
 import java.nio.file.Files
+import com.gridoai.adapters.parseDocx
+import com.gridoai.adapters.parsePptx
 def extractText(
     file: sttp.model.Part[java.io.File]
 ): IO[Either[FileUploadError, String]] =
-  import com.programandonocosmos.adapters.*
+  import com.gridoai.adapters.*
   val body = Files.readAllBytes(file.body.toPath)
   val name = file.fileName
   println("file name: " + name)
@@ -98,7 +102,7 @@ def uploadDocuments(
 
 def createDoc(
     docInput: DocCreationPayload
-)(implicit db: DocDB[IO]): IO[Either[String, Unit]] = {
+)(implicit db: DocDB[IO]): IO[Either[String, Unit]] =
   println("Creating doc... ")
   val document = Document(
     UUID.randomUUID(),
@@ -118,4 +122,16 @@ def createDoc(
     case (Right(()), Right(_)) => Right(())
     case (_, Left(e))          => Left(e.toString)
   }
-}
+
+def ask(messages: List[Message])(implicit
+    db: DocDB[IO]
+): IO[Either[String, String]] =
+  val prompt = messages.head.message
+  val llm = getLLM("palm2")
+  messages.last.from match
+    case MessageFrom.Bot =>
+      IO.pure(Left("Last message should be from the user"))
+    case MessageFrom.User =>
+      searchDoc(prompt).flatMap:
+        case Right(r) => llm.ask(r, messages)
+        case Left(l)  => IO.pure(Left(l))

@@ -12,7 +12,7 @@ To restart the server every time a change is detected, run `~reStart`
 - Set up google cloud credentials
 - Run `sbt deploy`
 
-# Testing
+## Testing
 - Set ENV=TEST
 - Run `sbt test`
 

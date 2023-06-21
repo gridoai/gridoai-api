@@ -1,7 +1,7 @@
-package com.programandonocosmos.adapters
+package com.gridoai.adapters
 
-import com.programandonocosmos.utils.trace
-import com.programandonocosmos.utils.|>
+import com.gridoai.utils.trace
+import com.gridoai.utils.|>
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import sttp.model.Part

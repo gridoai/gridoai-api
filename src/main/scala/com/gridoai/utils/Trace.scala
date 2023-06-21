@@ -1,4 +1,4 @@
-package com.programandonocosmos.utils
+package com.gridoai.utils
 
 import cats.effect.IO
 
