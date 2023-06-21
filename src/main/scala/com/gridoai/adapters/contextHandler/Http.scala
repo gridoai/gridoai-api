@@ -23,13 +23,19 @@ val contextHandlerEndpoint = sys.env.getOrElse(
 
 case class MessageResponse[T](message: T)
 
-type DocResponseItem = (String, Float)
+case class DocResponseItem(
+    uid: String,
+    distance: Float,
+    content: String,
+    path: Option[String] = None
+)
 type DocResponse = List[DocResponseItem]
-case class NewDocBody(uid: String, text: String)
+case class NewDocBody(uid: String, content: String, path: String)
 trait DocumentApiClient:
   def write(
       uid: String,
-      text: String
+      content: String,
+      path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]]
 
   def delete(uid: String): IO[StatusCode]
@@ -43,11 +49,12 @@ object DocumentApiClientHttp extends DocumentApiClient:
 
   def write(
       uid: String,
-      text: String
+      content: String,
+      path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]] =
     Http
       .post("/write")
-      .body(NewDocBody(uid, text).asJson.toString)
+      .body(NewDocBody(uid, content, path).asJson.toString)
       .contentType("application/json")
       .sendReq()
       .map(_.body.flatMap(decode[MessageResponse[List[Float]]]))
@@ -62,11 +69,11 @@ object DocumentApiClientHttp extends DocumentApiClient:
     Http
       .get(f"/neardocs?text=$text")
       .sendReq()
-      .map(_.body.trace.flatMap(decode[MessageResponse[DocResponse]]))
+      .map(_.body.flatMap(decode[MessageResponse[DocResponse]]))
       .map(
         _.map(res =>
           val docsWithoutUnrelated = res.message.filter(x => x._2 < 1.9f)
-          println("Found near docs: " + docsWithoutUnrelated)
+          println("Found near docs: " + docsWithoutUnrelated.map(_.path))
           keepTotalWordsUnderN(
             docsWithoutUnrelated,
             10_000
@@ -79,12 +86,20 @@ object MockDocumentApiClient extends DocumentApiClient:
     List(1.0f, 2.0f, 3.0f)
   )
   val mockDocResponse: MessageResponse[DocResponse] = MessageResponse(
-    List((mockedDoc.uid.toString, 0.5f), (mockedDoc.uid.toString, 0.3f))
+    List(
+      DocResponseItem(
+        mockedDoc.uid.toString,
+        0.5f,
+        "The sky is blue",
+        Some("Sky observations")
+      )
+    )
   )
 
   override def write(
       uid: String,
-      text: String
+      content: String,
+      path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]] =
     IO.pure(Right(mockResponse))
 
