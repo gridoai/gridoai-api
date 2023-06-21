@@ -17,6 +17,8 @@ import org.http4s.server.Router
 import org.http4s.server.middleware.CORS
 import sttp.tapir._
 import sttp.tapir.server.http4s.Http4sServerInterpreter
+import org.http4s.server.middleware.ErrorAction
+import org.http4s.server.middleware.ErrorHandling
 
 import java.util.UUID
 
@@ -47,6 +49,16 @@ def routes(implicit db: DocDB[IO]): HttpRoutes[IO] =
   searchRoute <+> healthCheckRoute <+> createRoute <+> askRoute <+> fileUploadRoute
 
 def httpApp(implicit db: DocDB[IO]): HttpApp[IO] =
-  Router(
-    "/" -> CORS.policy.withAllowOriginAll(routes)
-  ).orNotFound
+  ErrorHandling.Recover.total(
+    ErrorAction.log(
+      Router(
+        "/" -> CORS.policy.withAllowOriginAll(routes)
+      ).orNotFound,
+      messageFailureLogAction = (t, msg) =>
+        IO.println(msg) >>
+          IO.println(t),
+      serviceErrorLogAction = (t, msg) =>
+        IO.println(msg) >>
+          IO.println(t)
+    )
+  )
