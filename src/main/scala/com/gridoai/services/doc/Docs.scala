@@ -7,6 +7,7 @@ import com.gridoai.adapters.contextHandler.MessageResponse
 import com.gridoai.adapters.llm.*
 import com.gridoai.domain.*
 import com.gridoai.models.DocDB
+import com.gridoai.utils.*
 
 import java.util.UUID
 
@@ -18,9 +19,19 @@ def searchDoc(
   println("Searching for: " + x)
   DocumentApiClient.neardocs(x).flatMap {
     case Right(response) =>
-      val ids = response.message.map(_._1.pipe(UUID.fromString))
-      println(f"Searching ids: $ids")
-      db.getDocumentsByIds(ids).attempt.map(_.left.map(_.toString))
+      IO.pure(
+        Right(
+          response.message.map(doc =>
+            Document(
+              uid = UUID.fromString(doc.uid),
+              name = doc.path.getOrElse(""),
+              url = "",
+              content = doc.content,
+              numberOfWords = 0
+            )
+          )
+        )
+      )
     case Left(df: io.circe.Error) =>
       IO.pure(Left("Parsing error: " + df.getMessage))
     case Left(other) => IO.pure(Left(other.toString))
@@ -38,12 +49,15 @@ def createDoc(
     docInput.content.split(" ").length
   )
   (
-    db.addDocument(document).attempt,
-    DocumentApiClient.write(document.uid.toString, document.content)
+    IO.pure(Right(())),
+    DocumentApiClient.write(
+      document.uid.toString,
+      document.content,
+      document.name
+    )
   ).parTupled.map:
     case (Right(()), Right(_)) => Right(())
     case (_, Left(e))          => Left(e.toString)
-    case (Left(e), Right(_))   => Left(e.toString)
 
 def ask(messages: List[Message])(implicit
     db: DocDB[IO]
@@ -55,5 +69,6 @@ def ask(messages: List[Message])(implicit
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
       searchDoc(prompt).flatMap:
-        case Right(r) => llm.ask(r, messages)
-        case Left(l)  => IO.pure(Left(l))
+        case Right(r) =>
+          llm.ask(r, messages) |> attempt
+        case Left(l) => IO.pure(Left(l))
