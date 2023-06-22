@@ -64,7 +64,11 @@ lazy val app = (project in file("app"))
   .settings(
     assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")
   )
-
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-Wvalue-discard",
+  "-Wunused:all"
+)
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", "io.netty.versions.properties") =>
     MergeStrategy.discard
