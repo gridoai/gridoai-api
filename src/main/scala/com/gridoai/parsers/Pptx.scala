@@ -11,7 +11,7 @@ import java.io.File
 import java.io.FileInputStream
 import scala.util.Try
 
-import collection.JavaConverters.asScalaBufferConverter
+import scala.jdk.CollectionConverters.*
 
 def parsePptx(content: Array[Byte]): Try[String] = Try:
   println("Parsing pptx")
