@@ -70,7 +70,7 @@ object DocumentApiClientHttp extends DocumentApiClient:
     Http
       .get(f"/neardocs?text=$text")
       .sendReq()
-      .map(_.body.trace.flatMap(decode[MessageResponse[DocResponse]]))
+      .map(_.body.flatMap(decode[MessageResponse[DocResponse]]))
       .map(
         _.map(res =>
           val docsWithoutUnrelated = res.message.filter(x => x._2 < 1.9f)
