@@ -6,16 +6,14 @@ import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.text.PDFTextStripper
 
 import java.io.File
-class pdf extends CatsEffectSuite {
-  test("HelloWorld") {
-    val c = java.util.Calendar.getInstance()
-    val now = c.getTime()
-    val stripper = new PDFTextStripper()
-    val t = stripper.getText(
-      PDDocument.load(new File("/Users/davi/Downloads/grokking_algorithms.pdf"))
-    );
-    val end = java.util.Calendar.getInstance().getTime()
+import java.nio.file.Files
+import java.nio.file.Paths
+class PdfParserTest extends CatsEffectSuite {
+  test("Pdf parse") {
+    val t = Files.readAllBytes(Paths.get("./src/test/resources/test.pdf"))
+    val expected =
+      Files.readString(Paths.get("./src/test/resources/expected_pdf.txt"))
+    parsePdf(t).assertEquals(expected)
 
-    println("Time taken: " + (end.getTime() - now.getTime()))
   }
 }
