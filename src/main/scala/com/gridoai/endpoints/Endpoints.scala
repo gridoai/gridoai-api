@@ -31,7 +31,7 @@ val fileUploadEndpoint: PublicEndpoint[FileUpload, String, List[
     .errorOut(stringBody)
     .out(jsonBody[List[Either[FileUploadError, Unit]]])
 
-val searchEndpoint =
+val searchEndpoint: PublicEndpoint[String, String, List[Document], Any] =
   endpoint
     .name("Search")
     .description("Search for documents in the knowledge base")

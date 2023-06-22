@@ -1,23 +1,26 @@
 package com.gridoai.adapters.llm
-import sttp.client3._
+import cats.effect.IO
+import com.google.auth.oauth2.GoogleCredentials
+import com.gridoai.adapters.*
+import com.gridoai.domain.*
 import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.generic.semiauto.*
 import io.circe.parser.*
 import io.circe.syntax.*
-import scala.concurrent.{Future, ExecutionContext}
-import scala.util.{Success, Failure}
+import sttp.client3._
+
 import java.time.Instant
-import com.google.auth.oauth2.GoogleCredentials
-import cats.effect.IO
-import com.gridoai.adapters.*
-import com.gridoai.domain.*
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
 val modelId = "chat-bison@001"
 
-case class PalmMessage(`type`: String, message: String)
+case class PalmMessage(author: String, content: String)
 case class Data(instances: List[Instance], parameters: Parameters)
 case class Instance(
     context: String,
@@ -54,7 +57,7 @@ object Paml2Client extends LLM[IO]:
 
     Http
       .post(
-        s"v1/projects/$projectId/locations/us-central1/publishers/google/models/$modelId:predict"
+        s"/v1/projects/$projectId/locations/us-central1/publishers/google/models/$modelId:predict"
       )
       .headers(headers)
       .body(data.asJson.toString())
@@ -76,8 +79,8 @@ object Paml2Client extends LLM[IO]:
           examples = List.empty,
           messages = messages.map(message =>
             PalmMessage(
-              `type` = if (message.from == MessageFrom.User) "user" else "bot",
-              message = message.message
+              author = if (message.from == MessageFrom.User) "user" else "bot",
+              content = message.message
             )
           )
         )

@@ -11,14 +11,10 @@ import com.gridoai.adapters.Neo4jAsync
 import com.gridoai.domain.Document
 import com.gridoai.domain.Mentions
 import com.gridoai.endpoints.*
+import com.gridoai.endpoints.*
 import com.gridoai.endpoints.getSchema
 import com.gridoai.models.DocDB
-import com.gridoai.models.Neo4j
-import com.gridoai.adapters.Neo4jAsync
-import com.gridoai.domain.Document
-import com.gridoai.domain.Mentions
-import com.gridoai.endpoints.*
-import com.gridoai.models.DocDB
+import com.gridoai.models.MockDocDB
 import com.gridoai.models.Neo4j
 import de.killaitis.http4s.*
 import io.circe.*
@@ -35,12 +31,10 @@ import scala.util.Try
 
 class ScalaHttpFunction extends HttpFunction {
   def service(request: HttpRequest, response: HttpResponse) =
-    Neo4jAsync.resourceWithCredentials
-      .use { runner =>
-        given docDb: DocDB[IO] = Neo4j(runner)
-        IO.pure(Http4sCloudFunction(httpApp).service(request, response))
-      }
-      .unsafeRunSync()
+
+    given docDb: DocDB[IO] = MockDocDB
+    (Http4sCloudFunction(httpApp).service(request, response))
+
 }
 
 object Main extends IOApp {
@@ -52,16 +46,16 @@ object Main extends IOApp {
       bw.close()
       IO.pure(ExitCode.Success)
     else
-      Neo4jAsync.resourceWithCredentials.use { runner =>
-        given docDb: DocDB[IO] = Neo4j(runner)
-        EmberServerBuilder
-          .default[IO]
-          .withHost(ipv4"0.0.0.0")
-          .withPort(port"8080")
-          .withHttpApp(httpApp)
-          .build
-          .use(_ => IO.never)
-          .as(ExitCode.Success)
 
-      }
+      given docDb: DocDB[IO] = MockDocDB
+
+      EmberServerBuilder
+        .default[IO]
+        .withHost(ipv4"0.0.0.0")
+        .withPort(port"8080")
+        .withHttpApp(httpApp)
+        .build
+        .use(_ => IO.never)
+        .as(ExitCode.Success)
+
 }

@@ -5,14 +5,18 @@ import cats.effect.IO
 import cats.implicits._
 import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.parallel.*
+import cats.syntax.parallel.*
 import com.gridoai.adapters.PdfBoxParser
 import com.gridoai.adapters.contextHandler.DocumentApiClient
 import com.gridoai.adapters.contextHandler.MessageResponse
 import com.gridoai.adapters.llm.*
+import com.gridoai.adapters.llm.*
 import com.gridoai.domain._
+import com.gridoai.domain.*
 import com.gridoai.domain.*
 import com.gridoai.endpoints.FileUpload
 import com.gridoai.models.DocDB
+import com.gridoai.utils.*
 import com.gridoai.utils.trace
 
 import java.util.UUID
@@ -118,10 +122,9 @@ def createDoc(
       document.content,
       document.name
     )
-  ).parTupled.map {
+  ).parTupled.map:
     case (Right(()), Right(_)) => Right(())
     case (_, Left(e))          => Left(e.toString)
-  }
 
 def ask(messages: List[Message])(implicit
     db: DocDB[IO]
@@ -133,5 +136,6 @@ def ask(messages: List[Message])(implicit
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
       searchDoc(prompt).flatMap:
-        case Right(r) => llm.ask(r, messages)
-        case Left(l)  => IO.pure(Left(l))
+        case Right(r) =>
+          llm.ask(r, messages) |> attempt
+        case Left(l) => IO.pure(Left(l))

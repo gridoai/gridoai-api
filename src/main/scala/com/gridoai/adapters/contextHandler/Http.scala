@@ -29,13 +29,12 @@ case class DocResponseItem(
     content: String,
     path: Option[String] = None
 )
-
 type DocResponse = List[DocResponseItem]
 case class NewDocBody(uid: String, content: String, path: String)
 trait DocumentApiClient:
   def write(
       uid: String,
-      text: String,
+      content: String,
       path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]]
 
@@ -50,12 +49,12 @@ object DocumentApiClientHttp extends DocumentApiClient:
 
   def write(
       uid: String,
-      text: String,
+      content: String,
       path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]] =
     Http
       .post("/write")
-      .body(NewDocBody(uid, text, path).asJson.toString)
+      .body(NewDocBody(uid, content, path).asJson.toString)
       .contentType("application/json")
       .sendReq()
       .map(_.body.flatMap(decode[MessageResponse[List[Float]]]))
@@ -74,7 +73,7 @@ object DocumentApiClientHttp extends DocumentApiClient:
       .map(
         _.map(res =>
           val docsWithoutUnrelated = res.message.filter(x => x._2 < 1.9f)
-          println("Found near docs: " + docsWithoutUnrelated)
+          println("Found near docs: " + docsWithoutUnrelated.map(_.path))
           keepTotalWordsUnderN(
             docsWithoutUnrelated,
             10_000
@@ -88,14 +87,18 @@ object MockDocumentApiClient extends DocumentApiClient:
   )
   val mockDocResponse: MessageResponse[DocResponse] = MessageResponse(
     List(
-      DocResponseItem(mockedDoc.uid.toString, 0.5f, ""),
-      DocResponseItem(mockedDoc.uid.toString, 0.3f, "")
+      DocResponseItem(
+        mockedDoc.uid.toString,
+        0.5f,
+        "The sky is blue",
+        Some("Sky observations")
+      )
     )
   )
 
   override def write(
       uid: String,
-      text: String,
+      content: String,
       path: String
   ): IO[Either[String | io.circe.Error, MessageResponse[List[Float]]]] =
     IO.pure(Right(mockResponse))

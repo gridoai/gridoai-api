@@ -9,9 +9,8 @@ import sttp.model.Part
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
-import scala.util.Try
-
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 def parsePptx(content: Array[Byte]): Try[String] = Try:
   println("Parsing pptx")

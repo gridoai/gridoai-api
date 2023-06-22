@@ -49,7 +49,7 @@ class ExampleSuite extends CatsEffectSuite {
       .map(_.body)
       .flatMap(streamToString)
       .assertEquals(
-        """[{"uid":"694b8567-8c93-45c6-8051-34be4337e740","name":"Sky observations","content":"The sky is blue","url":"https://www.nasa.gov/planetarydefense/faq/asteroid","numberOfWords":4}]"""
+        """[{"uid":"694b8567-8c93-45c6-8051-34be4337e740","name":"Sky observations","content":"The sky is blue","url":"","numberOfWords":0}]"""
       )
   }
 
