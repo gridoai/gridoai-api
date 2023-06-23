@@ -5,19 +5,24 @@ import io.circe.generic.auto._
 import java.util.UUID
 
 type UID = UUID
+type Embedding = List[Double]
 
 case class Document(
     uid: UID,
     name: String,
+    source: String,
     content: String,
-    url: String,
-    numberOfWords: Int
+    tokenQuantity: Int
 )
 
-case class Mentions(
-    relationshipId: Long,
-    from: UID,
-    to: UID
+case class DocumentWithEmbedding(
+    document: Document,
+    embedding: Embedding
+)
+
+case class SimilarDocument(
+    document: Document,
+    similarity: Double
 )
 
 case class DocCreationPayload(
