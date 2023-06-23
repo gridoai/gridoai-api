@@ -3,16 +3,12 @@ package com.gridoai.services.doc
 import cats.effect.IO
 import cats.implicits._
 import cats.implicits.catsSyntaxApplicativeId
-import cats.syntax.parallel.*
-import com.gridoai.adapters.contextHandler.DocumentApiClient
-import com.gridoai.adapters.contextHandler.MessageResponse
 import com.gridoai.adapters.llm.*
-
+import com.gridoai.adapters.embeddingApi.*
 import com.gridoai.domain.*
-import com.gridoai.endpoints.FileUpload
 import com.gridoai.models.DocDB
 import com.gridoai.utils.*
-import com.gridoai.endpoints._
+import com.gridoai.endpoints.*
 import FileUploadError._
 import java.nio.file.Files
 import com.gridoai.adapters.extractTextFromDocx
@@ -22,32 +18,15 @@ import com.gridoai.parsers.{ExtractTextError}
 import com.gridoai.adapters.*
 import com.gridoai.parsers.*
 
-def searchDoc(x: String)(using
+def searchDoc(text: String)(using
     db: DocDB[IO]
 ): IO[Either[String, List[Document]]] =
-  println(s"Searching for: $x")
-  DocumentApiClient.neardocs(x).map { response =>
-    response
-      .fold(
-        error =>
-          (Left(error match
-            case df: io.circe.Error => s"Parsing error: ${df.getMessage}"
-            case other              => other.toString
-          )),
-        response =>
-          (Right(
-            response.message.map(i =>
-              Document(
-                UUID.fromString(i.uid),
-                i.path.getOrElse(""),
-                i.content,
-                "",
-                0
-              )
-            )
-          ))
-      )
-  }
+  println(s"Searching for: $text")
+  getEmbeddingAPI("gridoai-ml")
+    .embed(text)
+    .map(
+      _.map(vec => db.getNearDocuments(vec, 5).map(x => x.map(_.document)))
+    ) |> flattenIOEitherIO
 
 def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
   FileParseError(e.format, e.message)
@@ -98,7 +77,13 @@ def uploadDocuments(
       )
       .flatMap:
         case (Some(filename), Right(content)) =>
-          createDoc(DocCreationPayload(filename, content))
+          createDoc(
+            DocumentCreationPayload(
+              name = filename,
+              source = filename,
+              content = content
+            )
+          )
             .map(_.leftMap(DocumentCreationError.apply))
 
         case (_, Left(e: FileUploadError)) =>
@@ -107,26 +92,16 @@ def uploadDocuments(
           IO.pure(Left(UnknownError("File extension not known")))
 
 def createDoc(
-    docInput: DocCreationPayload
+    payload: DocumentCreationPayload
 )(implicit db: DocDB[IO]): IO[Either[String, Unit]] =
   println("Creating doc... ")
-  val document = Document(
-    UUID.randomUUID(),
-    docInput.name,
-    docInput.content,
-    docInput.url.getOrElse(docInput.name),
-    docInput.content.split(" ").length
-  )
-  (
-    IO.pure(Right(())),
-    DocumentApiClient.write(
-      document.uid.toString,
-      document.content,
-      document.name
-    )
-  ).parTupled.map:
-    case (Right(()), Right(_)) => Right(())
-    case (_, Left(e))          => Left(e.toString)
+  val document =
+    payload.toDocument(UUID.randomUUID(), payload.content.split(" ").length)
+  getEmbeddingAPI("gridoai-ml")
+    .embed(document.content)
+    .map(
+      _.map(vec => db.addDocument(DocumentWithEmbedding(document, vec)))
+    ) |> flattenIOEitherIO
 
 def ask(messages: List[Message])(implicit
     db: DocDB[IO]
