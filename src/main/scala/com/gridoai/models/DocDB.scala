@@ -1,12 +1,14 @@
 package com.gridoai.models
 
-import com.gridoai.domain.Document
-import com.gridoai.domain.Mentions
 import com.gridoai.domain.UID
+import com.gridoai.domain.Embedding
+import com.gridoai.domain.DocumentWithEmbedding
+import com.gridoai.domain.SimilarDocument
 
 trait DocDB[F[_]]:
-  def addDocument(doc: Document): F[Unit]
-  def addMentions(mentions: Mentions): F[Unit]
-  def getDocumentsByIds(ids: List[UID]): F[List[Document]]
-  def getDocumentById(id: UID): F[Document]
-  def getDocumentMentions(id: UID): F[List[Document]]
+  def addDocument(doc: DocumentWithEmbedding): F[Unit]
+  def getNearDocuments(
+      embedding: Embedding,
+      limit: Int
+  ): F[List[SimilarDocument]]
+  def deleteDocument(uid: UID): F[Unit]

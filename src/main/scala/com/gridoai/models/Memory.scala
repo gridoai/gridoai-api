@@ -8,29 +8,38 @@ import java.util.UUID
 import scala.collection.mutable.ListBuffer
 
 object MockDocDB extends DocDB[IO]:
-  private val documents = ListBuffer[Document](
+  private val documents = ListBuffer[DocumentWithEmbedding](
     mockedDoc
   )
-  private val mentions = ListBuffer[Mentions]()
 
-  def addDocument(doc: Document): IO[Unit] = IO.pure {
-    documents += doc
-    println(s"Mock: Adding document $doc")
-  }
+  def addDocument(doc: DocumentWithEmbedding): IO[Unit] =
+    IO.pure {
+      documents += doc
+      println(s"Mock: Adding document $doc")
+    }
 
-  def addMentions(mention: Mentions): IO[Unit] = IO.pure {
-    mentions += mention
-    println(s"Mock: Adding mentions $mention")
-  }
-  def getDocumentsByIds(ids: List[UID]): IO[List[Document]] = IO.pure {
-    documents.toList.filter(doc => ids.contains(doc.uid))
-  }
-  def getDocumentById(id: UID): IO[Document] = IO.pure {
-    documents
-      .find(_.uid == id)
-      .getOrElse(throw new Exception("Document not found"))
-  }
-  def getDocumentMentions(id: UID): IO[List[Document]] = IO.pure {
-    val mentionedIds = mentions.filter(_.from == id).map(_.to).toList
-    documents.filter(doc => mentionedIds.contains(doc.uid)).toList
-  }
+  def getNearDocuments(
+      embedding: Embedding,
+      limit: Int
+  ): IO[List[SimilarDocument]] =
+    IO.pure(
+      documents.toList
+        .take(limit)
+        .map(x =>
+          SimilarDocument(
+            uid = x.uid,
+            name = x.name,
+            source = x.source,
+            content = x.content,
+            tokenQuantity = x.tokenQuantity,
+            embedding = x.embedding,
+            similarity = 1
+          )
+        )
+    )
+
+  def deleteDocument(uid: UID): IO[Unit] =
+    IO.pure {
+      val documentToDelete = documents.filter(_.uid == uid).head
+      documents -= documentToDelete
+    }
