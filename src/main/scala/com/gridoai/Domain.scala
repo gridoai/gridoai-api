@@ -25,11 +25,21 @@ case class SimilarDocument(
     similarity: Double
 )
 
-case class DocCreationPayload(
+case class DocumentCreationPayload(
     name: String,
-    content: String,
-    url: Option[String] = None
-)
+    source: String,
+    content: String
+):
+  def toDocument(
+      uid: UID,
+      tokenQuantity: Int
+  ) = Document(
+    uid = uid,
+    name = this.name,
+    source = this.source,
+    content = this.source,
+    tokenQuantity = tokenQuantity
+  )
 
 enum MessageFrom:
   case Bot, User
