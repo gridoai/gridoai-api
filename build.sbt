@@ -6,6 +6,7 @@ import scala.sys.process._
 val http4sVersion = "0.23.19"
 val scala3Version = "3.3.0"
 val circeVersion = "0.14.1"
+val doobieVersion = "1.0.0-RC1"
 
 val deploy = Command.command("deploy") { (state: State) =>
   "rm target/scala-3.3.0/*.jar".!
@@ -61,6 +62,12 @@ libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-circe" % http4sVersion,
   "org.http4s" %% "http4s-dsl" % http4sVersion
 )
+
+libraryDependencies ++= Seq(
+  "org.tpolecat" %% "doobie-core" % doobieVersion,
+  "org.tpolecat" %% "doobie-postgres" % doobieVersion
+)
+
 lazy val app = (project in file("app"))
   .settings(
     assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")
