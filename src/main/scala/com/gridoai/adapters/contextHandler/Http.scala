@@ -88,7 +88,7 @@ object MockDocumentApiClient extends DocumentApiClient:
   val mockDocResponse: MessageResponse[DocResponse] = MessageResponse(
     List(
       DocResponseItem(
-        mockedDoc.uid.toString,
+        mockedDoc.document.uid.toString,
         0.5f,
         "The sky is blue",
         Some("Sky observations")

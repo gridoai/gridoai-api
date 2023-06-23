@@ -7,6 +7,7 @@ import com.comcast.ip4s.port
 import com.google.cloud.functions.HttpFunction
 import com.google.cloud.functions.HttpRequest
 import com.google.cloud.functions.HttpResponse
+import com.gridoai.models.PostgresClient
 import com.gridoai.endpoints.*
 import com.gridoai.models.DocDB
 import com.gridoai.models.MockDocDB
@@ -17,7 +18,7 @@ import org.http4s.ember.server.EmberServerBuilder
 class ScalaHttpFunction extends HttpFunction {
   def service(request: HttpRequest, response: HttpResponse) =
 
-    given docDb: DocDB[IO] = MockDocDB
+    given docDb: DocDB[IO] = PostgresClient
     (Http4sCloudFunction(httpApp).service(request, response))
 
 }
@@ -29,7 +30,7 @@ object Main extends IOApp {
       IO.pure(ExitCode.Success)
     else
 
-      given docDb: DocDB[IO] = MockDocDB
+      given docDb: DocDB[IO] = PostgresClient
 
       EmberServerBuilder
         .default[IO]
