@@ -4,11 +4,9 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.implicits.catsSyntaxApplicativeId
 import cats.implicits.toSemigroupKOps
-import com.gridoai.adapters.Neo4jAsync
 import com.gridoai.adapters.contextHandler.*
 import com.gridoai.domain.Document
 import com.gridoai.models.DocDB
-import com.gridoai.models.Neo4j
 import com.gridoai.services.doc.*
 import io.circe.DecodingFailure
 import org.http4s.HttpApp
