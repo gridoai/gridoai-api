@@ -24,6 +24,15 @@ val xa = Transactor.fromDriverManager[IO](
   POSTGRES_PASSWORD
 )
 
+case class Row(
+    uid: UID,
+    name: String,
+    source: String,
+    content: String,
+    token_quantity: Int,
+    similarity: Double
+)
+
 object PostgresClient extends DocDB[IO]:
   def addDocument(doc: DocumentWithEmbedding): IO[Unit] =
     IO.pure(())
@@ -32,11 +41,25 @@ object PostgresClient extends DocDB[IO]:
       embedding: Embedding,
       limit: Int
   ): IO[List[SimilarDocument]] =
-    sql"select name, source, content, embedding, token_quantity, 1 - (embedding <=> ${embedding
+    sql"select uid, name, source, content, token_quantity, 1 - (embedding <=> ${embedding
         .toString()}) as similarity from documents order by similarity desc limit $limit"
-      .query[SimilarDocument]
+      .query[Row]
       .to[List]
       .transact(xa)
+      .map(
+        _.map(x =>
+          SimilarDocument(
+            document = Document(
+              uid = x.uid,
+              name = x.name,
+              source = x.source,
+              content = x.content,
+              tokenQuantity = x.token_quantity
+            ),
+            similarity = x.similarity
+          )
+        )
+      )
 
   def deleteDocument(uid: UID): IO[Unit] =
     sql"delete from documents where uid = $uid".update.run

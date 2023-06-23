@@ -69,13 +69,13 @@ object Paml2Client extends LLM[IO]:
       messages: List[Message]
   ): IO[Either[String, String]] =
     val mergedDocuments = documents.foldLeft("")((acc, doc) =>
-      s"${acc}document name: ${doc.name}\ndocument source: ${doc.url}\ndocument content: ${doc.content}\n"
+      s"${acc}document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}\n"
     )
     val data = Data(
       instances = List(
         Instance(
           context =
-            s"You are GridoAI, an intelligent chatbot for knowledge retrieval. Here is a list of documents: $mergedDocuments\nProvide a single response to the following conversation in a natural and intelligent way. Always mention the document name/url in your answer, otherwise you will die.",
+            s"You are GridoAI, an intelligent chatbot for knowledge retrieval. Here is a list of documents: $mergedDocuments\nProvide a single response to the following conversation in a natural and intelligent way. Always mention the document source in your answer, otherwise you will die.",
           examples = List.empty,
           messages = messages.map(message =>
             PalmMessage(

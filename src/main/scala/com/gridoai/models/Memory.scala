@@ -27,12 +27,7 @@ object MockDocDB extends DocDB[IO]:
         .take(limit)
         .map(x =>
           SimilarDocument(
-            uid = x.uid,
-            name = x.name,
-            source = x.source,
-            content = x.content,
-            tokenQuantity = x.tokenQuantity,
-            embedding = x.embedding,
+            document = x.document,
             similarity = 1
           )
         )
@@ -40,6 +35,6 @@ object MockDocDB extends DocDB[IO]:
 
   def deleteDocument(uid: UID): IO[Unit] =
     IO.pure {
-      val documentToDelete = documents.filter(_.uid == uid).head
+      val documentToDelete = documents.filter(_.document.uid == uid).head
       documents -= documentToDelete
     }
