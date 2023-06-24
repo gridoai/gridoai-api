@@ -1,8 +1,5 @@
 package com.gridoai.parsers
 
-import scala.util.Try
-import com.gridoai.endpoints.FileUploadError
-
 enum FileFormats:
   case PDF, PPTX, DOCX
   case Unknown(ext: String = "")

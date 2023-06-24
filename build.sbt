@@ -37,7 +37,8 @@ lazy val root = project
     libraryDependencies += "de.killaitis" %% "http4s-cloud-functions" % "0.4.3",
     libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test",
     libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28",
-    libraryDependencies += "com.google.auth" % "google-auth-library-oauth2-http" % "1.3.0"
+    libraryDependencies += "com.google.auth" % "google-auth-library-oauth2-http" % "1.3.0",
+    javaOptions += "-Xmax-inlines64"
   )
   .enablePlugins(GraalVMNativeImagePlugin)
 
@@ -67,7 +68,8 @@ lazy val app = (project in file("app"))
 scalacOptions ++= Seq(
   "-deprecation",
   "-Wvalue-discard",
-  "-Wunused:all"
+  "-Wunused:all",
+  "-Xmax-inlines:33"
 )
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", "io.netty.versions.properties") =>
