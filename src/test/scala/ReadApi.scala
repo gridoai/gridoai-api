@@ -1,15 +1,13 @@
 import cats.effect.IO
-import cats.effect.SyncIO
 import com.gridoai.domain.*
 import com.gridoai.endpoints.*
 import com.gridoai.models.DocDB
 import com.gridoai.models.MockDocDB
-import com.gridoai.utils.|>
 import fs2.Stream
 import fs2.text.utf8Decode
 import io.circe.generic.auto.*
 import munit.CatsEffectSuite
-import org.http4s.EntityBody
+
 import org.http4s.EntityEncoder
 import org.http4s.Method
 import org.http4s.Request

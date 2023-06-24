@@ -1,27 +1,27 @@
 package com.gridoai.services.doc
 
-import cats.data.EitherT
 import cats.effect.IO
 import cats.implicits._
 import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.parallel.*
-import cats.syntax.parallel.*
-import com.gridoai.adapters.PdfBoxParser
 import com.gridoai.adapters.contextHandler.DocumentApiClient
 import com.gridoai.adapters.contextHandler.MessageResponse
 import com.gridoai.adapters.llm.*
-import com.gridoai.adapters.llm.*
-import com.gridoai.domain._
-import com.gridoai.domain.*
+
 import com.gridoai.domain.*
 import com.gridoai.endpoints.FileUpload
 import com.gridoai.models.DocDB
 import com.gridoai.utils.*
-import com.gridoai.utils.trace
-
+import com.gridoai.endpoints._
+import FileUploadError._
+import java.nio.file.Files
+import com.gridoai.adapters.extractTextFromDocx
+import com.gridoai.adapters.extractTextFromPptx
 import java.util.UUID
+import com.gridoai.parsers.{ExtractTextError}
+import com.gridoai.adapters.*
+import com.gridoai.parsers.*
 
-import util.chaining.scalaUtilChainingOps
 def searchDoc(x: String)(using
     db: DocDB[IO]
 ): IO[Either[String, List[Document]]] =
@@ -48,36 +48,33 @@ def searchDoc(x: String)(using
           ))
       )
   }
-import com.gridoai.endpoints._
 
-import FileUploadError._
-import java.nio.file.Files
-import com.gridoai.adapters.parseDocx
-import com.gridoai.adapters.parsePptx
+def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
+  FileParseError(e.format, e.message)
+
 def extractText(
     file: sttp.model.Part[java.io.File]
 ): IO[Either[FileUploadError, String]] =
-  import com.gridoai.adapters.*
+
   val body = Files.readAllBytes(file.body.toPath)
   val name = file.fileName
   println("file name: " + name)
   println("file content type: " + file.contentType)
   file.contentType match
     case Some("application/pdf") =>
-      parsePdf(body).attempt
-        .map(_.left.map(t => FileParseError(FileFormats.PDF, t.getMessage)))
+      extractTextFromPdf(body).map(
+        _.left.map(mapExtractToUploadError)
+      )
     case Some(
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ) =>
-      parseDocx(body).toEither.left
-        .map(e => FileParseError(FileFormats.DOCX, e.getMessage))
+      extractTextFromDocx(body).left
+        .map(mapExtractToUploadError)
         .pure[IO]
     case Some(
           "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         ) =>
-      parsePptx(body).toEither.left
-        .map(e => FileParseError(FileFormats.PPTX, e.getMessage))
-        .pure[IO]
+      extractTextFromPptx(body).left.map(mapExtractToUploadError).pure[IO]
     case Some("text/plain") => IO.pure(Right(String(body)))
     case Some(otherFormat) =>
       IO.pure(Left(UnknownError(s"Unknown file format ${otherFormat}")))

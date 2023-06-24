@@ -1,16 +1,13 @@
 package com.gridoai.adapters
 
-import cats.effect.IO
 import munit.FunSuite
 
 import java.nio.file.Files
 import java.nio.file.Paths
-import scala.util.Failure
-import scala.util.Success
 
 class DocxParserTest extends FunSuite {
 
-  test("parseDocx extracts text from Docx file") {
+  test("extractTextFromDocx extracts text from Docx file") {
     // Replace with the path to your test Docx file
     val testFilePath =
       "./src/test/resources/test.docx"
@@ -18,19 +15,19 @@ class DocxParserTest extends FunSuite {
     val content = Files.readAllBytes(Paths.get(testFilePath))
     val expectedContent = Files.readString(Paths.get(expectedContentPath))
 
-    val result = parseDocx(content)
+    val result = extractTextFromDocx(content)
 
     result match {
 
-      case Success(text) =>
+      case Right(text) =>
         println(text)
 
         assertEquals(
           text,
           expectedContent
         )
-      case Failure(exception) =>
-        fail(s"Failed to parse Docx file: ${exception.getMessage}")
+      case Left(exception) =>
+        fail(s"Failed to parse Docx file: ${exception.message}")
     }
   }
 }

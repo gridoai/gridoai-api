@@ -1,18 +1,17 @@
 package com.gridoai.adapters
 
-import com.gridoai.utils.trace
 import org.apache.poi.xslf.usermodel.XMLSlideShow
-import org.apache.poi.xslf.usermodel.XSLFSlide
 import org.apache.poi.xslf.usermodel.XSLFTextShape
-import sttp.model.Part
 
 import java.io.ByteArrayInputStream
-import java.io.File
-import java.io.FileInputStream
+
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import com.gridoai.parsers.{ExtractTextError, FileFormats}
 
-def parsePptx(content: Array[Byte]): Try[String] = Try:
+def extractTextFromPptx(
+    content: Array[Byte]
+): Either[ExtractTextError, String] = Try {
   println("Parsing pptx")
   XMLSlideShow(
     ByteArrayInputStream(content)
@@ -21,3 +20,5 @@ def parsePptx(content: Array[Byte]): Try[String] = Try:
       case textShape: XSLFTextShape => textShape.getText
     )
     .mkString("\n")
+}.toEither.left
+  .map(e => ExtractTextError(FileFormats.PPTX, e.getMessage))
