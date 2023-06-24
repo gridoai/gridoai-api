@@ -74,8 +74,8 @@ scalacOptions ++= Seq(
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", "io.netty.versions.properties") =>
     MergeStrategy.discard
-  case "module-info.class" =>
-    MergeStrategy.discard
+  case PathList(ps @ _*) if ps.last == "module-info.class" =>
+    MergeStrategy.concat
   case x =>
     val oldStrategy = (assemblyMergeStrategy in assembly).value
     oldStrategy(x)
