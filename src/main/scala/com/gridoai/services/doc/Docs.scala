@@ -54,31 +54,35 @@ def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
 
 def extractText(
     file: sttp.model.Part[java.io.File]
-): IO[Either[FileUploadError, String]] =
-
+): IO[Either[ExtractTextError, String]] =
   val body = Files.readAllBytes(file.body.toPath)
   val name = file.fileName
   println("file name: " + name)
   println("file content type: " + file.contentType)
   file.contentType match
     case Some("application/pdf") =>
-      extractTextFromPdf(body).map(
-        _.left.map(mapExtractToUploadError)
-      )
+      extractTextFromPdf(body)
     case Some(
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ) =>
-      extractTextFromDocx(body).left
-        .map(mapExtractToUploadError)
-        .pure[IO]
+      extractTextFromDocx(body).pure[IO]
     case Some(
           "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         ) =>
-      extractTextFromPptx(body).left.map(mapExtractToUploadError).pure[IO]
+      extractTextFromPptx(body).pure[IO]
     case Some("text/plain") => IO.pure(Right(String(body)))
     case Some(otherFormat) =>
-      IO.pure(Left(UnknownError(s"Unknown file format ${otherFormat}")))
-    case None => IO.pure(Left(UnknownError("Unknown file format")))
+      Left(
+        ExtractTextError(
+          FileFormats.Unknown(otherFormat),
+          "Unknown file format"
+        )
+      ).pure[IO]
+
+    case None =>
+      IO.pure(
+        Left(ExtractTextError(FileFormats.Unknown(""), "Unknown file format"))
+      )
 
 def uploadDocuments(
     source: FileUpload
@@ -87,6 +91,7 @@ def uploadDocuments(
     println(s"Uploading document... $file")
 
     extractText(file)
+      .map(_.left.map(mapExtractToUploadError))
       .map(extracted =>
         println(s"Extracted[${file.fileName}]: $extracted ")
         (file.fileName, extracted)
