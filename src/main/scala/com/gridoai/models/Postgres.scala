@@ -1,19 +1,22 @@
 package com.gridoai.models
 
-import doobie._
-import doobie.implicits._
-import doobie.util.ExecutionContexts
-import cats._
-import cats.data._
-import cats.effect._
-import cats.implicits._
-import doobie.postgres._
-import doobie.postgres.implicits._
-import fs2.Stream
+import doobie.*
+import doobie.implicits.*
+import cats.*
+import cats.effect.*
+import doobie.postgres.*
+import doobie.postgres.implicits.*
+import com.pgvector.PGvector
 
 import com.gridoai.domain.*
+import com.gridoai.utils.*
 
-val POSTGRES_URI = sys.env.getOrElse("POSTGRES_URI", "bolt://localhost:5432")
+implicit val getPGvector: Get[PGvector] =
+  Get[String].tmap(new PGvector(_))
+implicit val putPGvector: Put[PGvector] =
+  Put[String].tcontramap(x => s"'${x.toArray()}'::vector")
+
+val POSTGRES_URI = sys.env.getOrElse("POSTGRES_URI", "//localhost:5432/gridoai")
 val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
 val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
 
@@ -30,20 +33,24 @@ case class Row(
     source: String,
     content: String,
     token_quantity: Int,
-    similarity: Double
+    distance: Float
 )
 
 object PostgresClient extends DocDB[IO]:
-  def addDocument(doc: DocumentWithEmbedding): IO[Unit] =
-    IO.pure(())
+  def addDocument(doc: DocumentWithEmbedding): IO[Either[String, Unit]] =
+    IO.pure(Right(()))
 
   def getNearDocuments(
       embedding: Embedding,
       limit: Int
-  ): IO[List[SimilarDocument]] =
-    sql"select uid, name, source, content, token_quantity, 1 - (embedding <=> ${embedding
-        .toString()}) as similarity from documents order by similarity desc limit $limit"
-      .query[Row]
+  ): IO[Either[String, List[SimilarDocument]]] =
+
+    val vector = PGvector(embedding.toArray)
+    val query =
+      sql"select uid, name, source, content, token_quantity, embedding <-> '$vector'::vector as distance from documents order by distance asc limit $limit"
+    println(query.toString())
+    query
+      .queryWithLogHandler[Row](LogHandler.jdkLogHandler)
       .to[List]
       .transact(xa)
       .map(
@@ -56,12 +63,13 @@ object PostgresClient extends DocDB[IO]:
               content = x.content,
               tokenQuantity = x.token_quantity
             ),
-            similarity = x.similarity
+            distance = x.distance
           )
         )
       )
+      .map((Right(_))) |> attempt
 
-  def deleteDocument(uid: UID): IO[Unit] =
+  def deleteDocument(uid: UID): IO[Either[String, Unit]] =
     sql"delete from documents where uid = $uid".update.run
       .transact(xa)
-      .map(_ => ())
+      .map(_ => Right(())) |> attempt

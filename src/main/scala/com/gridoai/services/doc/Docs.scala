@@ -25,8 +25,10 @@ def searchDoc(text: String)(using
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
     .map(
-      _.map(vec => db.getNearDocuments(vec, 5).map(x => x.map(_.document)))
-    ) |> flattenIOEitherIO
+      _.map(vec =>
+        db.getNearDocuments(vec, 5).map(_.map(x => x.map(_.document)))
+      )
+    ) |> flattenIOEitherIOEither
 
 def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
   FileParseError(e.format, e.message)
@@ -101,7 +103,7 @@ def createDoc(
     .embed(document.content)
     .map(
       _.map(vec => db.addDocument(DocumentWithEmbedding(document, vec)))
-    ) |> flattenIOEitherIO
+    ) |> flattenIOEitherIOEither
 
 def ask(messages: List[Message])(implicit
     db: DocDB[IO]
