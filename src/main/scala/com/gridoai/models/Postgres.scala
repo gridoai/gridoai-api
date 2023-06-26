@@ -12,9 +12,9 @@ import com.gridoai.domain.*
 import com.gridoai.utils.*
 
 implicit val getPGvector: Get[PGvector] =
-  Get[String].tmap(new PGvector(_))
+  Get[Array[Float]].map(new PGvector(_))
 implicit val putPGvector: Put[PGvector] =
-  Put[String].tcontramap(x => s"'${x.toArray()}'::vector")
+  Put[Array[Float]].tcontramap(_.toArray())
 
 val POSTGRES_URI = sys.env.getOrElse("POSTGRES_URI", "//localhost:5432/gridoai")
 val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
@@ -47,7 +47,7 @@ object PostgresClient extends DocDB[IO]:
 
     val vector = PGvector(embedding.toArray)
     val query =
-      sql"select uid, name, source, content, token_quantity, embedding <-> '$vector'::vector as distance from documents order by distance asc limit $limit"
+      sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from documents order by distance asc limit $limit"
     println(query.toString())
     query
       .queryWithLogHandler[Row](LogHandler.jdkLogHandler)
@@ -55,6 +55,7 @@ object PostgresClient extends DocDB[IO]:
       .transact(xa)
       .map(
         _.map(x =>
+          println(x)
           SimilarDocument(
             document = Document(
               uid = x.uid,
