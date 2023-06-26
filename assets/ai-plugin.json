@@ -1,0 +1,17 @@
+{
+    "schema_version": "v1",
+    "name_for_human": "GridoAI",
+    "name_for_model": "grido ai",
+    "description_for_human": "GridoAI helps you with document and knowledge management.",
+    "description_for_model": "grido ai helps you with document and knowledge management. Retrieves data from your documents and makes it searchable.",
+    "auth": {
+        "type": "none"
+    },
+    "api": {
+        "type": "openapi",
+        "url": "http://localhost:3333/openapi.yaml"
+    },
+    "logo_url": "https://www.gridoai.com/logo.png",
+    "contact_email": "devs@gridoai.com",
+    "legal_info_url": "http://www.gridoai.com/legal"
+}

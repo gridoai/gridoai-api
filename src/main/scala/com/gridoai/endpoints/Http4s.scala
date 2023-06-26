@@ -15,10 +15,10 @@ import org.http4s.HttpApp
 import org.http4s.HttpRoutes
 import org.http4s.server.Router
 import org.http4s.server.middleware.CORS
-import sttp.tapir._
-import sttp.tapir.server.http4s.Http4sServerInterpreter
 import org.http4s.server.middleware.ErrorAction
 import org.http4s.server.middleware.ErrorHandling
+import sttp.tapir._
+import sttp.tapir.server.http4s.Http4sServerInterpreter
 
 import java.util.UUID
 
@@ -40,13 +40,21 @@ def createRoute(implicit db: DocDB[IO]): HttpRoutes[IO] =
     createDocumentEndpoint.serverLogic(createDoc _)
   )
 
+def uploadFileEndpoint(implicit db: DocDB[IO]): HttpRoutes[IO] =
+  Http4sServerInterpreter[IO]().toRoutes(
+    fileUploadEndpoint.serverLogic(files =>
+      println(files)
+      uploadDocuments(files).map(Right(_))
+    )
+  )
+
 def askRoute(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(
     askEndpoint.serverLogic(ask _)
   )
 
 def routes(implicit db: DocDB[IO]): HttpRoutes[IO] =
-  searchRoute <+> healthCheckRoute <+> createRoute <+> askRoute <+> fileUploadRoute
+  searchRoute <+> healthCheckRoute <+> createRoute <+> askRoute <+> uploadFileEndpoint
 
 def httpApp(implicit db: DocDB[IO]): HttpApp[IO] =
   ErrorHandling.Recover.total(

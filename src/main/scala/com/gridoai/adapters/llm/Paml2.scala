@@ -1,17 +1,20 @@
 package com.gridoai.adapters.llm
-import sttp.client3._
+import cats.effect.IO
+import com.google.auth.oauth2.GoogleCredentials
+import com.gridoai.adapters.*
+import com.gridoai.domain.*
 import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.generic.semiauto.*
 import io.circe.parser.*
 import io.circe.syntax.*
-import scala.concurrent.{Future, ExecutionContext}
-import scala.util.{Success, Failure}
+import sttp.client3._
+
 import java.time.Instant
-import com.google.auth.oauth2.GoogleCredentials
-import cats.effect.IO
-import com.gridoai.adapters.*
-import com.gridoai.domain.*
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
