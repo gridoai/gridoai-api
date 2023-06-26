@@ -68,6 +68,8 @@ libraryDependencies ++= Seq(
   "org.tpolecat" %% "doobie-postgres" % doobieVersion
 )
 
+libraryDependencies += "com.pgvector" % "pgvector" % "0.1.2"
+
 lazy val app = (project in file("app"))
   .settings(
     assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")

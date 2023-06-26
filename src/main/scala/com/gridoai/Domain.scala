@@ -5,7 +5,7 @@ import io.circe.generic.auto._
 import java.util.UUID
 
 type UID = UUID
-type Embedding = List[Double]
+type Embedding = List[Float]
 
 case class Document(
     uid: UID,
@@ -22,7 +22,7 @@ case class DocumentWithEmbedding(
 
 case class SimilarDocument(
     document: Document,
-    similarity: Double
+    distance: Float
 )
 
 case class DocumentCreationPayload(

@@ -8,6 +8,8 @@ import io.circe.generic.auto.*
 import io.circe.parser.*
 import io.circe.syntax.*
 
+import com.gridoai.utils.*
+
 val embeddingApiEndpoint = sys.env.getOrElse(
   "EMBEDDING_API_ENDPOINT",
   "http://127.0.0.1:8000"
@@ -30,4 +32,4 @@ object GridoAIML extends EmbeddingAPI[IO]:
           decode[MessageResponse[Embedding]](_).left.map(_.getMessage())
         )
       )
-      .map(_.map(_.message))
+      .map(_.map(_.message)) |> attempt

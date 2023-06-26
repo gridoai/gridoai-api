@@ -12,29 +12,31 @@ object MockDocDB extends DocDB[IO]:
     mockedDoc
   )
 
-  def addDocument(doc: DocumentWithEmbedding): IO[Unit] =
+  def addDocument(doc: DocumentWithEmbedding): IO[Either[String, Unit]] =
     IO.pure {
       documents += doc
-      println(s"Mock: Adding document $doc")
+      Right(println(s"Mock: Adding document $doc"))
     }
 
   def getNearDocuments(
       embedding: Embedding,
       limit: Int
-  ): IO[List[SimilarDocument]] =
+  ): IO[Either[String, List[SimilarDocument]]] =
     IO.pure(
-      documents.toList
-        .take(limit)
-        .map(x =>
-          SimilarDocument(
-            document = x.document,
-            similarity = 1
+      Right(
+        documents.toList
+          .take(limit)
+          .map(x =>
+            SimilarDocument(
+              document = x.document,
+              distance = 1
+            )
           )
-        )
+      )
     )
 
-  def deleteDocument(uid: UID): IO[Unit] =
+  def deleteDocument(uid: UID): IO[Either[String, Unit]] =
     IO.pure {
       val documentToDelete = documents.filter(_.document.uid == uid).head
-      documents -= documentToDelete
+      Right(documents -= documentToDelete)
     }
