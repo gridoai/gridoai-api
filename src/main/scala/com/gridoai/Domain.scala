@@ -37,7 +37,7 @@ case class DocumentCreationPayload(
     uid = uid,
     name = this.name,
     source = this.source,
-    content = this.source,
+    content = this.content,
     tokenQuantity = tokenQuantity
   )
 
