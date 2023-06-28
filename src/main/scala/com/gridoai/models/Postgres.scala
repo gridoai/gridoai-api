@@ -38,7 +38,17 @@ case class Row(
 
 object PostgresClient extends DocDB[IO]:
   def addDocument(doc: DocumentWithEmbedding): IO[Either[String, Unit]] =
-    IO.pure(Right(()))
+    sql"""insert into documents (uid, name, source, content, token_quantity, embedding)
+     values (
+      ${doc.document.uid},
+      ${doc.document.name},
+      ${doc.document.source},
+      ${doc.document.content},
+      ${doc.document.tokenQuantity},
+      ${doc.embedding}
+    )""".update.run
+      .transact(xa)
+      .map(_ => Right(())) |> attempt
 
   def getNearDocuments(
       embedding: Embedding,
@@ -48,9 +58,8 @@ object PostgresClient extends DocDB[IO]:
     val vector = PGvector(embedding.toArray)
     val query =
       sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from documents order by distance asc limit $limit"
-    println(query.toString())
     query
-      .queryWithLogHandler[Row](LogHandler.jdkLogHandler)
+      .query[Row]
       .to[List]
       .transact(xa)
       .map(
