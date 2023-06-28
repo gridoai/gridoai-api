@@ -115,6 +115,7 @@ def ask(messages: List[Message])(implicit
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
       searchDoc(prompt).flatMap:
-        case Right(r) =>
-          llm.ask(r, messages) |> attempt
+        case Right(docs) =>
+          val sources = docs.map(_.source).mkString(", ")
+          llm.ask(docs, messages).map(_.map(x => s"$x\nsources: $sources")) |> attempt
         case Left(l) => IO.pure(Left(l))
