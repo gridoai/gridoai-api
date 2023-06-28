@@ -67,11 +67,11 @@ object PostgresClient extends DocDB[IO]:
           println(x)
           SimilarDocument(
             document = Document(
-              uid = x.uid,
-              name = x.name,
-              source = x.source,
-              content = x.content,
-              tokenQuantity = x.token_quantity
+              x.uid,
+              x.name,
+              x.source,
+              x.content,
+              x.token_quantity
             ),
             distance = x.distance
           )
