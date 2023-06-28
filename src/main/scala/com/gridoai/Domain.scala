@@ -34,11 +34,11 @@ case class DocumentCreationPayload(
       uid: UID,
       tokenQuantity: Int
   ) = Document(
-    uid = uid,
-    name = this.name,
-    source = this.source,
-    content = this.content,
-    tokenQuantity = tokenQuantity
+    uid,
+    name,
+    source,
+    content,
+    tokenQuantity
   )
 
 enum MessageFrom:

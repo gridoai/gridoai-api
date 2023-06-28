@@ -117,5 +117,7 @@ def ask(messages: List[Message])(implicit
       searchDoc(prompt).flatMap:
         case Right(docs) =>
           val sources = docs.map(_.source).mkString(", ")
-          llm.ask(docs, messages).map(_.map(x => s"$x\nsources: $sources")) |> attempt
+          llm
+            .ask(docs, messages)
+            .map(_.map(x => s"$x\nsources: $sources")) |> attempt
         case Left(l) => IO.pure(Left(l))
