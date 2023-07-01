@@ -37,49 +37,63 @@ case class Row(
 )
 
 object PostgresClient extends DocDB[IO]:
-  def addDocument(doc: DocumentWithEmbedding): IO[Either[String, Unit]] =
-    sql"""insert into documents (uid, name, source, content, token_quantity, embedding)
+  def addDocument(
+      doc: DocumentWithEmbedding,
+      orgId: String,
+      role: String
+  ): IO[Either[String, Unit]] =
+    sql"""insert into documents (uid, name, source, content, token_quantity, embedding, organization, roles) 
      values (
       ${doc.document.uid},
       ${doc.document.name},
       ${doc.document.source},
       ${doc.document.content},
       ${doc.document.tokenQuantity},
-      ${doc.embedding}
+      ${doc.embedding},
+      ${orgId},
+      ${Array(role)}
+
     )""".update.run
       .transact(xa)
       .map(_ => Right(())) |> attempt
 
   def getNearDocuments(
       embedding: Embedding,
-      limit: Int
+      limit: Int,
+      orgId: String,
+      role: String
   ): IO[Either[String, List[SimilarDocument]]] =
-
-    val vector = PGvector(embedding.toArray)
-    val query =
-      sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from documents order by distance asc limit $limit"
-    query
-      .query[Row]
-      .to[List]
-      .transact(xa)
-      .map(
-        _.map(x =>
-          println(x)
-          SimilarDocument(
-            document = Document(
-              x.uid,
-              x.name,
-              x.source,
-              x.content,
-              x.token_quantity
-            ),
-            distance = x.distance
+    traceMappable("getNearDocuments"):
+      println("Getting near docs ")
+      val vector = PGvector(embedding.toArray)
+      val query =
+        sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from documents where organization = $orgId AND $role = ANY(roles) order by distance asc limit $limit"
+      query
+        .query[Row]
+        .to[List]
+        .transact(xa)
+        .map(
+          _.map(x =>
+            SimilarDocument(
+              document = Document(
+                x.uid,
+                x.name,
+                x.source,
+                x.content,
+                x.token_quantity
+              ),
+              distance = x.distance
+            )
           )
         )
-      )
-      .map((Right(_))) |> attempt
+        .map((Right(_))) |> attempt
 
-  def deleteDocument(uid: UID): IO[Either[String, Unit]] =
-    sql"delete from documents where uid = $uid".update.run
+  def deleteDocument(
+      uid: UID,
+      orgId: String,
+      role: String
+  ): IO[Either[String, Unit]] =
+    if role == "member" then return IO.pure(Left("Not authorized"))
+    sql"delete from documents where uid = $uid and organization = ${orgId}".update.run
       .transact(xa)
       .map(_ => Right(())) |> attempt
