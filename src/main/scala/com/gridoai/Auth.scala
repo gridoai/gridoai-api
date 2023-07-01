@@ -12,3 +12,6 @@ case class JWTPayload(
 )
 
 val mockedJwt = JWTPayload("", "", Some("Incredible org"), None, "", "")
+
+val getOrgIdAndRolesFromJwt = (jwt: JWTPayload) =>
+  (jwt.orgId.getOrElse(jwt.sid), jwt.role.getOrElse("member"))
