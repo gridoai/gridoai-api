@@ -1,6 +1,6 @@
 package com.gridoai.domain
 import io.circe._
-import io.circe.generic.auto._
+import io.circe.generic.semiauto._
 
 import java.util.UUID
 
