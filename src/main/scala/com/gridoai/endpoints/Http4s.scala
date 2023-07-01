@@ -38,10 +38,7 @@ def createRoute(implicit db: DocDB[IO]): HttpRoutes[IO] =
 
 def uploadFileEndpoint(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(
-    fileUploadEndpoint.serverLogic(files =>
-      println(files)
-      uploadDocuments(files).map(Right(_))
-    )
+    fileUploadEndpoint.serverLogic(uploadDocuments _)
   )
 
 def askRoute(implicit db: DocDB[IO]): HttpRoutes[IO] =
