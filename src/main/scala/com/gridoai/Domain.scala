@@ -28,7 +28,9 @@ case class SimilarDocument(
 case class DocumentCreationPayload(
     name: String,
     source: String,
-    content: String
+    content: String,
+    orgId: String,
+    role: String
 ):
   def toDocument(
       uid: UID,
