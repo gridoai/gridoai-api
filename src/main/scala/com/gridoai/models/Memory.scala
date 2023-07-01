@@ -4,7 +4,6 @@ import cats.effect.IO
 import com.gridoai.domain._
 import com.gridoai.mock.mockedDoc
 
-import java.util.UUID
 import scala.collection.mutable.ListBuffer
 
 object MockDocDB extends DocDB[IO]:
@@ -12,7 +11,11 @@ object MockDocDB extends DocDB[IO]:
     mockedDoc
   )
 
-  def addDocument(doc: DocumentWithEmbedding): IO[Either[String, Unit]] =
+  def addDocument(
+      doc: DocumentWithEmbedding,
+      orgId: String,
+      roles: String
+  ): IO[Either[String, Unit]] =
     IO.pure {
       documents += doc
       Right(println(s"Mock: Adding document $doc"))
@@ -20,7 +23,9 @@ object MockDocDB extends DocDB[IO]:
 
   def getNearDocuments(
       embedding: Embedding,
-      limit: Int
+      limit: Int,
+      orgId: String,
+      role: String
   ): IO[Either[String, List[SimilarDocument]]] =
     IO.pure(
       Right(
@@ -35,7 +40,11 @@ object MockDocDB extends DocDB[IO]:
       )
     )
 
-  def deleteDocument(uid: UID): IO[Either[String, Unit]] =
+  def deleteDocument(
+      uid: UID,
+      orgId: String,
+      role: String
+  ): IO[Either[String, Unit]] =
     IO.pure {
       val documentToDelete = documents.filter(_.document.uid == uid).head
       Right(documents -= documentToDelete)
