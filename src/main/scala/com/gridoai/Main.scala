@@ -10,7 +10,6 @@ import com.google.cloud.functions.HttpResponse
 import com.gridoai.models.PostgresClient
 import com.gridoai.endpoints.*
 import com.gridoai.models.DocDB
-import com.gridoai.models.MockDocDB
 import de.killaitis.http4s.*
 
 import org.http4s.ember.server.EmberServerBuilder
