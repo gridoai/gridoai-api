@@ -10,8 +10,14 @@ import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
 import sttp.apispec.openapi.circe.yaml._
 import java.io.File
 import java.util.UUID
+import com.gridoai.auth.JWTPayload
+import sttp.tapir.server.PartialServerEndpoint
+import cats.effect.IO
+import com.gridoai.endpoints.auth
 
 type PublicEndpoint[I, E, O, -R] = Endpoint[Unit, I, E, O, R]
+type SecuredEndpoint[I, E, O, -R] =
+  PartialServerEndpoint[String, JWTPayload, I, E, O, R, IO]
 
 case class FileUpload(files: List[Part[File]])
 
@@ -20,23 +26,21 @@ enum FileUploadError:
   case DocumentCreationError(m: String)
   case UnknownError(m: String)
 
-val fileUploadEndpoint: PublicEndpoint[FileUpload, String, List[
-  Either[FileUploadError, Unit]
-], Any] =
-  endpoint.post
+val fileUploadEndpoint
+    : SecuredEndpoint[FileUpload, List[FileUploadError] | String, Unit, Any] =
+  auth.securedWithBearer.post
     .in("upload")
     .in(multipartBody[FileUpload])
-    .errorOut(stringBody)
-    .out(jsonBody[List[Either[FileUploadError, Unit]]])
+    .out(jsonBody[Unit])
+    .mapErrorOut(identity)(_.toString())
 
-val searchEndpoint: PublicEndpoint[String, String, List[Document], Any] =
-  endpoint
+val searchEndpoint: SecuredEndpoint[String, String, List[Document], Any] =
+  auth.securedWithBearer
     .name("Search")
     .description("Search for documents in the knowledge base")
     .in("search")
     .in(query[String]("query"))
     .out(jsonBody[List[Document]])
-    .errorOut(stringBody)
 
 val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
   endpoint
@@ -46,28 +50,28 @@ val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
     .out(stringBody)
 
 val createDocumentEndpoint
-    : PublicEndpoint[DocumentCreationPayload, String, Unit, Any] =
-  endpoint
+    : SecuredEndpoint[DocumentCreationPayload, String, Unit, Any] =
+  auth.securedWithBearer
     .name("Create Document")
     .description("Create a document in the knowledge base")
     .post
     .in("document")
     .in(jsonBody[DocumentCreationPayload])
     .out(emptyOutput)
-    .errorOut(stringBody)
 
-val askEndpoint: PublicEndpoint[List[Message], String, String, Any] =
-  endpoint
+val askEndpoint: SecuredEndpoint[List[Message], String, String, Any] =
+  auth.securedWithBearer
     .name("Ask to LLM")
     .description("Ask something based on knowledge base")
     .post
     .in("ask")
     .in(jsonBody[List[Message]])
     .out(stringBody)
-    .errorOut(stringBody)
 
 val getSchema =
-  OpenAPIDocsInterpreter().toOpenAPI(searchEndpoint, "GridoAI", "1.0").toYaml
+  OpenAPIDocsInterpreter()
+    .toOpenAPI(askEndpoint.endpoint, "GridoAI", "1.0")
+    .toYaml
 
 def dumpSchema() =
   import java.io._
