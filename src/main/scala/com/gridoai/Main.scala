@@ -8,7 +8,6 @@ import com.google.cloud.functions.HttpFunction
 import com.google.cloud.functions.HttpRequest
 import com.google.cloud.functions.HttpResponse
 import com.gridoai.models.PostgresClient
-import com.gridoai.endpoints.*
 import com.gridoai.models.DocDB
 import de.killaitis.http4s.*
 
@@ -18,14 +17,14 @@ class ScalaHttpFunction extends HttpFunction {
   def service(request: HttpRequest, response: HttpResponse) =
 
     given docDb: DocDB[IO] = PostgresClient
-    (Http4sCloudFunction(httpApp).service(request, response))
+    (Http4sCloudFunction(endpoints.http4s.httpApp).service(request, response))
 
 }
 
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
     if args get 0 contains "openapi" then
-      dumpSchema()
+      endpoints.dumpSchema()
       IO.pure(ExitCode.Success)
     else
 
@@ -35,7 +34,7 @@ object Main extends IOApp {
         .default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"8080")
-        .withHttpApp(httpApp)
+        .withHttpApp(endpoints.http4s.httpApp)
         .build
         .use(_ => IO.never)
         .as(ExitCode.Success)
