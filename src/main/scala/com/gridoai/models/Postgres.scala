@@ -19,6 +19,10 @@ implicit val putPGvector: Put[PGvector] =
 val POSTGRES_URI = sys.env.getOrElse("POSTGRES_URI", "//localhost:5432/gridoai")
 val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
 val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
+val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
+
+def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
+val documentsTable = table("documents")
 
 val xa = Transactor.fromDriverManager[IO](
   "org.postgresql.Driver", // driver classname
@@ -42,7 +46,7 @@ object PostgresClient extends DocDB[IO]:
       orgId: String,
       role: String
   ): IO[Either[String, Unit]] =
-    sql"""insert into documents (uid, name, source, content, token_quantity, embedding, organization, roles) 
+    sql"""insert into $documentsTable (uid, name, source, content, token_quantity, embedding, organization, roles) 
      values (
       ${doc.document.uid},
       ${doc.document.name},
@@ -67,7 +71,7 @@ object PostgresClient extends DocDB[IO]:
       println("Getting near docs ")
       val vector = PGvector(embedding.toArray)
       val query =
-        sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from documents where organization = $orgId AND $role = ANY(roles) order by distance asc limit $limit"
+        sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from $documentsTable where organization = $orgId AND $role = ANY(roles) order by distance asc limit $limit"
       query
         .query[Row]
         .to[List]
@@ -93,7 +97,12 @@ object PostgresClient extends DocDB[IO]:
       orgId: String,
       role: String
   ): IO[Either[String, Unit]] =
-    if role == "member" then return IO.pure(Left("Not authorized"))
-    sql"delete from documents where uid = $uid and organization = ${orgId}".update.run
+    sql"delete from $documentsTable where uid = $uid and organization = ${orgId}".update.run
       .transact(xa)
-      .map(_ => Right(())) |> attempt
+      .flatMap(r =>
+        if (r > 0)
+          IO.pure(Right(()))
+        else
+          IO.pure(Left("No document was deleted"))
+      )
+      |> attempt
