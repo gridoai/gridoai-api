@@ -1,19 +1,20 @@
 package com.gridoai.endpoints
+import cats.effect.IO
+import com.gridoai.auth.JWTPayload
 import com.gridoai.domain.*
+import com.gridoai.endpoints.auth
+import com.gridoai.parsers.FileFormats
 import io.circe.generic.auto._
+import sttp.apispec.openapi.circe.yaml._
 import sttp.model.Part
 import sttp.tapir._
+import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
 import sttp.tapir.generic.auto._
 import sttp.tapir.json.circe._
-import com.gridoai.parsers.FileFormats
-import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
-import sttp.apispec.openapi.circe.yaml._
+import sttp.tapir.server.PartialServerEndpoint
+
 import java.io.File
 import java.util.UUID
-import com.gridoai.auth.JWTPayload
-import sttp.tapir.server.PartialServerEndpoint
-import cats.effect.IO
-import com.gridoai.endpoints.auth
 
 type PublicEndpoint[I, E, O, -R] = Endpoint[Unit, I, E, O, R]
 type SecuredEndpoint[I, E, O, -R] =
@@ -25,6 +26,7 @@ enum FileUploadError:
   case FileParseError(format: FileFormats, m: String)
   case DocumentCreationError(m: String)
   case UnknownError(m: String)
+  case UnauthorizedError(m: String)
 
 val fileUploadEndpoint
     : SecuredEndpoint[FileUpload, List[FileUploadError] | String, Unit, Any] =
