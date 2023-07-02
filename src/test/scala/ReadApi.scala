@@ -1,68 +1,95 @@
 import cats.effect.IO
+import com.gridoai.auth.makeMockedToken
 import com.gridoai.domain.*
 import com.gridoai.endpoints.*
 import com.gridoai.models.DocDB
 import com.gridoai.models.MockDocDB
+import com.gridoai.utils.trace
 import fs2.Stream
-import io.circe.generic.auto.*
-import munit.CatsEffectSuite
-
-import org.http4s.EntityEncoder
-import org.http4s.Method
-import org.http4s.Request
-import org.http4s.Status
-import org.http4s.circe.*
-import org.http4s.implicits.uri
 import fs2.text.utf8
+import io.circe.generic.auto.*
+import io.circe.syntax.*
+import munit.CatsEffectSuite
+import sttp.client3.UriContext
+import sttp.client3.basicRequest
+import sttp.client3.testing.SttpBackendStub
+import sttp.model.Header
+import sttp.model.StatusCode
+import sttp.tapir.integ.cats.effect.CatsMonadError
+import sttp.tapir.server.stub.TapirStubInterpreter
+import sttp.tapir.server.ServerEndpoint
 
 def streamToString(stream: Stream[IO, Byte]): IO[String] = {
   stream.through(utf8.decode).compile.toList.map(_.mkString)
 }
 
-class ExampleSuite extends CatsEffectSuite {
+val serverStub = TapirStubInterpreter(
+  SttpBackendStub(new CatsMonadError[IO]())
+)
+
+def serverStubOf(endpoint: ServerEndpoint[Any, IO]) = {
+  serverStub.whenServerEndpointRunLogic(endpoint).backend()
+}
+
+val mockedDocsResponse =
+  """[{"uid":"694b8567-8c93-45c6-8051-34be4337e740","name":"Sky observations","source":"https://www.nasa.gov/planetarydefense/faq/asteroid","content":"The sky is blue","tokenQuantity":4}]"""
+
+val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
+class API extends CatsEffectSuite {
   given db: DocDB[IO] = MockDocDB
 
-  test("Health check returns OK") {
-    routes.orNotFound
-      .run(
-        Request(
-          Method.GET,
-          uri = uri"/health"
-        )
-      )
-      .map(_.body)
-      .flatMap(streamToString)
-      .assertEquals("OK")
+  val searchDocsBE = serverStubOf(withService.searchDocs)
 
+  test("health check should return OK") {
+
+    val response = basicRequest
+      .get(uri"http://test.com/health")
+      .send(serverStubOf(withService.healthCheck))
+
+    assertIO(response.map(_.body), Right("OK"))
   }
 
+  test("Can't search documents without auth") {
+    val responseWithoutAuth = basicRequest
+      .get(uri"http://test.com/search?query=foo")
+      .send(searchDocsBE)
+
+    assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
+  }
   test("Searches for a document") {
-    routes.orNotFound
-      .run(
-        Request(
-          Method.GET,
-          uri = uri"/search?query=foo"
-        )
-      )
-      .map(_.body)
-      .flatMap(streamToString)
-      .assertEquals(
-        """[{"uid":"694b8567-8c93-45c6-8051-34be4337e740","name":"Sky observations","content":"The sky is blue","url":"","numberOfWords":0}]"""
-      )
+
+    val authenticatedRequest = basicRequest
+      .get(uri"http://test.com/search?query=foo")
+      .headers(authHeader)
+      .send(searchDocsBE)
+
+    assertIO(
+      authenticatedRequest
+        .trace("doc search response")
+        .map(x =>
+
+          println("THE DAMN BODY " + x.body)
+          x.body
+        ),
+      Right(mockedDocsResponse)
+    )
   }
 
   test("Ask LLM") {
-    given listMessageEncoder: EntityEncoder[IO, List[Message]] =
-      jsonEncoderOf[IO, List[Message]]
-
-    routes.orNotFound
-      .run(
-        Request[IO](
-          Method.POST,
-          uri = uri"/ask"
-        ).withEntity(List(Message(from = MessageFrom.User, message = "Hi")))
+    val backendStub =
+      serverStubOf(
+        withService.askLLM
       )
-      .map(_.status)
-      .assertEquals(Status.Ok)
+
+    basicRequest
+      .post(uri"http://test.com/ask")
+      .headers(authHeader)
+      .body(
+        List(Message(from = MessageFrom.User, message = "Hi")).asJson.toString
+      )
+      .send(backendStub)
+      .map(_.code)
+      .assertEquals(StatusCode.Ok)
+
   }
 }
