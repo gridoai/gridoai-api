@@ -5,16 +5,8 @@ import com.gridoai.adapters.*
 import com.gridoai.domain.*
 import io.circe.*
 import io.circe.generic.auto.*
-import io.circe.generic.semiauto.*
 import io.circe.parser.*
 import io.circe.syntax.*
-import sttp.client3._
-
-import java.time.Instant
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-import scala.util.Failure
-import scala.util.Success
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
