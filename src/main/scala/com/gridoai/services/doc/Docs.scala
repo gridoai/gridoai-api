@@ -19,6 +19,8 @@ import com.gridoai.parsers.*
 import com.gridoai.auth.{JWTPayload, getOrgIdAndRolesFromJwt}
 import sttp.model.Part
 import java.io.File
+import com.gridoai.auth.limitRole
+import com.gridoai.auth.authErrorMsg
 
 def searchDoc(auth: JWTPayload)(text: String)(using
     db: DocDB[IO]
@@ -100,25 +102,33 @@ def uploadFile(auth: JWTPayload)(file: Part[File])(using db: DocDB[IO]) =
 def uploadDocuments(auth: JWTPayload)(
     source: FileUpload
 )(using db: DocDB[IO]): IO[Either[List[FileUploadError], Unit]] =
-  source.files
-    .traverse(uploadFile(auth))
-    .map(collectLeftsOrElseUnit)
+  limitRole(
+    auth.role,
+    (Left(List(UnauthorizedError(authErrorMsg(auth.role))))).pure[IO]
+  ):
+    source.files
+      .traverse(uploadFile(auth))
+      .map(collectLeftsOrElseUnit)
 
 def createDoc(auth: JWTPayload)(
     payload: DocumentCreationPayload
 )(implicit db: DocDB[IO]): IO[Either[String, Unit]] =
-  traceMappable("createDoc"):
-    println("Creating doc... ")
-    val (orgId, roles) = getOrgIdAndRolesFromJwt(auth)
-    val document =
-      payload.toDocument(UUID.randomUUID(), payload.content.split(" ").length)
-    getEmbeddingAPI("gridoai-ml")
-      .embed(document.content)
-      .map(
-        _.map(vec =>
-          db.addDocument(DocumentWithEmbedding(document, vec), orgId, roles)
-        )
-      ) |> flattenIOEitherIOEither
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(auth.role)).pure[IO]
+  ):
+    traceMappable("createDoc"):
+      println("Creating doc... ")
+      val (orgId, roles) = getOrgIdAndRolesFromJwt(auth)
+      val document =
+        payload.toDocument(UUID.randomUUID(), payload.content.split(" ").length)
+      getEmbeddingAPI("gridoai-ml")
+        .embed(document.content)
+        .map(
+          _.map(vec =>
+            db.addDocument(DocumentWithEmbedding(document, vec), orgId, roles)
+          )
+        ) |> flattenIOEitherIOEither
 
 def ask(auth: JWTPayload)(messages: List[Message])(implicit
     db: DocDB[IO]
