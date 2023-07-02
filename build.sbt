@@ -39,7 +39,9 @@ lazy val root = project
     libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test",
     libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28",
     libraryDependencies += "com.google.auth" % "google-auth-library-oauth2-http" % "1.3.0",
-    libraryDependencies += "com.github.jwt-scala" %% "jwt-core" % "9.4.0"
+    libraryDependencies += "com.github.jwt-scala" %% "jwt-core" % "9.4.0",
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-sttp-stub-server" % "1.5.0" % Test,
+    libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.3.0"
   )
   .enablePlugins(GraalVMNativeImagePlugin)
 
