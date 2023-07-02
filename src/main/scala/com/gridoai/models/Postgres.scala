@@ -41,6 +41,7 @@ case class Row(
 )
 
 object PostgresClient extends DocDB[IO]:
+  given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
   def addDocument(
       doc: DocumentWithEmbedding,
       orgId: String,
@@ -71,7 +72,7 @@ object PostgresClient extends DocDB[IO]:
       println("Getting near docs ")
       val vector = PGvector(embedding.toArray)
       val query =
-        sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from $documentsTable where organization = $orgId AND $role = ANY(roles) order by distance asc limit $limit"
+        sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from $documentsTable where organization = $orgId  order by distance asc limit $limit"
       query
         .query[Row]
         .to[List]
