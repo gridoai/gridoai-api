@@ -88,8 +88,8 @@ def uploadFile(auth: JWTPayload)(file: Part[File])(using db: DocDB[IO]) =
             name = filename,
             source = filename,
             content = content,
-            orgId,
-            role
+            orgId = orgId,
+            role = role
           )
         )
           .map(_.leftMap(DocumentCreationError.apply))

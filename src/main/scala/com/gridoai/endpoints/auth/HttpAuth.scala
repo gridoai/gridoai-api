@@ -12,7 +12,6 @@ import com.gridoai.utils.|>
 import com.gridoai.utils.trace
 import com.gridoai.utils.addLocationToLeft
 implicit val jwtPayloadDecoder: Decoder[JWTPayload] = deriveDecoder[JWTPayload]
-case class AuthError(error: String)
 
 def decodeJwt(token: String) =
   Jwt
