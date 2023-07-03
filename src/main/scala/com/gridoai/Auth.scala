@@ -36,7 +36,7 @@ def makeMockedToken =
     .trace
 
 val getOrgIdAndRolesFromJwt = (jwt: JWTPayload) =>
-  (jwt.orgId.getOrElse(jwt.sid), jwt.role.getOrElse("member"))
+  (jwt.orgId.getOrElse(jwt.sub), jwt.role.getOrElse("member"))
 
 def limitRole[A](role: Option[String], error: A)(resource: A) =
   role match
