@@ -5,10 +5,10 @@ import com.gridoai.domain.Document
 import cats.effect.IO
 
 trait LLM[F[_]]:
-  def ask(
-      documents: List[Document],
-      messages: List[Message]
+  def ask(documents: List[Document])(
+      prompt: String
   ): F[Either[String, String]]
+  def mergeMessages(messages: List[Message]): F[Either[String, String]]
 
 def getLLMByName(name: String): LLM[IO] =
   name match
