@@ -86,7 +86,7 @@ object Paml2Client extends LLM[IO]:
   def getAnswer(
       llmOutput: IO[Either[String, Palm2Response]]
   ): IO[Either[String, String]] =
-    llmOutput.map(_.map(_.predictions.head.candidates.head.content))
+    llmOutput.mapRight(_.predictions.head.candidates.head.content)
 
   def ask(documents: List[Document])(
       prompt: String
