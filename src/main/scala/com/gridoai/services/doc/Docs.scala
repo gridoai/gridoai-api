@@ -30,8 +30,7 @@ def searchDoc(auth: AuthData)(text: String)(using
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
     .flatMapRight(vec =>
-      db.getNearDocuments(vec, 5, auth.orgId, auth.role)
-        .map(_.map(_.map(_.document)))
+      db.getNearDocuments(vec, 5, auth.orgId, auth.role).mapRight(_.map(_.document))
     )
 
 def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
@@ -161,6 +160,7 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
       val llm = getLLM("palm2")
       println("Using llm: " + llm.toString())
       val prompt = llm.mergeMessages(messages)
+      prompt.mapRight(x => println(s"prompt: $x"))
       prompt
         .flatMapRight(searchDoc(auth))
         .flatMapRight(docs => prompt.flatMapRight(llm.ask(docs)))
