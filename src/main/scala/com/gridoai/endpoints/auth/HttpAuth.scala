@@ -11,6 +11,7 @@ import cats.effect.IO
 import com.gridoai.utils.|>
 import com.gridoai.utils.trace
 import com.gridoai.utils.addLocationToLeft
+import com.gridoai.auth.getAuthDataFromJwt
 implicit val jwtPayloadDecoder: Decoder[JWTPayload] = deriveDecoder[JWTPayload]
 
 def decodeJwt(token: String) =
@@ -18,8 +19,7 @@ def decodeJwt(token: String) =
     .decode(token, JwtOptions(signature = false))
     .toEither
     .map(claim => claim.content)
-    .trace
-    .flatMap(decode[JWTPayload](_))
+    .flatMap(decode[JWTPayload](_).map(getAuthDataFromJwt))
     .left
     .map(_.getMessage())
     .addLocationToLeft
@@ -29,6 +29,7 @@ def decodeJwt(token: String) =
 private val securedWithBearerEndpoint = endpoint
   .securityIn(auth.bearer[String]())
   .errorOut(statusCode(StatusCode.Unauthorized))
+  .errorOut(statusCode(StatusCode.BadRequest))
 
 val securedWithBearer =
   securedWithBearerEndpoint
