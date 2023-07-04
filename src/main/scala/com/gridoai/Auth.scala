@@ -16,6 +16,12 @@ case class JWTPayload(
     sub: String
 )
 
+case class AuthData(
+    orgId: String,
+    role: String,
+    userId: String
+)
+
 val mockedJwt =
   JWTPayload(
     "www.grioai.com",
@@ -36,12 +42,20 @@ def makeMockedToken =
     .trace
 
 val getOrgIdAndRolesFromJwt = (jwt: JWTPayload) =>
-  (jwt.orgId.getOrElse(jwt.sub), jwt.role.getOrElse("member"))
+  (jwt.role, jwt.orgId) match
+    case (Some(role), Some(orgId)) => (orgId, role)
+    // If you aren't part of an org, you're an admin of your own org
+    case (_, None)       => (jwt.sub, "admin")
+    case (None, Some(_)) => (jwt.sub, "member")
 
-def limitRole[A](role: Option[String], error: A)(resource: A) =
+val getAuthDataFromJwt = (jwt: JWTPayload) =>
+  val (orgId, role) = getOrgIdAndRolesFromJwt(jwt)
+  AuthData(orgId, role, jwt.sub)
+
+def limitRole[A](role: String, error: A)(resource: => A) =
   role match
-    case Some("admin") => resource
-    case _             => error
+    case ("admin") => resource
+    case _         => error
 
 def authErrorMsg(author: Option[String] = Some("User")) =
   author match
