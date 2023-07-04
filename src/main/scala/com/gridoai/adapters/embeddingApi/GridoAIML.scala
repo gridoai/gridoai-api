@@ -3,7 +3,6 @@ package com.gridoai.adapters.embeddingApi
 import cats.effect.IO
 import com.gridoai.adapters.*
 import com.gridoai.domain.Embedding
-import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.parser.*
 import io.circe.syntax.*

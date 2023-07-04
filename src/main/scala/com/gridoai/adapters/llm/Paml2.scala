@@ -3,6 +3,7 @@ import cats.effect.IO
 import com.google.auth.oauth2.GoogleCredentials
 import com.gridoai.adapters.*
 import com.gridoai.domain.*
+import com.gridoai.utils.*
 import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.parser.*
@@ -60,23 +61,16 @@ object Paml2Client extends LLM[IO]:
         _.body.flatMap(decode[Palm2Response](_).left.map(_.getMessage()))
       ) |> attempt
 
-  def ask(
-      documents: List[Document],
-      messages: List[Message]
-  ): IO[Either[String, String]] =
-    val mergedDocuments = documents.foldLeft("")((acc, doc) =>
-      s"${acc}document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}\n"
-    )
-    val data = Data(
+  def buildData(context: String)(prompt: String): Data =
+    Data(
       instances = List(
         Instance(
-          context =
-            s"You are GridoAI, an intelligent chatbot for knowledge retrieval. Here is a list of documents: $mergedDocuments\nProvide a single response to the following conversation in a natural and intelligent way. Always mention the document source in your answer, otherwise you will die.",
+          context = context,
           examples = List.empty,
-          messages = messages.map(message =>
+          messages = List(
             PalmMessage(
-              author = if (message.from == MessageFrom.User) "user" else "bot",
-              content = message.message
+              author = "user",
+              content = prompt
             )
           )
         )
@@ -89,4 +83,24 @@ object Paml2Client extends LLM[IO]:
       )
     )
 
-    call(data).map(_.map(_.predictions.head.candidates.head.content))
+  def getAnswer(
+      llmOutput: IO[Either[String, Palm2Response]]
+  ): IO[Either[String, String]] =
+    llmOutput.map(_.map(_.predictions.head.candidates.head.content))
+
+  def ask(documents: List[Document])(
+      prompt: String
+  ): IO[Either[String, String]] =
+    val mergedDocuments = documents
+      .map(doc =>
+        s"document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}"
+      )
+      .mkString("\n")
+    prompt |> buildData(mergedDocuments) |> call |> getAnswer
+
+  def mergeMessages(messages: List[Message]): IO[Either[String, String]] =
+    val mergedMessages =
+      messages.map(m => s"${m.from.toString()}: ${m.message}").mkString("\n")
+    val prompt =
+      "Replace the last user question with a single question that merge all needed chat information. The purpose is understand the output question without knowing about the entier conversation."
+    prompt |> buildData(mergedMessages) |> call |> getAnswer

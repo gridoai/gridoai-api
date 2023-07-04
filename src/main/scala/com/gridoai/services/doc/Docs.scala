@@ -29,12 +29,10 @@ def searchDoc(auth: AuthData)(text: String)(using
 
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
-    .map(
-      _.map(vec =>
-        db.getNearDocuments(vec, 5, auth.orgId, auth.role)
-          .map(_.map(_.map(_.document)))
-      )
-    ) |> flattenIOEitherIOEither
+    .flatMapRight(vec =>
+      db.getNearDocuments(vec, 5, auth.orgId, auth.role)
+        .map(_.map(_.map(_.document)))
+    )
 
 def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
   FileParseError(e.format, e.message)
@@ -91,7 +89,7 @@ def uploadFile(auth: AuthData)(file: Part[File])(using db: DocDB[IO]) =
             content = content
           )
         )
-          .map(_.leftMap(DocumentCreationError.apply))
+          .mapLeft(DocumentCreationError.apply)
 
       case (_, Left(e: FileUploadError)) =>
         IO.pure(Left(e))
@@ -145,34 +143,24 @@ def createDoc(auth: AuthData)(
         payload.toDocument(UUID.randomUUID(), payload.content.split(" ").length)
       getEmbeddingAPI("gridoai-ml")
         .embed(document.content)
-        .map(
-          _.map(vec =>
-            db.addDocument(
-              DocumentWithEmbedding(document, vec),
-              auth.orgId,
-              auth.role
-            )
+        .flatMapRight(vec =>
+          db.addDocument(
+            DocumentWithEmbedding(document, vec),
+            auth.orgId,
+            auth.role
           )
-        ) |> flattenIOEitherIOEither
+        )
 
 def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]
 ): IO[Either[String, String]] = traceMappable("ask"):
-  val prompt = messages.head.message
-  val llm = getLLM("palm2")
-  println("Using llm: " + llm.toString())
   messages.last.from match
     case MessageFrom.Bot =>
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
-      searchDoc(auth)(prompt).flatMap:
-        case Right(docs) =>
-          val sources = docs.map(_.source).mkString(", ")
-          llm
-            .ask(docs, messages)
-            .map(
-              _.map(x =>
-                if docs.length < 1 then x else s"$x\nsources: $sources"
-              )
-            )
-        case Left(l) => IO.pure(Left(l))
+      val llm = getLLM("palm2")
+      println("Using llm: " + llm.toString())
+      val prompt = llm.mergeMessages(messages)
+      prompt
+        .flatMapRight(searchDoc(auth))
+        .flatMapRight(docs => prompt.flatMapRight(llm.ask(docs)))

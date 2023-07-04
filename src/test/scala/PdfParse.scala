@@ -8,7 +8,7 @@ class PdfParserTest extends CatsEffectSuite {
     val t = Files.readAllBytes(Paths.get("./src/test/resources/test.pdf"))
     val expected =
       Files.readString(Paths.get("./src/test/resources/expected_pdf.txt"))
-    extractTextFromPdf(t).assertEquals(expected)
+    extractTextFromPdf(t).assertEquals(Right(expected))
 
   }
 }
