@@ -1,6 +1,5 @@
 package com.gridoai.endpoints
 import cats.effect.IO
-import com.gridoai.auth.JWTPayload
 import com.gridoai.domain.*
 import com.gridoai.endpoints.auth
 import com.gridoai.parsers.FileFormats
@@ -15,10 +14,11 @@ import sttp.tapir.server.PartialServerEndpoint
 
 import java.io.File
 import java.util.UUID
+import com.gridoai.auth.AuthData
 
 type PublicEndpoint[I, E, O, -R] = Endpoint[Unit, I, E, O, R]
 type SecuredEndpoint[I, E, O, -R] =
-  PartialServerEndpoint[String, JWTPayload, I, E, O, R, IO]
+  PartialServerEndpoint[String, AuthData, I, E, O, R, IO]
 
 case class FileUpload(files: List[Part[File]])
 
