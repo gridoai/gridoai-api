@@ -61,7 +61,7 @@ object Paml2Client extends LLM[IO]:
         _.body.flatMap(decode[Palm2Response](_).left.map(_.getMessage()))
       ) |> attempt
 
-  def buildData(context: String)(prompt: String): Data =
+  def makePayloadWithContext(context: String)(prompt: String): Data =
     Data(
       instances = List(
         Instance(
@@ -96,11 +96,11 @@ object Paml2Client extends LLM[IO]:
         s"document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}"
       )
       .mkString("\n")
-    prompt |> buildData(mergedDocuments) |> call |> getAnswer
+    prompt |> makePayloadWithContext(mergedDocuments) |> call |> getAnswer
 
   def mergeMessages(messages: List[Message]): IO[Either[String, String]] =
     val mergedMessages =
       messages.map(m => s"${m.from.toString()}: ${m.message}").mkString("\n")
     val prompt =
       "Replace the last user question with a single question that merge all needed chat information. The purpose is understand the output question without knowing about the entier conversation."
-    prompt |> buildData(mergedMessages) |> call |> getAnswer
+    prompt |> makePayloadWithContext(mergedMessages) |> call |> getAnswer
