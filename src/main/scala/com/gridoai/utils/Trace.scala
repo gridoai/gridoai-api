@@ -1,8 +1,6 @@
 package com.gridoai.utils
 
 import cats.effect.IO
-import cats.syntax.functor._
-import cats.syntax.applicativeError._
 
 extension [T](a: T)
   def trace =
