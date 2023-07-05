@@ -88,19 +88,7 @@ object Paml2Client extends LLM[IO]:
   ): IO[Either[String, String]] =
     llmOutput.mapRight(_.predictions.head.candidates.head.content)
 
-  def ask(documents: List[Document])(
+  def ask(context: String)(
       prompt: String
   ): IO[Either[String, String]] =
-    val mergedDocuments = documents
-      .map(doc =>
-        s"document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}"
-      )
-      .mkString("\n")
-    prompt |> makePayloadWithContext(mergedDocuments) |> call |> getAnswer
-
-  def mergeMessages(messages: List[Message]): IO[Either[String, String]] =
-    val mergedMessages =
-      messages.map(m => s"${m.from.toString()}: ${m.message}").mkString("\n")
-    val prompt =
-      "Replace the last user question with a single question that merge all needed chat information. The purpose is understand the output question without knowing about the whole conversation."
-    prompt |> makePayloadWithContext(mergedMessages) |> call |> getAnswer
+    prompt |> makePayloadWithContext(context) |> call |> getAnswer
