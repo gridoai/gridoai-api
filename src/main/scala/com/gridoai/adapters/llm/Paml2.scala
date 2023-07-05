@@ -102,5 +102,5 @@ object Paml2Client extends LLM[IO]:
     val mergedMessages =
       messages.map(m => s"${m.from.toString()}: ${m.message}").mkString("\n")
     val prompt =
-      "Replace the last user question with a single question that merge all needed chat information. The purpose is understand the output question without knowing about the entier conversation."
+      "Replace the last user question with a single question that merge all needed chat information. The purpose is understand the output question without knowing about the whole conversation."
     prompt |> makePayloadWithContext(mergedMessages) |> call |> getAnswer
