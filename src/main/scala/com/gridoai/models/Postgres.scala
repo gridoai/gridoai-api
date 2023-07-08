@@ -11,26 +11,6 @@ import com.pgvector.PGvector
 import com.gridoai.domain.*
 import com.gridoai.utils.*
 
-implicit val getPGvector: Get[PGvector] =
-  Get[Array[Float]].map(new PGvector(_))
-implicit val putPGvector: Put[PGvector] =
-  Put[Array[Float]].tcontramap(_.toArray())
-
-val POSTGRES_URI = sys.env.getOrElse("POSTGRES_URI", "//localhost:5432/gridoai")
-val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
-val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
-val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
-
-def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
-val documentsTable = table("documents")
-
-val xa = Transactor.fromDriverManager[IO](
-  "org.postgresql.Driver", // driver classname
-  s"jdbc:postgresql:$POSTGRES_URI", // connect URL (driver-specific)
-  POSTGRES_USER,
-  POSTGRES_PASSWORD
-)
-
 case class Row(
     uid: UID,
     name: String,
@@ -40,13 +20,33 @@ case class Row(
     distance: Float
 )
 
+implicit val getPGvector: Get[PGvector] =
+  Get[Array[Float]].map(new PGvector(_))
+implicit val putPGvector: Put[PGvector] =
+  Put[Array[Float]].tcontramap(_.toArray())
+
+val POSTGRES_URI =
+  sys.env.getOrElse("POSTGRES_URI", "//localhost:5432/gridoai")
+val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
+val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
+val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
+
+val xa = Transactor.fromDriverManager[IO](
+  "org.postgresql.Driver", // driver classname
+  s"jdbc:postgresql:$POSTGRES_URI", // connect URL (driver-specific)
+  POSTGRES_USER,
+  POSTGRES_PASSWORD
+)
+
+def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
+val documentsTable = table("documents")
+
 object PostgresClient extends DocDB[IO]:
-  given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
   def addDocument(
       doc: DocumentWithEmbedding,
       orgId: String,
       role: String
-  ): IO[Either[String, Unit]] =
+  ): IO[Either[String, String]] =
     sql"""insert into $documentsTable (uid, name, source, content, token_quantity, embedding, organization, roles) 
      values (
       ${doc.document.uid},
@@ -60,7 +60,20 @@ object PostgresClient extends DocDB[IO]:
 
     )""".update.run
       .transact(xa)
-      .map(_ => Right(())) |> attempt
+      .map(_ => Right(doc.document.uid.toString())) |> attempt
+
+  def listDocuments(
+      orgId: String,
+      role: String,
+      limit: Int,
+      page: Int
+  ): IO[Either[String, List[Document]]] =
+    traceMappable("listDocuments"):
+      sql"select uid, name, source, content, token_quantity from $documentsTable where organization = $orgId limit $limit offset ${page * limit}"
+        .query[Document]
+        .to[List]
+        .transact(xa)
+        .map(Right(_)) |> attempt
 
   def getNearDocuments(
       embedding: Embedding,
