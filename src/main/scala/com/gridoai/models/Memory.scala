@@ -10,15 +10,23 @@ object MockDocDB extends DocDB[IO]:
   private val documents = ListBuffer[DocumentWithEmbedding](
     mockedDoc
   )
+  def listDocuments(
+      orgId: String,
+      role: String,
+      limit: Int,
+      page: Int
+  ): IO[Either[String, List[Document]]] =
+    IO.pure(Right(documents.toList.map(_.document)))
 
   def addDocument(
       doc: DocumentWithEmbedding,
       orgId: String,
       roles: String
-  ): IO[Either[String, Unit]] =
+  ): IO[Either[String, String]] =
     IO.pure {
       documents += doc
-      Right(println(s"Mock: Adding document $doc"))
+      println(s"Mock: Adding document $doc")
+      Right(doc.document.uid.toString())
     }
 
   def getNearDocuments(
