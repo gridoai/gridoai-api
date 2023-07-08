@@ -16,22 +16,23 @@ import java.util.UUID
 import com.gridoai.parsers.{ExtractTextError}
 import com.gridoai.adapters.*
 import com.gridoai.parsers.*
-import com.gridoai.auth.{JWTPayload, getOrgIdAndRolesFromJwt}
 import sttp.model.Part
 import java.io.File
 import com.gridoai.auth.limitRole
 import com.gridoai.auth.authErrorMsg
+import com.gridoai.auth.AuthData
 
-def searchDoc(auth: JWTPayload)(text: String)(using
+def searchDoc(auth: AuthData)(text: String)(using
     db: DocDB[IO]
 ): IO[Either[String, List[Document]]] =
   println(s"Searching for: $text")
-  val (orgId, roles) = getOrgIdAndRolesFromJwt(auth)
+
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
     .map(
       _.map(vec =>
-        db.getNearDocuments(vec, 5, orgId, roles).map(_.map(_.map(_.document)))
+        db.getNearDocuments(vec, 5, auth.orgId, auth.role)
+          .map(_.map(_.map(_.document)))
       )
     ) |> flattenIOEitherIOEither
 
@@ -70,9 +71,9 @@ def extractText(
         Left(ExtractTextError(FileFormats.Unknown(""), "Unknown file format"))
       )
 
-def uploadFile(auth: JWTPayload)(file: Part[File])(using db: DocDB[IO]) =
+def uploadFile(auth: AuthData)(file: Part[File])(using db: DocDB[IO]) =
   println(s"Uploading document... ${file.fileName}")
-  val (orgId, role) = getOrgIdAndRolesFromJwt(auth)
+
   extractText(file)
     .map(_.left.map(mapExtractToUploadError))
     .map(extracted =>
@@ -87,9 +88,7 @@ def uploadFile(auth: JWTPayload)(file: Part[File])(using db: DocDB[IO]) =
           DocumentCreationPayload(
             name = filename,
             source = filename,
-            content = content,
-            orgId = orgId,
-            role = role
+            content = content
           )
         )
           .map(_.leftMap(DocumentCreationError.apply))
@@ -99,38 +98,42 @@ def uploadFile(auth: JWTPayload)(file: Part[File])(using db: DocDB[IO]) =
       case (None, _) =>
         IO.pure(Left(UnknownError("File extension not known")))
 
-def uploadDocuments(auth: JWTPayload)(
+def uploadDocuments(auth: AuthData)(
     source: FileUpload
 )(using db: DocDB[IO]): IO[Either[List[FileUploadError], Unit]] =
   limitRole(
     auth.role,
-    (Left(List(UnauthorizedError(authErrorMsg(auth.role))))).pure[IO]
+    (Left(List(UnauthorizedError(authErrorMsg(Some(auth.role)))))).pure[IO]
   ):
     source.files
       .traverse(uploadFile(auth))
       .map(collectLeftsOrElseUnit)
 
-def createDoc(auth: JWTPayload)(
+
+def createDoc(auth: AuthData)(
     payload: DocumentCreationPayload
-)(implicit db: DocDB[IO]): IO[Either[String, Unit]] =
+)(implicit db: DocDB[IO]): IO[Either[String, String]] =
   limitRole(
     auth.role,
-    Left(authErrorMsg(auth.role)).pure[IO]
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
     traceMappable("createDoc"):
       println("Creating doc... ")
-      val (orgId, roles) = getOrgIdAndRolesFromJwt(auth)
       val document =
         payload.toDocument(UUID.randomUUID(), payload.content.split(" ").length)
       getEmbeddingAPI("gridoai-ml")
         .embed(document.content)
         .map(
           _.map(vec =>
-            db.addDocument(DocumentWithEmbedding(document, vec), orgId, roles)
+            db.addDocument(
+              DocumentWithEmbedding(document, vec),
+              auth.orgId,
+              auth.role
+            )
           )
         ) |> flattenIOEitherIOEither
 
-def ask(auth: JWTPayload)(messages: List[Message])(implicit
+def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]
 ): IO[Either[String, String]] = traceMappable("ask"):
   val prompt = messages.head.message
@@ -145,5 +148,9 @@ def ask(auth: JWTPayload)(messages: List[Message])(implicit
           val sources = docs.map(_.source).mkString(", ")
           llm
             .ask(docs, messages)
-            .map(_.map(x => s"$x\nsources: $sources"))
+            .map(
+              _.map(x =>
+                if docs.length < 1 then x else s"$x\nsources: $sources"
+              )
+            )
         case Left(l) => IO.pure(Left(l))
