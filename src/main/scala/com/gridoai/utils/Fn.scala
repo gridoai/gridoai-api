@@ -89,7 +89,7 @@ def traceMappable[T, F[_]: Functor](label: String)(
   *   `Either` is a `Right` containing `Unit`.
   */
 def collectLeftsOrElseUnit[E](
-    list: List[Either[E, Unit]]
+    list: List[Either[E, ?]]
 ): Either[List[E], Unit] = {
   val lefts = list.collect { case Left(e) => e }
   if (lefts.isEmpty) Right(())
