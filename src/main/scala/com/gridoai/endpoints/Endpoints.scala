@@ -36,6 +36,23 @@ val fileUploadEndpoint
     .out(jsonBody[Unit])
     .mapErrorOut(identity)(_.toString())
 
+val listEndpoint =
+  auth.securedWithBearer
+    .name("List")
+    .description("List all documents in the knowledge base")
+    .in("documents")
+    .in(query[Option[Int]]("limit").map(_.getOrElse(10))(Some(_)))
+    .in(query[Option[Int]]("offset").map(_.getOrElse(0))(Some(_)))
+    .out(jsonBody[List[Document]])
+
+val deleteEndpoint: SecuredEndpoint[String, String, Unit, Any] =
+  auth.securedWithBearer
+    .name("Delete")
+    .description("Delete a document from the knowledge base")
+    .in("documents")
+    .in(path[String]("id"))
+    .out(emptyOutput)
+
 val searchEndpoint: SecuredEndpoint[String, String, List[Document], Any] =
   auth.securedWithBearer
     .name("Search")
@@ -52,14 +69,14 @@ val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
     .out(stringBody)
 
 val createDocumentEndpoint
-    : SecuredEndpoint[DocumentCreationPayload, String, Unit, Any] =
+    : SecuredEndpoint[DocumentCreationPayload, String, String, Any] =
   auth.securedWithBearer
     .name("Create Document")
     .description("Create a document in the knowledge base")
     .post
-    .in("document")
+    .in("documents")
     .in(jsonBody[DocumentCreationPayload])
-    .out(emptyOutput)
+    .out(stringBody)
 
 val askEndpoint: SecuredEndpoint[List[Message], String, String, Any] =
   auth.securedWithBearer
@@ -70,9 +87,20 @@ val askEndpoint: SecuredEndpoint[List[Message], String, String, Any] =
     .in(jsonBody[List[Message]])
     .out(stringBody)
 
+val allEndpoints: List[AnyEndpoint] =
+  List(
+    fileUploadEndpoint.endpoint,
+    listEndpoint.endpoint,
+    deleteEndpoint.endpoint,
+    searchEndpoint.endpoint,
+    healthCheckEndpoint,
+    createDocumentEndpoint.endpoint,
+    askEndpoint.endpoint
+  )
+
 val getSchema =
   OpenAPIDocsInterpreter()
-    .toOpenAPI(askEndpoint.endpoint, "GridoAI", "1.0")
+    .toOpenAPI(allEndpoints, "GridoAI", "1.0")
     .toYaml
 
 def dumpSchema() =
