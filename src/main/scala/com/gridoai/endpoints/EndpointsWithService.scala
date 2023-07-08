@@ -19,8 +19,22 @@ object withService:
   def uploadDocs(implicit db: DocDB[IO]) =
     fileUploadEndpoint.serverLogic(uploadDocuments _)
 
+  def deleteDoc(implicit db: DocDB[IO]) =
+    deleteEndpoint.serverLogic(deleteDocument _)
+
+  def listDocs(implicit db: DocDB[IO]) =
+    listEndpoint.serverLogic(listDocuments _)
+
   def askLLM(implicit db: DocDB[IO]) =
     askEndpoint.serverLogic(ask _)
 
   def allEndpoints(implicit db: DocDB[IO]): List[ServerEndpoint[Any, IO]] =
-    List(searchDocs, healthCheck, createDocument, uploadDocs, askLLM)
+    List(
+      searchDocs,
+      healthCheck,
+      createDocument,
+      uploadDocs,
+      askLLM,
+      deleteDoc,
+      listDocs
+    )
