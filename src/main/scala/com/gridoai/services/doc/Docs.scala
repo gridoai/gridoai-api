@@ -109,6 +109,28 @@ def uploadDocuments(auth: AuthData)(
       .traverse(uploadFile(auth))
       .map(collectLeftsOrElseUnit)
 
+def listDocuments(auth: AuthData)(
+    limit: Int,
+    page: Int
+)(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    traceMappable("listDocuments"):
+      println("Listing docs... ")
+      db.listDocuments(auth.orgId, auth.role, limit, page)
+
+def deleteDocument(auth: AuthData)(id: String)(using
+    db: DocDB[IO]
+): IO[Either[String, Unit]] =
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    traceMappable("deleteDocument"):
+      println("Deleting doc... ")
+      db.deleteDocument(UUID.fromString(id), auth.orgId, auth.role)
 
 def createDoc(auth: AuthData)(
     payload: DocumentCreationPayload
