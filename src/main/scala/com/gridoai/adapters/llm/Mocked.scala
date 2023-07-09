@@ -1,4 +1,4 @@
-package com.gridoai.adapters.llm.mocked
+package com.gridoai.adapters.llm
 
 import cats._
 import cats.implicits._
