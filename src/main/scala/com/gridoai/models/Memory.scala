@@ -13,8 +13,8 @@ object MockDocDB extends DocDB[IO]:
   def listDocuments(
       orgId: String,
       role: String,
-      limit: Int,
-      page: Int
+      start: Int,
+      end: Int
   ): IO[Either[String, List[Document]]] =
     IO.pure(Right(documents.toList.map(_.document)))
 

@@ -110,8 +110,8 @@ def uploadDocuments(auth: AuthData)(
       .map(collectLeftsOrElseUnit)
 
 def listDocuments(auth: AuthData)(
-    limit: Int,
-    page: Int
+    start: Int,
+    end: Int
 )(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
   limitRole(
     auth.role,
@@ -119,7 +119,7 @@ def listDocuments(auth: AuthData)(
   ):
     traceMappable("listDocuments"):
       println("Listing docs... ")
-      db.listDocuments(auth.orgId, auth.role, limit, page)
+      db.listDocuments(auth.orgId, auth.role, start, end)
 
 def deleteDocument(auth: AuthData)(id: String)(using
     db: DocDB[IO]
