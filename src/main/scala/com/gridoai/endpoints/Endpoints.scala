@@ -41,8 +41,8 @@ val listEndpoint =
     .name("List")
     .description("List all documents in the knowledge base")
     .in("documents")
-    .in(query[Option[Int]]("start").map(_.getOrElse(10))(Some(_)))
-    .in(query[Option[Int]]("end").map(_.getOrElse(0))(Some(_)))
+    .in(query[Option[Int]]("start").map(_.getOrElse(0))(Some(_)))
+    .in(query[Option[Int]]("end").map(_.getOrElse(10))(Some(_)))
     .out(jsonBody[List[Document]])
 
 val deleteEndpoint: SecuredEndpoint[String, String, Unit, Any] =
