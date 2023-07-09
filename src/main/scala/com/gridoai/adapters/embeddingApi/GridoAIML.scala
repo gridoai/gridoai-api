@@ -5,7 +5,6 @@ import com.gridoai.adapters.*
 import com.gridoai.domain.Embedding
 import io.circe.generic.auto.*
 import io.circe.parser.*
-import io.circe.syntax.*
 
 import com.gridoai.utils.*
 
@@ -33,4 +32,4 @@ object GridoAIML extends EmbeddingAPI[IO]:
           decode[MessageResponse[Embedding]](_).left.map(_.getMessage())
         )
       )
-      .map(_.map(_.message)) |> attempt
+      .mapRight(_.message) |> attempt

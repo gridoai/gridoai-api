@@ -61,25 +61,30 @@ object Paml2Client extends LLM[IO]:
         _.body.flatMap(decode[Palm2Response](_).left.map(_.getMessage()))
       ) |> attempt
 
-  def makePayloadWithContext(context: String)(prompt: String): Data =
+  def makePayloadWithContext(
+      context: String,
+      temperature: Double = 0.2,
+      topP: Double = 0.8,
+      topK: Int = 10
+  )(messages: List[Message]): Data =
     Data(
       instances = List(
         Instance(
           context = context,
           examples = List.empty,
-          messages = List(
+          messages = messages.map(message =>
             PalmMessage(
-              author = "user",
-              content = prompt
+              author = if (message.from == MessageFrom.User) "user" else "bot",
+              content = message.message
             )
           )
         )
       ),
       parameters = Parameters(
-        temperature = 0.2,
+        temperature = temperature,
         maxOutputTokens = 512,
-        topP = 0.8,
-        topK = 10
+        topP = topP,
+        topK = topK
       )
     )
 
@@ -88,7 +93,32 @@ object Paml2Client extends LLM[IO]:
   ): IO[Either[String, String]] =
     llmOutput.mapRight(_.predictions.head.candidates.head.content)
 
-  def ask(context: String)(
-      prompt: String
+  def ask(documents: List[Document])(
+      messages: List[Message]
   ): IO[Either[String, String]] =
-    prompt |> makePayloadWithContext(context) |> call |> getAnswer
+    val mergedDocuments = documents
+      .map(doc =>
+        s"document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}"
+      )
+      .mkString("\n")
+    val context = s"$baseContextPrompt\n$mergedDocuments"
+    messages |> makePayloadWithContext(context) |> call |> getAnswer
+
+  def mergeMessages(messages: List[Message]): IO[Either[String, String]] =
+
+    val mergedMessages =
+      messages.init
+        .map(m => s"${m.from.toString()}: ${m.message}")
+        .mkString("\n")
+    val singleMessage = List(
+      Message(
+        from = MessageFrom.User,
+        message =
+          s"Provide a laconic summary for the following conversation: $mergedMessages"
+      )
+    )
+    singleMessage |> makePayloadWithContext(
+      chatMergePrompt,
+      topP = 0.95,
+      topK = 40
+    ) |> call |> getAnswer
