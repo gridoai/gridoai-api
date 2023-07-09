@@ -7,6 +7,8 @@ import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.parser.*
 import io.circe.syntax.*
+import com.gridoai.utils.attempt
+import com.gridoai.utils.|>
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
@@ -54,7 +56,9 @@ object Paml2Client extends LLM[IO]:
       .headers(headers)
       .body(data.asJson.toString())
       .sendReq()
-      .map(_.body.flatMap(decode[Palm2Response](_).left.map(_.getMessage())))
+      .map(
+        _.body.flatMap(decode[Palm2Response](_).left.map(_.getMessage()))
+      ) |> attempt
 
   def ask(
       documents: List[Document],

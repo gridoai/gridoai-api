@@ -120,6 +120,9 @@ def listDocuments(auth: AuthData)(
     traceMappable("listDocuments"):
       println("Listing docs... ")
       db.listDocuments(auth.orgId, auth.role, start, end)
+        .map: x =>
+          println("Listed docs: " + x.map(_.length))
+          x
 
 def deleteDocument(auth: AuthData)(id: String)(using
     db: DocDB[IO]

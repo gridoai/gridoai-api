@@ -42,6 +42,7 @@ def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
 val documentsTable = table("documents")
 
 object PostgresClient extends DocDB[IO]:
+  given doobie.LogHandler = doobie.util.log.LogHandler.jdkLogHandler
   def addDocument(
       doc: DocumentWithEmbedding,
       orgId: String,
@@ -69,7 +70,7 @@ object PostgresClient extends DocDB[IO]:
       end: Int
   ): IO[Either[String, List[Document]]] =
     traceMappable("listDocuments"):
-      sql"select uid, name, source, content, token_quantity from $documentsTable where organization = ${orgId} limit ${(end - start).abs} offset ${start}"
+      sql"select uid, name, source, content, token_quantity from $documentsTable where organization = ${orgId} order by uid asc limit ${(end - start).abs} offset ${start}"
         .query[Document]
         .to[List]
         .transact(xa)

@@ -15,7 +15,10 @@ val catsBackend =
 
 def sendRequest[T] = (r: Request[T, Any]) => catsBackend.flatMap(r.send)
 
-extension [T](r: Request[T, Any]) def sendReq() = sendRequest(r)
+extension [T](r: Request[T, Any])
+  def sendReq() =
+    println(r.toCurl)
+    sendRequest(r)
 
 def isHostReachable(
     host: String

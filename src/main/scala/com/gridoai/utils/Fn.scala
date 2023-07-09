@@ -9,7 +9,7 @@ extension [A](a: A) {
 }
 
 def attempt[T](x: IO[Either[String, T]]): IO[Either[String, T]] =
-  x.attempt.map(_.flatten.left.map(_.toString()))
+  x.attempt.map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
 
 def flattenIOEitherIOEither[E, T](
     x: IO[Either[E, IO[Either[E, T]]]]
