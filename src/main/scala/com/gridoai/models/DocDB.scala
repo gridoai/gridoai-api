@@ -29,6 +29,6 @@ trait DocDB[F[_]]:
   def listDocuments(
       orgId: String,
       role: String,
-      limit: Int,
-      page: Int
+      start: Int,
+      end: Int
   ): F[Either[String, List[Document]]]
