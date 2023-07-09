@@ -55,7 +55,7 @@ class DocumentModel extends CatsEffectSuite {
       DocsDB.addDocument(doc2, "org2", "admin")
     ).parSequence
 
-    assertIO(results, List(Right(()), Right(())))
+    assertIO(results, List(Right(doc1Id.toString()), Right(doc2Id.toString())))
   }
 
   test("Get near documents") {

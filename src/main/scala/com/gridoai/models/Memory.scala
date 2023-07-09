@@ -6,17 +6,31 @@ import com.gridoai.mock.mockedDoc
 
 import scala.collection.mutable.ListBuffer
 
+case class MockedRow(
+    doc: DocumentWithEmbedding,
+    orgId: String,
+    role: String
+)
+
 object MockDocDB extends DocDB[IO]:
-  private val documents = ListBuffer[DocumentWithEmbedding](
-    mockedDoc
+  private val documents = ListBuffer[MockedRow](
+    MockedRow(mockedDoc, "org1", "role1")
   )
+
   def listDocuments(
       orgId: String,
       role: String,
       start: Int,
       end: Int
   ): IO[Either[String, List[Document]]] =
-    IO.pure(Right(documents.toList.map(_.document)))
+    IO.pure(
+      Right(
+        documents.toList
+          .filter(row => row.orgId == orgId && row.role == role)
+          .map(_.doc.document)
+          .slice(start, end)
+      )
+    )
 
   def addDocument(
       doc: DocumentWithEmbedding,
@@ -24,7 +38,7 @@ object MockDocDB extends DocDB[IO]:
       roles: String
   ): IO[Either[String, String]] =
     IO.pure {
-      documents += doc
+      documents += MockedRow(doc, orgId, roles)
       println(s"Mock: Adding document $doc")
       Right(doc.document.uid.toString())
     }
@@ -38,10 +52,11 @@ object MockDocDB extends DocDB[IO]:
     IO.pure(
       Right(
         documents.toList
+          .filter(row => row.orgId == orgId && row.role == role)
           .take(limit)
           .map(x =>
             SimilarDocument(
-              document = x.document,
+              document = x.doc.document,
               distance = 1
             )
           )
@@ -54,6 +69,16 @@ object MockDocDB extends DocDB[IO]:
       role: String
   ): IO[Either[String, Unit]] =
     IO.pure {
-      val documentToDelete = documents.filter(_.document.uid == uid).head
-      Right(documents -= documentToDelete)
+      val documentToDelete = documents
+        .filter(row =>
+          row.doc.document.uid == uid && row.orgId == orgId && row.role == role
+        )
+        .headOption
+      documentToDelete match {
+        case Some(doc) =>
+          documents -= doc
+          Right(())
+        case None =>
+          Left("No document was deleted")
+      }
     }

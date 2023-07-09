@@ -1,3 +1,5 @@
+package com.gridoai.test
+
 import cats.effect.IO
 import com.gridoai.auth.makeMockedToken
 import com.gridoai.domain.*
@@ -19,18 +21,6 @@ import sttp.tapir.integ.cats.effect.CatsMonadError
 import sttp.tapir.server.stub.TapirStubInterpreter
 import sttp.tapir.server.ServerEndpoint
 
-def streamToString(stream: Stream[IO, Byte]): IO[String] = {
-  stream.through(utf8.decode).compile.toList.map(_.mkString)
-}
-
-val serverStub = TapirStubInterpreter(
-  SttpBackendStub(new CatsMonadError[IO]())
-)
-
-def serverStubOf(endpoint: ServerEndpoint[Any, IO]) = {
-  serverStub.whenServerEndpointRunLogic(endpoint).backend()
-}
-
 val mockedDocsResponse =
   """[{"uid":"694b8567-8c93-45c6-8051-34be4337e740","name":"Sky observations","source":"https://www.nasa.gov/planetarydefense/faq/asteroid","content":"The sky is blue","tokenQuantity":4}]"""
 
@@ -48,13 +38,51 @@ class API extends CatsEffectSuite {
 
     assertIO(response.map(_.body), Right("OK"))
   }
+  test("Can't get documents without auth") {
+    val responseWithoutAuth = basicRequest
+      .get(uri"http://test.com/documents")
+      .send(serverStubOf(withService.listDocs))
 
+    assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
+  }
+  test("Can't create documents without auth") {
+    val responseWithoutAuth = basicRequest
+      .post(uri"http://test.com/documents")
+      .send(serverStubOf(withService.createDocument))
+
+    assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
+  }
+  test("Can't delete documents without auth") {
+    val responseWithoutAuth = basicRequest
+      .delete(uri"http://test.com/documents/123")
+      .send(serverStubOf(withService.deleteDoc))
+
+    assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
+  }
   test("Can't search documents without auth") {
     val responseWithoutAuth = basicRequest
       .get(uri"http://test.com/search?query=foo")
       .send(searchDocsBE)
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
+  }
+  test("Creates a document") {
+    val authenticatedRequest = basicRequest
+      .post(uri"http://test.com/documents")
+      .headers(authHeader)
+      .body(
+        Document(
+          uid =
+            java.util.UUID.fromString("694b8567-8c93-45c6-8051-34be4337e740"),
+          name = "Sky observations",
+          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
+          content = "The sky is blue",
+          tokenQuantity = 4
+        ).asJson.toString
+      )
+      .send(serverStubOf(withService.createDocument))
+
+    assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
   }
   test("Searches for a document") {
 
