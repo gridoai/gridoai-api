@@ -69,7 +69,7 @@ object PostgresClient extends DocDB[IO]:
       end: Int
   ): IO[Either[String, List[Document]]] =
     traceMappable("listDocuments"):
-      sql"select uid, name, source, content, token_quantity from $documentsTable where organization = ${orgId} limit ${end - start} offset ${start}"
+      sql"select uid, name, source, content, token_quantity from $documentsTable where organization = ${orgId} limit ${(end - start).abs} offset ${start}"
         .query[Document]
         .to[List]
         .transact(xa)
