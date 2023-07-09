@@ -29,9 +29,11 @@ def searchDoc(auth: AuthData)(text: String)(using
 
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
-    .flatMapRight(vec =>
-      db.getNearDocuments(vec, 5, auth.orgId, auth.role).mapRight(_.map(_.document))
+    .flatMapRight(vec => db.getNearDocuments(vec, 5, auth.orgId, auth.role))
+    .traceRight(docs =>
+      s"result documents: ${docs.map(doc => s"${doc.document.name} (${doc.distance})").mkString(", ")}"
     )
+    .mapRight(_.map(_.document))
 
 def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
   FileParseError(e.format, e.message)
@@ -153,29 +155,19 @@ def createDoc(auth: AuthData)(
 def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]
 ): IO[Either[String, String]] = traceMappable("ask"):
-  val mergePrompt =
-    "Replace the last user question with a single question that merge all needed chat information. The purpose is understand the output question without knowing about the whole conversation."
-  val baseContextPrompt =
-    "You are GridoAI, an intelligent chatbot for knowledge retrieval. Provide a single response to the following conversation in a natural and intelligent way. Always mention the document source in your answer, otherwise you will die."
   messages.last.from match
     case MessageFrom.Bot =>
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
       val llm = getLLM("palm2")
-      println("Using llm: " + llm.toString())
-      val mergedMessages =
-        messages.map(m => s"${m.from.toString()}: ${m.message}").mkString("\n")
-      val prompt = llm.ask(mergedMessages)(mergePrompt)
+      println("Used llm: " + llm.toString())
+
+      val prompt = llm.mergeMessages(messages)
       prompt
         .trace("prompt built by llm")
         .flatMapRight(searchDoc(auth))
-        .mapRight(
-          _.map(doc =>
-            s"document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}"
-          )
-            .mkString("\n")
+        .flatMapRight(docs =>
+          prompt
+            .mapRight(p => List(Message(from = MessageFrom.User, message = p)))
+            .flatMapRight(llm.ask(docs))
         )
-        .mapRight(docs =>
-          s"$baseContextPrompt\nHere is a list of documents:\n$docs"
-        )
-        .flatMapRight(context => prompt.flatMapRight(llm.ask(context)))

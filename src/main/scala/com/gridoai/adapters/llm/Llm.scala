@@ -1,9 +1,14 @@
 package com.gridoai.adapters.llm
 
 import cats.effect.IO
+import com.gridoai.domain.Message
+import com.gridoai.domain.Document
 
 trait LLM[F[_]]:
-  def ask(context: String)(prompt: String): F[Either[String, String]]
+  def ask(documents: List[Document])(
+      messages: List[Message]
+  ): F[Either[String, String]]
+  def mergeMessages(messages: List[Message]): F[Either[String, String]]
 
 def getLLMByName(name: String): LLM[IO] =
   name match
