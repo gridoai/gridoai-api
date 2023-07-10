@@ -9,11 +9,11 @@ extension [T](a: T)
 
 extension [T](a: IO[T])
   def trace(msg: String = ""): IO[T] =
-    a.attempt.flatTap(attempt => IO(println(s"$msg: $attempt"))).rethrow
+    a.attempt.flatTap(attempt => IO.println(s"$msg: $attempt")).rethrow
 
   def trace(f: T => String): IO[T] =
-    a.attempt.flatTap(attempt => IO(println(attempt.map(f)))).rethrow
+    a.attempt.flatTap(attempt => IO.println(attempt.map(f))).rethrow
 
 extension [T, E](a: IO[Either[E, T]])
   def traceRight(f: T => String): IO[Either[E, T]] =
-    a.attempt.flatTap(attempt => IO(println(attempt.map(_.map(f))))).rethrow
+    a.attempt.flatTap(attempt => IO.println(attempt.map(_.map(f)))).rethrow
