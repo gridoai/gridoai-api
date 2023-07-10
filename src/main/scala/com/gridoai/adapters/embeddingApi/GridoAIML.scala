@@ -5,6 +5,8 @@ import com.gridoai.adapters.*
 import com.gridoai.domain.Embedding
 import io.circe.generic.auto.*
 import io.circe.parser.*
+import io.circe.*
+import io.circe.syntax.*
 
 import com.gridoai.utils.*
 
