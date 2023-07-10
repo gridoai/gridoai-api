@@ -114,11 +114,11 @@ object Paml2Client extends LLM[IO]:
       Message(
         from = MessageFrom.User,
         message =
-          s"Provide a laconic summary for the following conversation: $mergedMessages"
+          s"$chatMergePrompt\n\nProvide a laconic summary for the following conversation: $mergedMessages"
       )
     )
     singleMessage |> makePayloadWithContext(
-      chatMergePrompt,
+      "",
       topP = 0.95,
       topK = 40
     ) |> call |> getAnswer
