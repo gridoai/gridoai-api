@@ -107,7 +107,7 @@ object Paml2Client extends LLM[IO]:
   def mergeMessages(messages: List[Message]): IO[Either[String, String]] =
 
     val mergedMessages =
-      messages.init
+      messages
         .map(m => s"${m.from.toString()}: ${m.message}")
         .mkString("\n")
     val singleMessage = List(
