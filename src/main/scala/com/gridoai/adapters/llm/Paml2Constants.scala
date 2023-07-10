@@ -3,6 +3,11 @@ package com.gridoai.adapters.llm
 val baseContextPrompt =
   "You are GridoAI, an intelligent chatbot for knowledge retrieval. Provide a single response to the following conversation in a natural and intelligent way. Always mention the document source in your answer."
 
+val defaultTemperature: Double = 0.2
+val defaultMaxOutputTokens: Int = 512
+val defaultTopP: Double = 0.8
+val defaultTopK: Int = 10
+
 val chatMergePrompt: String =
   """Provide a laconic summary for the following conversation: User: We need to take the accounts system offline to carry out the upgrade. But don\'t worry, it won\'t cause too much inconvenience. We\'re going to do it over the weekend.
 Bot: How long will the system be down for?

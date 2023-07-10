@@ -3,7 +3,7 @@ import cats.effect.IO
 import com.google.auth.oauth2.GoogleCredentials
 import com.gridoai.adapters.*
 import com.gridoai.domain.*
-import com.gridoai.utils.*
+import com.gridoai.utils._
 import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.parser.*
@@ -63,9 +63,10 @@ object Paml2Client extends LLM[IO]:
 
   def makePayloadWithContext(
       context: String,
-      temperature: Double = 0.2,
-      topP: Double = 0.8,
-      topK: Int = 10
+      temperature: Double = defaultTemperature,
+      maxOutputTokens: Int = defaultMaxOutputTokens,
+      topP: Double = defaultTopP,
+      topK: Int = defaultTopK
   )(messages: List[Message]): Data =
     Data(
       instances = List(
@@ -82,7 +83,7 @@ object Paml2Client extends LLM[IO]:
       ),
       parameters = Parameters(
         temperature = temperature,
-        maxOutputTokens = 512,
+        maxOutputTokens = maxOutputTokens,
         topP = topP,
         topK = topK
       )
