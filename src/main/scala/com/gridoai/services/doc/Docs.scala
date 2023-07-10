@@ -162,7 +162,13 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
       val llm = getLLM("palm2")
       println("Used llm: " + llm.toString())
 
-      llm.mergeMessages(messages)
+      llm
+        .mergeMessages(messages)
         .trace("prompt built by llm")
         .flatMapRight(searchDoc(auth))
-        .flatMapRight(docs => llm.ask(docs)(messages))
+        .flatMapRight(docs =>
+          val answer = llm.ask(docs)(messages)
+          val sources = docs.map(_.source).mkString(", ")
+          if docs.length < 1 then answer
+          else answer.mapRight(x => s"$x\nsources: $sources")
+        )
