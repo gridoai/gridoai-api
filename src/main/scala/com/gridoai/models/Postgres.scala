@@ -42,7 +42,7 @@ def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
 val documentsTable = table("documents")
 
 object PostgresClient extends DocDB[IO]:
-  given doobie.LogHandler = doobie.util.log.LogHandler.jdkLogHandler
+
   def addDocument(
       doc: DocumentWithEmbedding,
       orgId: String,

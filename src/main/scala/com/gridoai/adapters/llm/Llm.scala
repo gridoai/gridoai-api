@@ -10,7 +10,12 @@ trait LLM[F[_]]:
       messages: List[Message]
   ): F[Either[String, String]]
 
+def getLLMByName(name: String): LLM[IO] =
+  name match
+    case "palm2"  => Paml2Client
+    case "mocked" => MockLLM[IO]
+
 def getLLM(name: String): LLM[IO] =
-  (sys.env.get("USE_MOCKED_EMBEDDINGS_API"), name) match
-    case ((Some("1"), _) | (_, "mocked")) => MockLLM[IO]
-    case (_, "palm2")                     => Paml2Client
+  sys.env.get("USE_MOCKED_LLM") match
+    case Some("1") => MockLLM[IO]
+    case _         => getLLMByName(name)
