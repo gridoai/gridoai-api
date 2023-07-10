@@ -162,12 +162,7 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
       val llm = getLLM("palm2")
       println("Used llm: " + llm.toString())
 
-      val prompt = llm.mergeMessages(messages)
-      prompt
+      llm.mergeMessages(messages)
         .trace("prompt built by llm")
         .flatMapRight(searchDoc(auth))
-        .flatMapRight(docs =>
-          prompt
-            .mapRight(p => List(Message(from = MessageFrom.User, message = p)))
-            .flatMapRight(llm.ask(docs))
-        )
+        .flatMapRight(docs => llm.ask(docs)(messages))
