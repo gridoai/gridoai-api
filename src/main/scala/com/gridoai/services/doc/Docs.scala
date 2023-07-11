@@ -149,9 +149,6 @@ def deleteDocument(auth: AuthData)(id: String)(using
       println("Deleting doc... ")
       db.deleteDocument(UUID.fromString(id), auth.orgId, auth.role)
 
-def splitContent(content: String): List[String] =
-  List(content)
-
 def createDoc(auth: AuthData)(
     payload: DocumentCreationPayload
 )(implicit db: DocDB[IO]): IO[Either[String, String]] =
@@ -162,25 +159,13 @@ def createDoc(auth: AuthData)(
     traceMappable("createDoc"):
       val embedding = getEmbeddingAPI("gridoai-ml")
       println("Creating doc... ")
-      splitContent(payload.content)
-        .map(content =>
-          Document(
-            uid = UUID.randomUUID(),
-            name = payload.name,
-            source = payload.source,
-            content = content,
-            tokenQuantity = content.split(" ").length
-          )
-        )
-        .traverse(document =>
-          embedding
-            .embed(document.content)
-            .flatMapRight(vec =>
-              db.addDocument(DocumentWithEmbedding(document, vec), auth.orgId, auth.role)
-            )
-        )
-        .map(collectLeftsOrElseUnit)
-        .mapLeft(x => x.mkString(","))
+      val document =
+        payload.toDocument(UUID.randomUUID(), payload.content.split(" ").length)
+      db.addDocument(
+        document,
+        auth.orgId,
+        auth.role
+      ).flatMapRight(makeAndStoreChunks(embedding, auth.orgId, auth.role))
 
 def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]

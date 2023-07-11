@@ -5,7 +5,9 @@ import io.circe.generic.semiauto._
 import java.util.UUID
 
 type UID = UUID
-type Embedding = List[Float]
+
+enum MessageFrom:
+  case Bot, User
 
 case class Document(
     uid: UID,
@@ -15,13 +17,24 @@ case class Document(
     tokenQuantity: Int
 )
 
-case class DocumentWithEmbedding(
-    document: Document,
-    embedding: Embedding
+case class Chunk(
+    documentUid: UID,
+    documentName: String,
+    documentSource: String,
+    uid: UID,
+    content: String,
+    tokenQuantity: Int
 )
 
-case class SimilarDocument(
-    document: Document,
+case class EmbeddingOutput(vector: List[Float], model: String)
+
+case class ChunkWithEmbedding(
+    chunk: Chunk,
+    embedding: EmbeddingOutput
+)
+
+case class SimilarChunk(
+    chunk: Chunk,
     distance: Float
 )
 
@@ -40,9 +53,6 @@ case class DocumentCreationPayload(
     content,
     tokenQuantity
   )
-
-enum MessageFrom:
-  case Bot, User
 
 case class Message(from: MessageFrom, message: String)
 
