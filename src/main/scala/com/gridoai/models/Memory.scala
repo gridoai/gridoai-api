@@ -22,13 +22,14 @@ object MockDocDB extends DocDB[IO]:
       role: String,
       start: Int,
       end: Int
-  ): IO[Either[String, List[Document]]] =
+  ) =
     IO.pure(
       Right(
         documents.toList
           .filter(row => row.orgId == orgId && row.role == role)
           .map(_.doc.document)
-          .slice(start, end)
+          .slice(start, end),
+        documents.length
       )
     )
 

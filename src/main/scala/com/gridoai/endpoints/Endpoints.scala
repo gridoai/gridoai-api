@@ -1,5 +1,6 @@
 package com.gridoai.endpoints
 import cats.effect.IO
+import com.gridoai.services.PaginatedResponse
 import com.gridoai.domain.*
 import com.gridoai.endpoints.auth
 import com.gridoai.parsers.FileFormats
@@ -43,7 +44,7 @@ val listEndpoint =
     .in("documents")
     .in(query[Option[Int]]("start").map(_.getOrElse(0))(Some(_)))
     .in(query[Option[Int]]("end").map(_.getOrElse(10))(Some(_)))
-    .out(jsonBody[List[Document]])
+    .out(jsonBody[PaginatedResponse[List[Document]]])
 
 val deleteEndpoint: SecuredEndpoint[String, String, Unit, Any] =
   auth.securedWithBearer

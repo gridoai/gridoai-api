@@ -3,7 +3,8 @@ import cats.effect.IO
 import cats.Functor
 import cats.implicits.toFunctorOps
 import cats.ApplicativeError
-
+import cats.effect.kernel.Sync
+import cats.implicits._
 extension [A](a: A) {
   inline def |>[B](inline f: A => B): B = f(a)
 }
@@ -18,8 +19,10 @@ extension [E, T](x: IO[Either[E, T]])
   def flatMapRight[V](f: T => IO[Either[E, V]]): IO[Either[E, V]] =
     x.mapRight(f) |> flattenIOEitherIOEither
 
-def attempt[T](x: IO[Either[String, T]]): IO[Either[String, T]] =
-  x.attempt.map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
+def attempt[T, F[_], E <: Either[String, T]](
+    x: F[E]
+)(using ae: ApplicativeError[F, Throwable]): F[Either[String, T]] =
+  ae.attempt(x).map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
 
 def flattenIOEitherIOEither[E, T](
     x: IO[Either[E, IO[Either[E, T]]]]
