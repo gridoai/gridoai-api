@@ -21,7 +21,7 @@ import java.io.File
 import com.gridoai.auth.limitRole
 import com.gridoai.auth.authErrorMsg
 import com.gridoai.auth.AuthData
-import com.gridoai.services.PaginatedResponse
+
 def searchDoc(auth: AuthData)(text: String)(using
     db: DocDB[IO]
 ): IO[Either[String, List[Document]]] =
@@ -119,11 +119,6 @@ def listDocuments(auth: AuthData)(
     traceMappable("listDocuments"):
       println("Listing docs... ")
       db.listDocuments(auth.orgId, auth.role, start, end)
-        .map(
-          _.map((documents, totalCount) =>
-            PaginatedResponse(documents, totalCount)
-          )
-        )
 
 def deleteDocument(auth: AuthData)(id: String)(using
     db: DocDB[IO]

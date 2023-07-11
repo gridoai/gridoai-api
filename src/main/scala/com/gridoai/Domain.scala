@@ -45,3 +45,5 @@ enum MessageFrom:
   case Bot, User
 
 case class Message(from: MessageFrom, message: String)
+
+case class PaginatedResponse[T](data: T, total: Int)

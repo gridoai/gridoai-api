@@ -5,6 +5,7 @@ import com.gridoai.domain.Embedding
 import com.gridoai.domain.DocumentWithEmbedding
 import com.gridoai.domain.SimilarDocument
 import com.gridoai.domain.Document
+import com.gridoai.domain.PaginatedResponse
 
 trait DocDB[F[_]]:
   def addDocument(
@@ -31,4 +32,4 @@ trait DocDB[F[_]]:
       role: String,
       start: Int,
       end: Int
-  ): F[Either[String, (List[Document], Int)]]
+  ): F[Either[String, PaginatedResponse[List[Document]]]]
