@@ -7,21 +7,39 @@ val http4sVersion = "0.23.19"
 val scala3Version = "3.3.0"
 val circeVersion = "0.14.1"
 val doobieVersion = "1.0.0-RC1"
+val projectName = "API"
+val currentVersion = "0.1.0-SNAPSHOT"
+val jarPath =
+  s"target/scala-${scala3Version}/API-assembly-${currentVersion}.jar"
+
+def bashCommand(name: String, command: String) = Command.command(name) {
+  state =>
+    val output = command.!(state.log)
+    output match {
+      case 0 => state
+      case _ => state.fail
+    }
+}
+
+val deployGcpFunction = bashCommand(
+  "deployGcpFunction",
+  "gcloud functions deploy api --region=us-west1 --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/deployment"
+)
+
+val makeJar = bashCommand("makeJar", s"cp $jarPath target/deployment/app.jar")
 
 val deploy = Command.command("deploy") { (state: State) =>
-  "rm target/scala-3.3.0/*.jar".!
-  "sbt assembly".!
-  "gcloud functions deploy api --region=us-west1 --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/scala-3.3.0/".!
-  state
+  state.:::(List("assembly", "makeJar", "deployGcpFunction"))
+
 }
 
 lazy val root = project
   .in(file("."))
   .settings(
-    name := "API",
-    version := "0.1.0-SNAPSHOT",
+    name := projectName,
+    version := currentVersion,
     scalaVersion := scala3Version,
-    commands += deploy,
+    commands ++= Seq(deployGcpFunction, makeJar, deploy),
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "com.google.cloud.functions" % "functions-framework-api" % "1.0.4" % "provided",
     libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "5.8.0",
