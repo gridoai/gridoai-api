@@ -22,7 +22,7 @@ object MockDocDB extends DocDB[IO]:
       role: String,
       start: Int,
       end: Int
-  ) =
+  ): IO[Either[String, PaginatedResponse[List[Document]]]] =
     IO.pure(
       Right(
         PaginatedResponse(
