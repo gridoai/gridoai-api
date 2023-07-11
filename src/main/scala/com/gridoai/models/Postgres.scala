@@ -57,7 +57,7 @@ object PostgresClient {
         ${doc.document.content},
         ${doc.document.tokenQuantity},
         ${doc.embedding},
-        ${orgId}, 
+        ${orgId},
         ${Array(role)}
       )""".update.run
         .transact[F](xa)
