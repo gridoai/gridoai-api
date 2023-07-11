@@ -57,7 +57,7 @@ object PostgresClient {
         ${doc.document.content},
         ${doc.document.tokenQuantity},
         ${doc.embedding},
-        ${orgId},
+        ${orgId}, 
         ${Array(role)}
       )""".update.run
         .transact[F](xa)
@@ -68,7 +68,7 @@ object PostgresClient {
         role: String,
         start: Int,
         end: Int
-    ): F[Either[String, (List[Document], Int)]] =
+    ): F[Either[String, PaginatedResponse[List[Document]]]] =
       traceMappable("listDocuments"):
         sql"""
        select uid, name, source, content, token_quantity, count(*) over() as total_count 
@@ -83,7 +83,7 @@ object PostgresClient {
           .transact[F](xa)
           .map(results =>
             val totalCount = results.headOption.map(_._2).getOrElse(0)
-            Right((results.map(_._1), totalCount))
+            Right(PaginatedResponse(results.map(_._1), totalCount))
           ) |> attempt
 
     def getNearDocuments(

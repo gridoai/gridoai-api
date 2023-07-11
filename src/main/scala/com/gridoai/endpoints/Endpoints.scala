@@ -1,6 +1,5 @@
 package com.gridoai.endpoints
 import cats.effect.IO
-import com.gridoai.services.PaginatedResponse
 import com.gridoai.domain.*
 import com.gridoai.endpoints.auth
 import com.gridoai.parsers.FileFormats

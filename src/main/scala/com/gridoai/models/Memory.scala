@@ -25,11 +25,13 @@ object MockDocDB extends DocDB[IO]:
   ) =
     IO.pure(
       Right(
-        documents.toList
-          .filter(row => row.orgId == orgId && row.role == role)
-          .map(_.doc.document)
-          .slice(start, end),
-        documents.length
+        PaginatedResponse(
+          documents.toList
+            .filter(row => row.orgId == orgId && row.role == role)
+            .map(_.doc.document)
+            .slice(start, end),
+          documents.length
+        )
       )
     )
 
