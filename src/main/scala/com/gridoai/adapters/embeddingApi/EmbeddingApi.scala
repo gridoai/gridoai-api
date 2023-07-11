@@ -1,10 +1,10 @@
 package com.gridoai.adapters.embeddingApi
 
 import cats.effect.IO
-import com.gridoai.domain.Embedding
+import com.gridoai.domain.EmbeddingOutput
 
 trait EmbeddingAPI[F[_]]:
-  def embed(text: String): F[Either[String, Embedding]]
+  def embed(text: String): F[Either[String, EmbeddingOutput]]
 
 def getEmbeddingAPI(name: String): EmbeddingAPI[IO] =
   sys.env.get("USE_MOCKED_EMBEDDINGS_API") match

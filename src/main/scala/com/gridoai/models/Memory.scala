@@ -2,20 +2,41 @@ package com.gridoai.models
 
 import cats.effect.IO
 import com.gridoai.domain._
-import com.gridoai.mock.mockedDoc
+import com.gridoai.mock.mockedChunk
+import com.gridoai.mock.mockedDocument
 
 import scala.collection.mutable.ListBuffer
 
-case class MockedRow(
-    doc: DocumentWithEmbedding,
-    orgId: String,
-    role: String
+case class MockedDocument(
+  doc: Document,
+  orgId: String,
+  role: String
+)
+
+case class MockedChunk(
+  chunk: ChunkWithEmbedding,
+  orgId: String,
+  role: String
 )
 
 object MockDocDB extends DocDB[IO]:
-  private val documents = ListBuffer[MockedRow](
-    MockedRow(mockedDoc, "org1", "role1")
+  private val allDocuments = ListBuffer[MockedDocument](
+    MockedDocument(mockedDocument, "org1", "role1")
   )
+  private val allChunks = ListBuffer[MockedChunk](
+    MockedChunk(mockedChunk, "org1", "role1")
+  )
+
+  def addDocument(
+    doc: Document,
+    orgId: String,
+    roles: String
+  ): IO[Either[String, Document]] =
+    IO.pure {
+      allDocuments += MockedDocument(doc, orgId, roles)
+      println(s"Mock: Adding document $doc")
+      Right(doc)
+    }
 
   def listDocuments(
       orgId: String,
@@ -26,60 +47,79 @@ object MockDocDB extends DocDB[IO]:
     IO.pure(
       Right(
         PaginatedResponse(
-          documents.toList
+          allDocuments.toList
             .filter(row => row.orgId == orgId && row.role == role)
-            .map(_.doc.document)
+            .map(_.doc)
             .slice(start, end),
-          documents.length
+          allDocuments.length
         )
       )
     )
 
-  def addDocument(
-      doc: DocumentWithEmbedding,
-      orgId: String,
-      roles: String
-  ): IO[Either[String, String]] =
+  def deleteDocument(
+    uid: UID,
+    orgId: String,
+    role: String
+  ): IO[Either[String, Unit]] =
     IO.pure {
-      documents += MockedRow(doc, orgId, roles)
-      println(s"Mock: Adding document $doc")
-      Right(doc.document.uid.toString())
+      val documentToDelete = allDocuments
+        .filter(row =>
+          row.doc.uid == uid && row.orgId == orgId && row.role == role
+        )
+        .headOption
+      documentToDelete match {
+        case Some(doc) =>
+          allDocuments -= doc
+          Right(())
+        case None =>
+          Left("No document was deleted")
+      }
     }
 
-  def getNearDocuments(
-      embedding: Embedding,
-      limit: Int,
-      orgId: String,
-      role: String
-  ): IO[Either[String, List[SimilarDocument]]] =
+
+  def addChunks(orgId: String, role: String)(
+      chunks: List[ChunkWithEmbedding]
+  ): IO[Either[String, List[ChunkWithEmbedding]]] =
+    IO.pure {
+      allChunks ++= chunks.map(chunk => MockedChunk(chunk, orgId, role))
+      println(s"Mock: Adding chunks $chunks")
+      Right(chunks)
+    }
+
+  def getNearChunks(
+    embedding: List[Float],
+    limit: Int,
+    orgId: String,
+    role: String
+  ): IO[Either[String, List[SimilarChunk]]] =
     IO.pure(
       Right(
-        documents.toList
+        allChunks.toList
           .filter(row => row.orgId == orgId && row.role == role)
           .take(limit)
           .map(x =>
-            SimilarDocument(
-              document = x.doc.document,
+            SimilarChunk(
+              chunk = x.chunk.chunk,
               distance = 1
             )
           )
       )
     )
 
-  def deleteDocument(
-      uid: UID,
-      orgId: String,
-      role: String
+  def deleteChunks(
+    uid: List[UID],
+    orgId: String,
+    role: String
   ): IO[Either[String, Unit]] =
     IO.pure {
-      val documentToDelete = documents
+      val chunkToDelete = allChunks
         .filter(row =>
-          row.doc.document.uid == uid && row.orgId == orgId && row.role == role
+          row.chunk.chunk.uid == uid && row.orgId == orgId && row.role == role
         )
         .headOption
-      documentToDelete match {
-        case Some(doc) =>
-          documents -= doc
+      chunkToDelete match {
+        case Some(chunk) =>
+          allChunks -= chunk
           Right(())
         case None =>
           Left("No document was deleted")

@@ -2,7 +2,7 @@ package com.gridoai.adapters.embeddingApi
 
 import cats.effect.IO
 import com.gridoai.adapters.*
-import com.gridoai.domain.Embedding
+import com.gridoai.domain.*
 import io.circe.generic.auto.*
 import io.circe.parser.*
 import io.circe.*
@@ -22,7 +22,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
 
   def embed(
       text: String
-  ): IO[Either[String, Embedding]] =
+  ): IO[Either[String, EmbeddingOutput]] =
     println("Searching near docs for: " + text)
     Http
       .post(f"/embed")
@@ -31,7 +31,9 @@ object GridoAIML extends EmbeddingAPI[IO]:
       .sendReq()
       .map(
         _.body.flatMap(
-          decode[MessageResponse[Embedding]](_).left.map(_.getMessage())
+          decode[MessageResponse[List[Float]]](_).left.map(_.getMessage())
         )
       )
-      .mapRight(_.message) |> attempt
+      .mapRight(x =>
+        EmbeddingOutput(vector = x.message, model = "instructor-large")
+      ) |> attempt

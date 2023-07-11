@@ -88,27 +88,25 @@ def traceMappable[T, F[_]: Functor](label: String)(
       )
       ae.raiseError(e)
 
-/** Transforms a list of `Either[E, Unit]` into an `Either[List[E], Unit]`.
+/** Transforms a list of `Either[E, T]` into an `Either[List[E], List[T]]`.
   *
   * This function processes a list of `Either` values. If any of them are
   * `Left`, it collects all `Left` values into a list and returns a `Left`
-  * containing that list. If there are no `Left` values, it returns a `Right`
-  * containing `Unit`.
+  * containing that list. If there are no `Left` values, it collects all `Right`
+  * values into a list and returns a `Right` containing that list.
   *
   * @param list
-  *   The list of `Either[E, Unit]` to be processed.
+  *   The list of `Either[E, T]` to be processed.
   * @tparam E
   *   The type of the value in the `Left` part of the `Either`.
+  * @tparam T
+  *   The type of the value in the `Right` part of the `Either`.
   * @return
-  *   An `Either[List[E], Unit]`. If the input list contains any `Left` values,
-  *   the returned `Either` is a `Left` containing a list of all `Left` values.
-  *   If the input list does not contain any `Left` values, the returned
-  *   `Either` is a `Right` containing `Unit`.
+  *   An `Either[List[E], List[T]]`. If the input list contains any `Left`
+  *   values, the returned `Either` is a `Left` containing a list of all `Left`
+  *   values. If the input list does not contain any `Left` values, the returned
+  *   `Either` is a `Right` containing a list of all `Right` values.
   */
-def collectLeftsOrElseUnit[E](
-    list: List[Either[E, ?]]
-): Either[List[E], Unit] = {
-  val lefts = list.collect { case Left(e) => e }
-  if (lefts.isEmpty) Right(())
-  else Left(lefts)
-}
+def partitionEithers[E, T](list: List[Either[E, T]]): Either[List[E], List[T]] =
+  val (lefts, rights) = list.partitionMap(identity)
+  if (lefts.isEmpty) Right(rights) else Left(lefts)
