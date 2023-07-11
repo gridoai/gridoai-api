@@ -16,7 +16,7 @@ import org.http4s.ember.server.EmberServerBuilder
 class ScalaHttpFunction extends HttpFunction {
   def service(request: HttpRequest, response: HttpResponse) =
 
-    given docDb: DocDB[IO] = PostgresClient
+    given docDb: DocDB[IO] = PostgresClient[IO]
     (Http4sCloudFunction(endpoints.http4s.httpApp).service(request, response))
 
 }
@@ -28,7 +28,7 @@ object Main extends IOApp {
       IO.pure(ExitCode.Success)
     else
 
-      given docDb: DocDB[IO] = PostgresClient
+      given docDb: DocDB[IO] = PostgresClient[IO]
 
       EmberServerBuilder
         .default[IO]
