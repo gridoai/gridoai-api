@@ -31,4 +31,4 @@ trait DocDB[F[_]]:
       role: String,
       start: Int,
       end: Int
-  ): F[Either[String, List[Document]]]
+  ): F[Either[String, (List[Document], Int)]]
