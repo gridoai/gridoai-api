@@ -54,13 +54,13 @@ val deleteEndpoint: SecuredEndpoint[String, String, Unit, Any] =
     .in(path[String]("id"))
     .out(emptyOutput)
 
-val searchEndpoint: SecuredEndpoint[String, String, List[Document], Any] =
+val searchEndpoint: SecuredEndpoint[String, String, List[Chunk], Any] =
   auth.securedWithBearer
     .name("Search")
     .description("Search for documents in the knowledge base")
     .in("search")
     .in(query[String]("query"))
-    .out(jsonBody[List[Document]])
+    .out(jsonBody[List[Chunk]])
 
 val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
   endpoint

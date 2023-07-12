@@ -2,10 +2,10 @@ package com.gridoai.adapters.llm
 
 import cats.effect.IO
 import com.gridoai.domain.Message
-import com.gridoai.domain.Document
+import com.gridoai.domain.Chunk
 
 trait LLM[F[_]]:
-  def ask(documents: List[Document])(
+  def ask(chunks: List[Chunk])(
       messages: List[Message]
   ): F[Either[String, String]]
   def mergeMessages(messages: List[Message]): F[Either[String, String]]

@@ -1,0 +1,14 @@
+version: '3'
+services:
+  postgres:
+    image: ankane/pgvector:v0.4.4
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - 5432:5432
+    volumes:
+      - "./schema.sql:/docker-entrypoint-initdb.d/schema.sql"

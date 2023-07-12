@@ -27,7 +27,7 @@ def makeChunks(document: Document): List[Chunk] =
 
 def embedChunks(embedding: EmbeddingAPI[IO])(
     chunks: List[Chunk]
-): Any =
+): IO[Either[String, List[ChunkWithEmbedding]]] =
   chunks
     .traverse(chunk =>
       embedding
@@ -47,6 +47,5 @@ def makeAndStoreChunks(
     orgId: String,
     role: String
 )(document: Document)(implicit db: DocDB[IO]) =
-  (makeChunks(document) |> embedChunks(embedding)).flatMapRight(
-    db.addChunks(orgId, role)
-  )
+  val embededChunks = makeChunks(document) |> embedChunks(embedding)
+  embededChunks.flatMapRight(db.addChunks(orgId, role))

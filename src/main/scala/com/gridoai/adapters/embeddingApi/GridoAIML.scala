@@ -22,7 +22,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
 
   def embed(
       text: String
-  ): IO[Either[String, EmbeddingOutput]] =
+  ): IO[Either[String, Embedding]] =
     println("Searching near docs for: " + text)
     Http
       .post(f"/embed")
@@ -35,5 +35,5 @@ object GridoAIML extends EmbeddingAPI[IO]:
         )
       )
       .mapRight(x =>
-        EmbeddingOutput(vector = x.message, model = "instructor-large")
+        Embedding(vector = x.message, model = "instructor-large")
       ) |> attempt

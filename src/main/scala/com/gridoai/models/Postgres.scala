@@ -11,13 +11,17 @@ import com.pgvector.PGvector
 import com.gridoai.domain.*
 import com.gridoai.utils.*
 
-case class Row(
+case class ChunkRow(
     uid: UID,
-    name: String,
-    source: String,
+    document_uid: UID,
+    document_name: String,
+    document_source: String,
     content: String,
+    embedding: List[Float],
+    embedding_model: String,
     token_quantity: Int,
-    distance: Float
+    document_organization: String,
+    document_roles: List[String]
 )
 
 implicit val getPGvector: Get[PGvector] =
@@ -33,6 +37,7 @@ val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
 
 def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
 val documentsTable = table("documents")
+val chunksTable = table("chunks")
 object PostgresClient {
 
   def apply[F[_]: Async]: DocDB[F] = new DocDB[F] {
@@ -45,23 +50,22 @@ object PostgresClient {
     )
 
     def addDocument(
-        doc: DocumentWithEmbedding,
+        doc: Document,
         orgId: String,
         role: String
-    ): F[Either[String, String]] =
-      sql"""insert into $documentsTable (uid, name, source, content, token_quantity, embedding, organization, roles) 
+    ): F[Either[String, Document]] =
+      sql"""insert into $documentsTable (uid, name, source, content, token_quantity, organization, roles) 
        values (
-        ${doc.document.uid},
-        ${doc.document.name},
-        ${doc.document.source},
-        ${doc.document.content},
-        ${doc.document.tokenQuantity},
-        ${doc.embedding},
+        ${doc.uid},
+        ${doc.name},
+        ${doc.source},
+        ${doc.content},
+        ${doc.tokenQuantity},
         ${orgId},
         ${Array(role)}
       )""".update.run
         .transact[F](xa)
-        .map(_ => Right(doc.document.uid.toString())) |> attempt
+        .map(_ => Right(doc)) |> attempt
 
     def listDocuments(
         orgId: String,
@@ -86,36 +90,6 @@ object PostgresClient {
             Right(PaginatedResponse(results.map(_._1), totalCount))
           ) |> attempt
 
-    def getNearDocuments(
-        embedding: Embedding,
-        limit: Int,
-        orgId: String,
-        role: String
-    ): F[Either[String, List[SimilarDocument]]] =
-      traceMappable("getNearDocuments"):
-        println("Getting near docs ")
-        val vector = PGvector(embedding.toArray)
-        val query =
-          sql"select uid, name, source, content, token_quantity, embedding <-> $vector::vector as distance from $documentsTable where organization = $orgId  order by distance asc limit $limit"
-        query
-          .query[Row]
-          .to[List]
-          .transact[F](xa)
-          .map(
-            _.map(x =>
-              SimilarDocument(
-                document = Document(
-                  x.uid,
-                  x.name,
-                  x.source,
-                  x.content,
-                  x.token_quantity
-                ),
-                distance = x.distance
-              )
-            )
-          )
-          .map((Right(_))) |> attempt
     def deleteDocument(
         uid: UID,
         orgId: String,
@@ -128,6 +102,93 @@ object PostgresClient {
             (Right(())).pure[F]
           else
             (Left("No document was deleted")).pure[F]
+        ) |> attempt
+
+    def addChunks(orgId: String, role: String)(
+        chunks: List[ChunkWithEmbedding]
+    ): F[Either[String, List[ChunkWithEmbedding]]] =
+      val rows = chunks.map(x =>
+        ChunkRow(
+          uid = x.chunk.uid,
+          document_uid = x.chunk.documentUid,
+          document_name = x.chunk.documentName,
+          document_source = x.chunk.documentSource,
+          content = x.chunk.content,
+          embedding = x.embedding.vector,
+          embedding_model = x.embedding.model,
+          token_quantity = x.chunk.tokenQuantity,
+          document_organization = orgId,
+          document_roles = List(role)
+        )
+      )
+      Update[ChunkRow](s"""insert into $chunksTable (
+        uid,
+        document_uid,
+        document_name,
+        document_source,
+        content,
+        embedding,
+        embedding_model,
+        token_quantity,
+        document_organization,
+        document_roles
+      ) values (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      )""")
+        .updateMany(rows)
+        .transact[F](xa)
+        .map(_ => Right(chunks)) |> attempt
+
+    def getNearChunks(
+        embedding: Embedding,
+        limit: Int,
+        orgId: String,
+        role: String
+    ): F[Either[String, List[SimilarChunk]]] =
+      traceMappable("getNearDocuments"):
+        println("Getting near docs ")
+        val vector = PGvector(embedding.vector.toArray)
+        val query =
+          sql"""select
+            document_uid,
+            document_name,
+            document_source,
+            uid,
+            content,
+            token_quantity,
+            embedding <-> $vector::vector as distance
+          from $chunksTable
+          where
+            organization = $orgId and
+            embedding_model = ${embedding.model}
+          order by distance asc
+          limit $limit"""
+        query
+          .query[(Chunk, Float)]
+          .to[List]
+          .transact[F](xa)
+          .map(
+            _.map(x =>
+              SimilarChunk(
+                chunk = x(0),
+                distance = x(1)
+              )
+            )
+          )
+          .map((Right(_))) |> attempt
+
+    def deleteChunksByDocument(
+        documentUid: UID,
+        orgId: String,
+        role: String
+    ): F[Either[String, Unit]] =
+      sql"delete from $chunksTable where document_uid = $documentUid and organization = ${orgId}".update.run
+        .transact(xa)
+        .flatMap(r =>
+          if (r > 0)
+            (Right(())).pure[F]
+          else
+            (Left("No chunk was deleted")).pure[F]
         ) |> attempt
   }
 }
