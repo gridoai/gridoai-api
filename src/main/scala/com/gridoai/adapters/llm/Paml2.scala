@@ -94,15 +94,15 @@ object Paml2Client extends LLM[IO]:
   ): IO[Either[String, String]] =
     llmOutput.mapRight(_.predictions.head.candidates.head.content)
 
-  def ask(documents: List[Document])(
+  def ask(chunks: List[Chunk])(
       messages: List[Message]
   ): IO[Either[String, String]] =
-    val mergedDocuments = documents
-      .map(doc =>
-        s"document name: ${doc.name}\ndocument source: ${doc.source}\ndocument content: ${doc.content}"
+    val mergedChunks = chunks
+      .map(chunk =>
+        s"document name: ${chunk.documentName}\ndocument source: ${chunk.documentSource}\nchunk content: ${chunk.content}"
       )
       .mkString("\n")
-    val context = s"$baseContextPrompt\n$mergedDocuments"
+    val context = s"$baseContextPrompt\n$mergedChunks"
     messages |> makePayloadWithContext(context) |> call |> getAnswer
 
   def mergeMessages(messages: List[Message]): IO[Either[String, String]] =

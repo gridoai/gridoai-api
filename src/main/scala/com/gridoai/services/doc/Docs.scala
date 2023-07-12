@@ -23,16 +23,16 @@ import com.gridoai.auth.AuthData
 
 def searchDoc(auth: AuthData)(text: String)(using
     db: DocDB[IO]
-): IO[Either[String, List[Document]]] =
+): IO[Either[String, List[Chunk]]] =
   println(s"Searching for: $text")
 
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
-    .flatMapRight(vec => db.getNearDocuments(vec, 5, auth.orgId, auth.role))
-    .traceRight(docs =>
-      s"result documents: ${docs.map(doc => s"${doc.document.name} (${doc.distance})").mkString(", ")}"
+    .flatMapRight(vec => db.getNearChunks(vec, 5, auth.orgId, auth.role))
+    .traceRight(chunks =>
+      s"result chunks: ${chunks.map(chunk => s"${chunk.chunk.documentName} (${chunk.distance})").mkString(", ")}"
     )
-    .mapRight(_.map(_.document))
+    .mapRight(_.map(_.chunk))
 
 def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
   FileParseError(e.format, e.message)
@@ -166,6 +166,7 @@ def createDoc(auth: AuthData)(
         auth.orgId,
         auth.role
       ).flatMapRight(makeAndStoreChunks(embedding, auth.orgId, auth.role))
+        .mapRight(x => document.name)
 
 def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]
@@ -181,9 +182,9 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
         .mergeMessages(messages)
         .trace("prompt built by llm")
         .flatMapRight(searchDoc(auth))
-        .flatMapRight(docs =>
-          val answer = llm.ask(docs)(messages)
-          val sources = docs.map(_.source).mkString(", ")
-          if docs.length < 1 then answer
+        .flatMapRight(chunks =>
+          val answer = llm.ask(chunks)(messages)
+          val sources = chunks.map(_.documentSource).distinct.mkString(", ")
+          if chunks.length < 1 then answer
           else answer.mapRight(x => s"$x\nsources: $sources")
         )

@@ -26,11 +26,11 @@ case class Chunk(
     tokenQuantity: Int
 )
 
-case class EmbeddingOutput(vector: List[Float], model: String)
+case class Embedding(vector: List[Float], model: String)
 
 case class ChunkWithEmbedding(
     chunk: Chunk,
-    embedding: EmbeddingOutput
+    embedding: Embedding
 )
 
 case class SimilarChunk(

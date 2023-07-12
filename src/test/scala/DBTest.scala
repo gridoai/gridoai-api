@@ -13,24 +13,6 @@ class DocumentModel extends CatsEffectSuite {
   // Create a test transactor
   import com.gridoai.models.{xa, PostgresClient, POSTGRES_SCHEMA}
   val DocsDB: DocDB[IO] = PostgresClient
-  // Create a test schema if it doesn't exist
-  val createSchema =
-    sql"CREATE SCHEMA IF NOT EXISTS ${Fragment.const(POSTGRES_SCHEMA)}".update.run
-      .transact(xa)
-  // Create a test table if it doesn't exist
-  val createTable = sql"""
-    CREATE TABLE IF NOT EXISTS ${Fragment.const(POSTGRES_SCHEMA)}.documents (
-      uid uuid not null default uuid_generate_v4 (),
-      name text not null,
-      source text not null,
-      content text not null,
-      embedding public.vector not null,
-      token_quantity integer not null,
-      organization text null,
-      roles text[] not null default '{}'::text[],
-      constraint documents_pkey primary key (uid)
-    )
-  """.update.run.transact(xa)
 
   // Ensure the test schema and table are set up before each test
   override def beforeAll(): Unit = {

@@ -8,15 +8,15 @@ import com.gridoai.mock.mockedDocument
 import scala.collection.mutable.ListBuffer
 
 case class MockedDocument(
-  doc: Document,
-  orgId: String,
-  role: String
+    doc: Document,
+    orgId: String,
+    role: String
 )
 
 case class MockedChunk(
-  chunk: ChunkWithEmbedding,
-  orgId: String,
-  role: String
+    chunk: ChunkWithEmbedding,
+    orgId: String,
+    role: String
 )
 
 object MockDocDB extends DocDB[IO]:
@@ -28,9 +28,9 @@ object MockDocDB extends DocDB[IO]:
   )
 
   def addDocument(
-    doc: Document,
-    orgId: String,
-    roles: String
+      doc: Document,
+      orgId: String,
+      roles: String
   ): IO[Either[String, Document]] =
     IO.pure {
       allDocuments += MockedDocument(doc, orgId, roles)
@@ -57,9 +57,9 @@ object MockDocDB extends DocDB[IO]:
     )
 
   def deleteDocument(
-    uid: UID,
-    orgId: String,
-    role: String
+      uid: UID,
+      orgId: String,
+      role: String
   ): IO[Either[String, Unit]] =
     IO.pure {
       val documentToDelete = allDocuments
@@ -76,7 +76,6 @@ object MockDocDB extends DocDB[IO]:
       }
     }
 
-
   def addChunks(orgId: String, role: String)(
       chunks: List[ChunkWithEmbedding]
   ): IO[Either[String, List[ChunkWithEmbedding]]] =
@@ -87,10 +86,10 @@ object MockDocDB extends DocDB[IO]:
     }
 
   def getNearChunks(
-    embedding: List[Float],
-    limit: Int,
-    orgId: String,
-    role: String
+      embedding: Embedding,
+      limit: Int,
+      orgId: String,
+      role: String
   ): IO[Either[String, List[SimilarChunk]]] =
     IO.pure(
       Right(
@@ -106,15 +105,15 @@ object MockDocDB extends DocDB[IO]:
       )
     )
 
-  def deleteChunks(
-    uid: List[UID],
-    orgId: String,
-    role: String
+  def deleteChunksByDocument(
+      documentUid: UID,
+      orgId: String,
+      role: String
   ): IO[Either[String, Unit]] =
     IO.pure {
       val chunkToDelete = allChunks
         .filter(row =>
-          row.chunk.chunk.uid == uid && row.orgId == orgId && row.role == role
+          row.chunk.chunk.documentUid == documentUid && row.orgId == orgId && row.role == role
         )
         .headOption
       chunkToDelete match {
