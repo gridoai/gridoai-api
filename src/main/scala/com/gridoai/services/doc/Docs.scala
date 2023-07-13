@@ -107,10 +107,7 @@ def uploadFile(
         IO.pure(Left(UnknownError(e.getMessage)))
       case Right(x) => IO.pure(x)
 
-def uploadDocuments(auth: AuthData)(
-    // stream: fs2.Stream[IO, Byte]
-    source: FileUpload
-)(using
+def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     db: DocDB[IO]
 ): IO[Either[List[Either[FileUploadError, String]], List[String]]] =
   limitRole(
