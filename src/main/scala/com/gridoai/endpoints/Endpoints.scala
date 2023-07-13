@@ -2,7 +2,7 @@ package com.gridoai.endpoints
 import cats.effect.IO
 import com.gridoai.domain.*
 import com.gridoai.endpoints.auth
-import com.gridoai.parsers.FileFormats
+import com.gridoai.parsers.FileFormat
 import io.circe.generic.auto._
 import sttp.apispec.openapi.circe.yaml._
 import sttp.model.Part
@@ -23,7 +23,7 @@ type SecuredEndpoint[I, E, O, -R] =
 case class FileUpload(files: List[Part[File]])
 
 enum FileUploadError:
-  case FileParseError(format: FileFormats, m: String)
+  case FileParseError(format: FileFormat, m: String)
   case DocumentCreationError(m: String)
   case UnknownError(m: String)
   case UnauthorizedError(m: String)

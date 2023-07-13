@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.Sync
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.text.PDFTextStripper
-import com.gridoai.parsers.{ExtractTextError, FileFormats}
+import com.gridoai.parsers.{ExtractTextError, FileFormat}
 trait PdfParser[F[_]]:
   def load(bytes: Array[Byte]): F[PDDocument]
   def getText(doc: PDDocument): F[String]
@@ -30,4 +30,4 @@ def extractTextFromPdf(
   .flatMap(doc => PdfBoxParser.getText(doc).map(text => (doc, text)))
   .flatMap((doc, text) => PdfBoxParser.close(doc).map(_ => text))
   .attempt
-  .map(_.left.map(t => ExtractTextError(FileFormats.PDF, t.getMessage)))
+  .map(_.left.map(t => ExtractTextError(FileFormat.PDF, t.getMessage)))
