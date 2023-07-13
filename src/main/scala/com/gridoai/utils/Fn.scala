@@ -21,8 +21,12 @@ extension [E, T](x: IO[Either[E, T]])
 
 def attempt[T, F[_], E <: Either[String, T]](
     x: F[E]
-)(using ae: ApplicativeError[F, Throwable]): F[Either[String, T]] =
-  ae.attempt(x).map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
+)(using
+    ae: ApplicativeError[F, Throwable],
+    line: sourcecode.Line,
+    file: sourcecode.File
+): F[Either[String, T]] =
+  ae.attempt(x).map(_.flatten.left.map(_.toString()).addLocationToLeft)
 
 def flattenIOEitherIOEither[E, T](
     x: IO[Either[E, IO[Either[E, T]]]]
@@ -104,6 +108,7 @@ def traceMappable[T, F[_]: Functor](label: String)(
 def collectLeftsOrElseUnit[E](
     list: List[Either[E, ?]]
 ): Either[List[E], Unit] = {
+  println(list)
   val lefts = list.collect { case Left(e) => e }
   if (lefts.isEmpty) Right(())
   else Left(lefts)
