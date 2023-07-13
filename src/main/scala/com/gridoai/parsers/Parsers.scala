@@ -1,7 +1,20 @@
 package com.gridoai.parsers
 
-enum FileFormats:
-  case PDF, PPTX, DOCX
+enum FileFormat:
+  case PDF, PPTX, DOCX, Plaintext, HTML
   case Unknown(ext: String = "")
 
-case class ExtractTextError(format: FileFormats, message: String)
+import FileFormat._
+case class ExtractTextError(format: FileFormat, message: String)
+
+object FileFormat:
+  def ofExtension(ext: String) =
+    ext match
+      case "pdf"        => PDF
+      case "docx"       => DOCX
+      case "pptx"       => PPTX
+      case "txt" | "md" => Plaintext
+      case "html"       => HTML
+      case other        => Unknown(other)
+  def ofFilename(filename: String) =
+    filename.split("\\.").lastOption.map(ofExtension)

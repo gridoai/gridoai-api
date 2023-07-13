@@ -7,7 +7,7 @@ import java.io.ByteArrayInputStream
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import com.gridoai.parsers.{ExtractTextError, FileFormats}
+import com.gridoai.parsers.{ExtractTextError, FileFormat}
 
 def extractTextFromPptx(
     content: Array[Byte]
@@ -21,4 +21,4 @@ def extractTextFromPptx(
     )
     .mkString("\n")
 }.toEither.left
-  .map(e => ExtractTextError(FileFormats.PPTX, e.getMessage))
+  .map(e => ExtractTextError(FileFormat.PPTX, e.getMessage))

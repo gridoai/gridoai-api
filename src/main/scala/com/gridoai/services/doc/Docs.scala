@@ -16,8 +16,7 @@ import java.util.UUID
 import com.gridoai.parsers.{ExtractTextError}
 import com.gridoai.adapters.*
 import com.gridoai.parsers.*
-import sttp.model.Part
-import java.io.File
+
 import com.gridoai.auth.limitRole
 import com.gridoai.auth.authErrorMsg
 import com.gridoai.auth.AuthData
@@ -39,50 +38,57 @@ def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
   FileParseError(e.format, e.message)
 
 def extractText(
-    file: Part[java.io.File]
+    name: String,
+    body: Array[Byte]
 ): IO[Either[ExtractTextError, String]] = traceMappable("extractText"):
-  val body = Files.readAllBytes(file.body.toPath)
-  val name = file.fileName
   println("file name: " + name)
-  println("file content type: " + file.contentType)
-  file.contentType match
-    case Some("application/pdf") =>
+
+  FileFormat.ofFilename(name) match
+    case Some(FileFormat.PDF) =>
       extractTextFromPdf(body)
     case Some(
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          FileFormat.DOCX
         ) =>
       extractTextFromDocx(body).pure[IO]
     case Some(
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          FileFormat.PPTX
         ) =>
       extractTextFromPptx(body).pure[IO]
-    case Some("text/plain") => IO.pure(Right(String(body)))
-    case Some(otherFormat) =>
+    case Some(FileFormat.Plaintext) => IO.pure(Right(String(body)))
+    case Some(other) =>
       Left(
         ExtractTextError(
-          FileFormats.Unknown(otherFormat),
+          other,
           "Unknown file format"
         )
       ).pure[IO]
-
     case None =>
       IO.pure(
-        Left(ExtractTextError(FileFormats.Unknown(""), "Unknown file format"))
+        Left(
+          ExtractTextError(
+            FileFormat.Unknown(name),
+            "Unknown file format"
+          )
+        )
       )
 
-def uploadFile(auth: AuthData)(file: Part[File])(using db: DocDB[IO]) =
-  println(s"Uploading document... ${file.fileName}")
+def uploadFile(
+    auth: AuthData
+)(name: String, body: Array[Byte])(using
+    db: DocDB[IO]
+) =
+  println(s"Uploading document... ${name}")
 
-  extractText(file)
+  extractText(name, body)
     .map(_.left.map(mapExtractToUploadError))
     .map(extracted =>
       println(
-        s"Extracted[${file.fileName}]: ${extracted.map(_.slice(0, 20))} "
+        s"Extracted[${name}]: ${extracted.map(_.slice(0, 20))} "
       )
-      (file.fileName, extracted)
+      (name, extracted)
     )
     .flatMap:
-      case (Some(filename), Right(content)) =>
+      case (filename, Right(content)) =>
         createDoc(auth)(
           DocumentCreationPayload(
             name = filename,
@@ -94,19 +100,35 @@ def uploadFile(auth: AuthData)(file: Part[File])(using db: DocDB[IO]) =
 
       case (_, Left(e: FileUploadError)) =>
         IO.pure(Left(e))
-      case (None, _) =>
-        IO.pure(Left(UnknownError("File extension not known")))
+    .attempt
+    .flatMap:
+      case Left(e) =>
+        println(s"Error uploading file: $e")
+        IO.pure(Left(UnknownError(e.getMessage)))
+      case Right(x) => IO.pure(x)
 
 def uploadDocuments(auth: AuthData)(
+    // stream: fs2.Stream[IO, Byte]
     source: FileUpload
-)(using db: DocDB[IO]): IO[Either[List[FileUploadError], Unit]] =
+)(using
+    db: DocDB[IO]
+): IO[Either[List[Either[FileUploadError, String]], List[String]]] =
   limitRole(
     auth.role,
-    (Left(List(UnauthorizedError(authErrorMsg(Some(auth.role)))))).pure[IO]
+    (Left(List(Left(UnauthorizedError(authErrorMsg(Some(auth.role))))))
+      .pure[IO])
   ):
+    println(s"Uploading files... ${source.files.length}")
     source.files
-      .traverse(uploadFile(auth))
-      .map(collectLeftsOrElseUnit)
+      .traverse: f =>
+        uploadFile(auth)(
+          f.fileName.getOrElse("file"),
+          Files.readAllBytes(f.body.toPath())
+        )
+      .map: eithers =>
+        val (errors, successes) = eithers.partitionMap(identity)
+        if (errors.nonEmpty) Left(eithers)
+        else Right(successes)
 
 def listDocuments(auth: AuthData)(
     start: Int,
