@@ -27,7 +27,7 @@ val mockedJwt =
     "www.grioai.com",
     "accounts.mock.com",
     Some("org1"),
-    Some("member"),
+    Some("admin"),
     "session_blablablabl",
     "user_blablablabla"
   )
