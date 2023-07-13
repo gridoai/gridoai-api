@@ -28,12 +28,13 @@ enum FileUploadError:
   case UnknownError(m: String)
   case UnauthorizedError(m: String)
 
-val fileUploadEndpoint
-    : SecuredEndpoint[FileUpload, List[FileUploadError] | String, Unit, Any] =
+val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
+  Either[FileUploadError, String]
+] | String, List[String], Any] =
   auth.securedWithBearer.post
     .in("upload")
     .in(multipartBody[FileUpload])
-    .out(jsonBody[Unit])
+    .out(jsonBody[List[String]])
     .mapErrorOut(identity)(_.toString())
 
 val listEndpoint =
