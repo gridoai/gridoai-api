@@ -134,13 +134,9 @@ def listDocuments(auth: AuthData)(
     start: Int,
     end: Int
 )(using db: DocDB[IO]): IO[Either[String, PaginatedResponse[List[Document]]]] =
-  limitRole(
-    auth.role,
-    Left(authErrorMsg(Some(auth.role))).pure[IO]
-  ):
-    traceMappable("listDocuments"):
-      println("Listing docs... ")
-      db.listDocuments(auth.orgId, auth.role, start, end)
+  traceMappable("listDocuments"):
+    println("Listing docs... ")
+    db.listDocuments(auth.orgId, auth.role, start, end)
 
 def deleteDocument(auth: AuthData)(id: String)(using
     db: DocDB[IO]
