@@ -107,9 +107,12 @@ def uploadFile(
         IO.pure(Left(UnknownError(e.getMessage)))
       case Right(x) => IO.pure(x)
 
+type FileUpErr = List[Either[FileUploadError, String]]
+type FileUpOutput = List[String]
+
 def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     db: DocDB[IO]
-): IO[Either[List[Either[FileUploadError, String]], List[String]]] =
+): IO[Either[FileUpErr, FileUpOutput]] =
   limitRole(
     auth.role,
     (Left(List(Left(UnauthorizedError(authErrorMsg(Some(auth.role))))))
