@@ -11,6 +11,7 @@ val projectName = "API"
 val currentVersion = "0.1.0-SNAPSHOT"
 val jarPath =
   s"target/scala-${scala3Version}/API-assembly-${currentVersion}.jar"
+val deployRegion = "southamerica-east1"
 
 def bashCommand(name: String, command: String) = Command.command(name) {
   state =>
@@ -23,7 +24,7 @@ def bashCommand(name: String, command: String) = Command.command(name) {
 
 val deployGcpFunction = bashCommand(
   "deployGcpFunction",
-  "gcloud functions deploy api --region=us-west1 --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/deployment"
+  s"gcloud functions deploy api --region=$deployRegion --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/deployment"
 )
 
 val makeJar = bashCommand("makeJar", s"cp $jarPath target/deployment/app.jar")
