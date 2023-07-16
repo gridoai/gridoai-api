@@ -22,7 +22,7 @@ import sttp.tapir.server.stub.TapirStubInterpreter
 import sttp.tapir.server.ServerEndpoint
 
 val mockedDocsResponse =
-  """[{"uid":"694b8567-8c93-45c6-8051-34be4337e740","name":"Sky observations","source":"https://www.nasa.gov/planetarydefense/faq/asteroid","content":"The sky is blue","tokenQuantity":4}]"""
+  """[{"documentUid":"694b8567-8c93-45c6-8051-34be4337e740","documentName":"Sky observations","documentSource":"https://www.nasa.gov/planetarydefense/faq/asteroid","uid":"694b8567-8c93-45c6-8051-34be4337e740","content":"The sky is blue","tokenQuantity":4}]"""
 
 val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
 class API extends CatsEffectSuite {
@@ -66,25 +66,7 @@ class API extends CatsEffectSuite {
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
   }
-  test("Creates a document") {
-    val authenticatedRequest = basicRequest
-      .post(uri"http://test.com/documents")
-      .headers(authHeader)
-      .body(
-        Document(
-          uid =
-            java.util.UUID.fromString("694b8567-8c93-45c6-8051-34be4337e740"),
-          name = "Sky observations",
-          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
-          content = "The sky is blue",
-          tokenQuantity = 4
-        ).asJson.toString
-      )
-      .send(serverStubOf(withService.createDocument))
-
-    assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
-  }
-  test("Searches for a document") {
+  test("Searches for a chunk") {
 
     val authenticatedRequest = basicRequest
       .get(uri"http://test.com/search?query=foo")
@@ -93,14 +75,29 @@ class API extends CatsEffectSuite {
 
     assertIO(
       authenticatedRequest
-        .trace("doc search response")
+        .trace("document search response")
         .map(x =>
-
           println("THE DAMN BODY " + x.body)
           x.body
         ),
       Right(mockedDocsResponse)
     )
+  }
+
+  test("Creates a document") {
+    val authenticatedRequest = basicRequest
+      .post(uri"http://test.com/documents")
+      .headers(authHeader)
+      .body(
+        DocumentCreationPayload(
+          name = "Sky observations",
+          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
+          content = "The sky is blue"
+        ).asJson.toString
+      )
+      .send(serverStubOf(withService.createDocument))
+
+    assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
   }
 
   test("Ask LLM") {

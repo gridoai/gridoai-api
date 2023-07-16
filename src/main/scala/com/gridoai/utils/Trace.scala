@@ -17,3 +17,6 @@ extension [T](a: IO[T])
 extension [T, E](a: IO[Either[E, T]])
   def traceRight(f: T => String): IO[Either[E, T]] =
     a.attempt.flatTap(attempt => IO.println(attempt.map(_.map(f)))).rethrow
+
+  def traceLeft(f: E => String): IO[Either[E, T]] =
+    a.attempt.flatTap(attempt => IO.println(attempt.map(_.left.map(f)))).rethrow

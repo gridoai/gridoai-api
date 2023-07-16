@@ -35,5 +35,5 @@ object GridoAIML extends EmbeddingAPI[IO]:
         )
       )
       .mapRight(x =>
-        Embedding(vector = x.message, model = "instructor-large")
+        Embedding(vector = x.message, model = EmbeddingModel.InstructorLarge)
       ) |> attempt

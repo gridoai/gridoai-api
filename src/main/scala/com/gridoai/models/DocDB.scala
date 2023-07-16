@@ -6,7 +6,6 @@ import com.gridoai.domain.Embedding
 import com.gridoai.domain.SimilarChunk
 import com.gridoai.domain.Document
 import com.gridoai.domain.PaginatedResponse
-import com.gridoai.domain.Chunk
 
 trait DocDB[F[_]]:
   def addDocument(

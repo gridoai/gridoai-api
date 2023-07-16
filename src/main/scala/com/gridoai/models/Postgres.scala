@@ -18,7 +18,7 @@ case class ChunkRow(
     document_source: String,
     content: String,
     embedding: List[Float],
-    embedding_model: String,
+    embedding_model: EmbeddingModel,
     token_quantity: Int,
     document_organization: String,
     document_roles: List[String]
@@ -28,6 +28,10 @@ implicit val getPGvector: Get[PGvector] =
   Get[Array[Float]].map(new PGvector(_))
 implicit val putPGvector: Put[PGvector] =
   Put[Array[Float]].tcontramap(_.toArray())
+implicit val getEmbeddingModel: Get[EmbeddingModel] =
+  Get[String].map(strToEmbedding(_))
+implicit val putEmbeddingModel: Put[EmbeddingModel] =
+  Put[String].tcontramap(embeddingToStr(_))
 
 val POSTGRES_URI =
   sys.env.getOrElse("POSTGRES_URI", "//localhost:5432/gridoai")
@@ -121,7 +125,8 @@ object PostgresClient {
           document_roles = List(role)
         )
       )
-      Update[ChunkRow](s"""insert into $chunksTable (
+      Update[ChunkRow](
+        s"""insert into chunks(
         uid,
         document_uid,
         document_name,
@@ -133,8 +138,9 @@ object PostgresClient {
         document_organization,
         document_roles
       ) values (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-      )""")
+        ?, ?, ?, ?, ?, ?, ?::embedding_model, ?, ?, ?
+      )"""
+      )
         .updateMany(rows)
         .transact[F](xa)
         .map(_ => Right(chunks)) |> attempt
@@ -159,8 +165,8 @@ object PostgresClient {
             embedding <-> $vector::vector as distance
           from $chunksTable
           where
-            organization = $orgId and
-            embedding_model = ${embedding.model}
+            document_organization = $orgId and
+            embedding_model = ${embedding.model}::embedding_model
           order by distance asc
           limit $limit"""
         query
