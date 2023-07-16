@@ -21,10 +21,10 @@ case class MockedChunk(
 
 object MockDocDB extends DocDB[IO]:
   private val allDocuments = ListBuffer[MockedDocument](
-    MockedDocument(mockedDocument, "org1", "role1")
+    MockedDocument(mockedDocument, "org1", "admin")
   )
   private val allChunks = ListBuffer[MockedChunk](
-    MockedChunk(mockedChunk, "org1", "role1")
+    MockedChunk(mockedChunk, "org1", "admin")
   )
 
   def addDocument(

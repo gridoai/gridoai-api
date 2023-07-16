@@ -2,6 +2,7 @@ package com.gridoai.mock
 
 import com.gridoai.domain.ChunkWithEmbedding
 import com.gridoai.domain.Embedding
+import com.gridoai.domain.EmbeddingModel
 import com.gridoai.domain.Document
 import com.gridoai.domain.Chunk
 
@@ -16,7 +17,7 @@ val mockedChunk = ChunkWithEmbedding(
     content = "The sky is blue",
     tokenQuantity = 4
   ),
-  embedding = Embedding(vector = List(1, 2, 3), model = "mocked")
+  embedding = Embedding(vector = List(1, 2, 3), model = EmbeddingModel.Mocked)
 )
 
 val mockedDocument = Document(

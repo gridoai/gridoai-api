@@ -11,25 +11,19 @@ import com.gridoai.mock
 
 class DocumentModel extends CatsEffectSuite {
   // Create a test transactor
-  import com.gridoai.models.{xa, PostgresClient, POSTGRES_SCHEMA}
-  val DocsDB: DocDB[IO] = PostgresClient
+  import com.gridoai.models.PostgresClient
+  val DocsDB: DocDB[IO] = PostgresClient[IO]
 
-  // Ensure the test schema and table are set up before each test
-  override def beforeAll(): Unit = {
-    (createSchema >> createTable) |> (_.unsafeRunSync()) |> println
-  }
   val doc1Id = UUID.randomUUID()
   val doc2Id = UUID.randomUUID()
-  val mockEmbedding = List.range(1, 769).map(_.toFloat)
+  val mockEmbedding =
+    Embedding(
+      vector = List.range(1, 769).map(_.toFloat),
+      model = EmbeddingModel.Mocked
+    )
 
-  val doc = DocumentWithEmbedding(
-    mock.mockedDoc.document.copy(uid = doc1Id),
-    mockEmbedding
-  )
-  val doc2 = DocumentWithEmbedding(
-    mock.mockedDoc.document.copy(uid = doc2Id),
-    mockEmbedding
-  )
+  val doc = mock.mockedDocument.copy(uid = doc1Id)
+  val doc2 = mock.mockedDocument.copy(uid = doc2Id)
 
   test("Add a document") {
     val results = List(
@@ -37,26 +31,31 @@ class DocumentModel extends CatsEffectSuite {
       DocsDB.addDocument(doc2, "org2", "admin")
     ).parSequence
 
-    assertIO(results, List(Right(doc1Id.toString()), Right(doc2Id.toString())))
+    assertIO(results, List(Right(doc), Right(doc2)))
   }
 
-  test("Get near documents") {
+  test("Get near chunks") {
     for
-      maybeDocs <-
-        DocsDB.getNearDocuments(doc.embedding, 10, "org1", "member")
-      _ <- IO.println(maybeDocs)
-      _ = assert(maybeDocs.isRight)
-      docs = maybeDocs.getOrElse(List.empty)
+      maybeChunks <-
+        DocsDB.getNearChunks(mockEmbedding, 10, "org1", "member")
+      _ <- IO.println(maybeChunks)
+      _ = assert(maybeChunks.isRight)
+      chunks = maybeChunks.getOrElse(List.empty)
       _ = assert(
-        docs
-          .forall(_.document.uid.toString() != doc2Id.toString())
+        chunks
+          .forall(_.chunk.uid.toString() != doc2Id.toString())
       )
-      _ = assert(docs.length > 0)
+      _ = assert(chunks.length > 0)
     yield ()
   }
   test("Deletes a document") {
     val deletionAssertions = List(
-      ((doc1Id, "org2", "admin"), Left("No document was deleted")),
+      (
+        (doc1Id, "org2", "admin"),
+        Left(
+          "/home/pedro/repos/gridoai-api/src/main/scala/com/gridoai/models/Postgres.scala:109 No document was deleted"
+        )
+      ),
       ((doc2Id, "org2", "admin"), Right(())),
       ((doc1Id, "org1", "admin"), Right(()))
     )

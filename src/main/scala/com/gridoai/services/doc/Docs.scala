@@ -29,9 +29,11 @@ def searchDoc(auth: AuthData)(text: String)(using
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
     .flatMapRight(vec => db.getNearChunks(vec, 5, auth.orgId, auth.role))
-    .traceRight(chunks =>
-      s"result chunks: ${chunks.map(chunk => s"${chunk.chunk.documentName} (${chunk.distance})").mkString(", ")}"
-    )
+    .traceRight: chunks =>
+      val chunksInfo = chunks
+        .map(chunk => s"${chunk.chunk.documentName} (${chunk.distance})")
+        .mkString(", ")
+      s"result chunks: $chunksInfo"
     .mapRight(_.map(_.chunk))
 
 def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
@@ -148,6 +150,9 @@ def deleteDocument(auth: AuthData)(id: String)(using
     traceMappable("deleteDocument"):
       println("Deleting doc... ")
       db.deleteDocument(UUID.fromString(id), auth.orgId, auth.role)
+        .flatMapRight(_ =>
+          db.deleteChunksByDocument(UUID.fromString(id), auth.orgId, auth.role)
+        )
 
 def createDoc(auth: AuthData)(
     payload: DocumentCreationPayload
