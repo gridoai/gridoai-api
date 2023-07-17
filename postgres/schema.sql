@@ -2,12 +2,12 @@ create extension if not exists "uuid-ossp";
 create extension vector;
 
 create type public.embedding_model AS ENUM (
-  'text-embeddings-ada-002',
-  'text-embeddings-bert-002',
-  'text-embeddings-bert-multilingual-002',
-  'text-gecko',
-  'instructor-large',
-  'mocked'
+  'TextEmbeddingsAda002',
+  'TextEmbeddingsBert002',
+  'TextEmbeddingsBertMultilingual002',
+  'TextGecko',
+  'InstructorLarge',
+  'Mocked'
 );
 
 create table
