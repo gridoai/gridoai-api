@@ -10,7 +10,23 @@ The electromechanical age began with the development of punch-card systems for d
 
 **3. The Electronic Age: 1940 to 1970**
 
+During the electronic age, the first generation of computers used vacuum tubes for circuitry and magnetic drums for memory. Notable machines from this era include the ENIAC, UNIVAC, and IBM’s 701. However, these machines were incredibly expensive and large, making them inaccessible for most purposes. This era was also marked by the development of transistor technology, which led to the miniaturization of electronic devices and paved
+$$$$$$$$
+and Herman Hollerith's tabulating machine. This technology was used extensively in the 1890 U.S. Census. This period also saw the development of analog computing devices like the differential analyzer.
+
+**3. The Electronic Age: 1940 to 1970**
+
 During the electronic age, the first generation of computers used vacuum tubes for circuitry and magnetic drums for memory. Notable machines from this era include the ENIAC, UNIVAC, and IBM’s 701. However, these machines were incredibly expensive and large, making them inaccessible for most purposes. This era was also marked by the development of transistor technology, which led to the miniaturization of electronic devices and paved the way for the next generation of computers.
+
+**4. The Microelectronics Age: 1970 to Present**
+
+The advent of integrated circuit technology marked the start of the microelectronics age. This led to the development of microprocessors, which made computers more powerful, smaller, and affordable. The introduction of personal computers like the Apple II and IBM PC during this era revolutionized the computing landscape. With the rise of the internet and mobile technology, computing became more pervasive, reshaping every aspect of society.
+
+**5. The Quantum Computing Age: Present and Beyond**
+
+The current frontier of computing is quantum computing, which harnesses quantum phenomena to perform complex calculations
+$$$$$$$$
+the way for the next generation of computers.
 
 **4. The Microelectronics Age: 1970 to Present**
 
