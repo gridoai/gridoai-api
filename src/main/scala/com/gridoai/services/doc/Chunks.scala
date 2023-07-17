@@ -48,11 +48,6 @@ def embedChunks(embedding: EmbeddingAPI[IO])(
     .map(partitionEithers)
     .mapLeft(x => x.mkString(","))
 
-def addChunks(orgId: String, role: String)(
-    chunks: IO[Either[String, List[ChunkWithEmbedding]]]
-)(implicit db: DocDB[IO]) =
-  chunks
-
 def makeAndStoreChunks(
     embedding: EmbeddingAPI[IO],
     orgId: String,
