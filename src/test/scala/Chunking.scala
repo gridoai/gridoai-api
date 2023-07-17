@@ -15,10 +15,10 @@ class ChunkingTest extends FunSuite {
     val content = Files.readString(Paths.get(testFilePath))
     val expectedContent = Files.readString(Paths.get(expectedContentPath))
 
-    val text = chunkContent(content)
+    val text = chunkContent(content, 200, 100)
 
     assertEquals(
-      text.mkString("#<#>#<#>#<#>#<#>#<#>#<#>#<#>#<#>#<#>#"),
+      text.mkString("\n$$$$$$$$\n"),
       expectedContent
     )
   }

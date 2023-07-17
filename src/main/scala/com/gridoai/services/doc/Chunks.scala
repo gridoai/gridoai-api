@@ -9,12 +9,23 @@ import com.gridoai.utils.*
 import com.gridoai.adapters.embeddingApi.*
 import com.gridoai.models.DocDB
 
-def chunkContent(content: String): List[String] =
-  val chunksByNewline = content.split("\n").filter(chunk => chunk.length > 5)
-  chunksByNewline.toList
+def chunkContent(
+    content: String,
+    chunkSize: Int,
+    overlapSize: Int
+): List[String] =
+  val words = content.split(" ")
+
+  List
+    .range(
+      0,
+      words.length + 1 - overlapSize,
+      chunkSize - overlapSize
+    )
+    .map(i => words.slice(i, i + chunkSize).mkString(" "))
 
 def makeChunks(document: Document): List[Chunk] =
-  chunkContent(document.content).map(content =>
+  chunkContent(document.content, 200, 100).map(content =>
     Chunk(
       documentUid = document.uid,
       documentName = document.name,
