@@ -31,7 +31,7 @@ create table
     document_source text not null,
     content text not null,
     embedding public.vector not null,
-    embedding_model public.embedding_model null default 'instructor-large'::embedding_model,
+    embedding_model public.embedding_model null default 'InstructorLarge'::embedding_model,
     token_quantity integer not null,
     document_organization text null,
     document_roles text[] not null default '{}'::text[],
