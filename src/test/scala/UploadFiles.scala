@@ -23,7 +23,13 @@ object fileMock:
 
   def generateFilePartsOfDir(directory: String) =
     val dir = Paths.get(directory)
-    val files = Files.list(dir).iterator().asScala.toList
+    val files = Files
+      .list(dir)
+      .iterator()
+      .asScala
+      .filter(_.toFile.isFile())
+      .toList
+
     files.map { path =>
       val name = path.getFileName.toString
       val bytes = Files.readAllBytes(path)
