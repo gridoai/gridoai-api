@@ -26,7 +26,7 @@ def attempt[T, F[_], E <: Either[String, T]](
     line: sourcecode.Line,
     file: sourcecode.File
 ): F[Either[String, T]] =
-  ae.attempt(x).map(_.flatten.left.map(_.toString()).addLocationToLeft)
+  ae.attempt(x).map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
 
 def flattenIOEitherIOEither[E, T](
     x: IO[Either[E, IO[Either[E, T]]]]
