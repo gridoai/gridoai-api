@@ -61,7 +61,7 @@ class API extends CatsEffectSuite {
   }
   test("Can't search documents without auth") {
     val responseWithoutAuth = basicRequest
-      .get(uri"http://test.com/search?query=foo")
+      .get(uri"http://test.com/search?query=foo&tokenLimit=1000")
       .send(searchDocsBE)
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
@@ -69,7 +69,7 @@ class API extends CatsEffectSuite {
   test("Searches for a chunk") {
 
     val authenticatedRequest = basicRequest
-      .get(uri"http://test.com/search?query=foo")
+      .get(uri"http://test.com/search?query=foo&tokenLimit=1000")
       .headers(authHeader)
       .send(searchDocsBE)
 
