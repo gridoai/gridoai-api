@@ -3,21 +3,21 @@ import cats.effect.IO
 import cats.Functor
 import cats.implicits.toFunctorOps
 import cats.ApplicativeError
-import cats.effect.kernel.Sync
 import cats.implicits._
+import cats.Monad
 extension [A](a: A) {
   inline def |>[B](inline f: A => B): B = f(a)
 }
 
-extension [E, T](x: IO[Either[E, T]])
-  def mapRight[V](f: T => V): IO[Either[E, V]] =
+extension [E, T, F[_]: Monad](x: F[Either[E, T]])
+  def mapRight[V](f: T => V) =
     x.map(_.map(f))
 
-  def mapLeft[V](f: E => V): IO[Either[V, T]] =
+  def mapLeft[V](f: E => V) =
     x.map(_.left.map(f))
 
-  def flatMapRight[V](f: T => IO[Either[E, V]]): IO[Either[E, V]] =
-    x.mapRight(f) |> flattenIOEitherIOEither
+  def flatMapRight[V](f: T => F[Either[E, V]]) =
+    x.map(_.fold(Left(_).pure, f)).flatten
 
 def attempt[T, F[_], E <: Either[String, T]](
     x: F[E]
