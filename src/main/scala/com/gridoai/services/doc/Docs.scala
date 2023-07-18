@@ -74,6 +74,12 @@ def extractText(
         )
       )
 
+def extractAndCleanText(
+    name: String,
+    body: Array[Byte]
+): IO[Either[ExtractTextError, String]] =
+  extractText(name, body).mapRight(filterNonUtf8)
+
 def uploadFile(
     auth: AuthData
 )(name: String, body: Array[Byte])(using
@@ -81,7 +87,7 @@ def uploadFile(
 ) =
   println(s"Uploading document... ${name}")
 
-  extractText(name, body)
+  extractAndCleanText(name, body)
     .map(_.left.map(mapExtractToUploadError))
     .map(extracted =>
       println(
