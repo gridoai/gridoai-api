@@ -52,7 +52,7 @@ class DocumentModel extends CatsEffectSuite {
       (
         (doc1Id, "org2", "admin"),
         Left(
-          "/home/pedro/repos/gridoai-api/src/main/scala/com/gridoai/models/Postgres.scala:108 No document was deleted"
+          "No document was deleted"
         )
       ),
       ((doc2Id, "org2", "admin"), Right(())),
@@ -62,7 +62,11 @@ class DocumentModel extends CatsEffectSuite {
       .map:
         case ((docId, orgId, role), expected) =>
           val result = DocsDB.deleteDocument(docId, orgId, role)
-          assertIO(result, expected, s"Failed for $docId, $orgId, $role")
+          assertIO(
+            result.mapLeft(_.split(" ", 2).last),
+            expected,
+            s"Failed for $docId, $orgId, $role"
+          )
       .sequence
 
   }
