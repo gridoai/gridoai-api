@@ -6,7 +6,6 @@ import com.gridoai.utils._
 import cats.implicits._
 import java.util.UUID
 import com.gridoai.models.DocDB
-import doobie.util.fragment.Fragment
 import com.gridoai.mock
 
 class DocumentModel extends CatsEffectSuite {
@@ -37,7 +36,7 @@ class DocumentModel extends CatsEffectSuite {
   test("Get near chunks") {
     for
       maybeChunks <-
-        DocsDB.getNearChunks(mockEmbedding, 10, "org1", "member")
+        DocsDB.getNearChunks(mockEmbedding, 0, 10, "org1", "member")
       _ <- IO.println(maybeChunks)
       _ = assert(maybeChunks.isRight)
       chunks = maybeChunks.getOrElse(List.empty)
@@ -53,7 +52,7 @@ class DocumentModel extends CatsEffectSuite {
       (
         (doc1Id, "org2", "admin"),
         Left(
-          "/home/pedro/repos/gridoai-api/src/main/scala/com/gridoai/models/Postgres.scala:109 No document was deleted"
+          "/home/pedro/repos/gridoai-api/src/main/scala/com/gridoai/models/Postgres.scala:108 No document was deleted"
         )
       ),
       ((doc2Id, "org2", "admin"), Right(())),
