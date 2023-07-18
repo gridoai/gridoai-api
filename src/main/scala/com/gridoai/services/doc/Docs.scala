@@ -21,7 +21,7 @@ import com.gridoai.auth.limitRole
 import com.gridoai.auth.authErrorMsg
 import com.gridoai.auth.AuthData
 
-def searchDoc(auth: AuthData)(tokenLimit: Int)(text: String)(using
+def searchDoc(auth: AuthData)(text: String, tokenLimit: Int)(using
     db: DocDB[IO]
 ): IO[Either[String, List[Chunk]]] =
   println(s"Searching for: $text")
@@ -186,7 +186,7 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
       llm
         .mergeMessages(messages)
         .trace("prompt built by llm")
-        .flatMapRight(searchDoc(auth)(llm.maxInputToken))
+        .flatMapRight(prompt => searchDoc(auth)(prompt, llm.maxInputToken))
         .flatMapRight(chunks =>
           val answer = llm.ask(chunks)(messages)
           val sources = chunks.map(_.documentSource).distinct.mkString(", ")

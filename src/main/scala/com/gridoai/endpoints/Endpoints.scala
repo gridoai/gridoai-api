@@ -37,7 +37,9 @@ val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
     .out(jsonBody[List[String]])
     .mapErrorOut(identity)(_.toString())
 
-val listEndpoint =
+val listEndpoint: SecuredEndpoint[(Int, Int), String, PaginatedResponse[
+  List[Document]
+], Any] =
   auth.securedWithBearer
     .name("List")
     .description("List all documents in the knowledge base")
@@ -54,12 +56,13 @@ val deleteEndpoint: SecuredEndpoint[String, String, Unit, Any] =
     .in(path[String]("id"))
     .out(emptyOutput)
 
-val searchEndpoint: SecuredEndpoint[String, String, List[Chunk], Any] =
+val searchEndpoint: SecuredEndpoint[(String, Int), String, List[Chunk], Any] =
   auth.securedWithBearer
     .name("Search")
     .description("Search for documents in the knowledge base")
     .in("search")
     .in(query[String]("query"))
+    .in(query[Int]("tokenLimit"))
     .out(jsonBody[List[Chunk]])
 
 val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
