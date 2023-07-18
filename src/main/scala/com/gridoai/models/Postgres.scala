@@ -58,13 +58,12 @@ object PostgresClient {
         orgId: String,
         role: String
     ): F[Either[String, Document]] =
-      sql"""insert into $documentsTable (uid, name, source, content, token_quantity, organization, roles) 
+      sql"""insert into $documentsTable (uid, name, source, content, organization, roles) 
        values (
         ${doc.uid},
         ${doc.name},
         ${doc.source},
         ${doc.content},
-        ${doc.tokenQuantity},
         ${orgId},
         ${Array(role)}
       )""".update.run
@@ -79,7 +78,7 @@ object PostgresClient {
     ): F[Either[String, PaginatedResponse[List[Document]]]] =
       traceMappable("listDocuments"):
         sql"""
-       select uid, name, source, content, token_quantity, count(*) over() as total_count 
+       select uid, name, source, content, count(*) over() as total_count 
        from $documentsTable 
        where organization = ${orgId} 
        order by uid asc 
@@ -147,6 +146,7 @@ object PostgresClient {
 
     def getNearChunks(
         embedding: Embedding,
+        offset: Int,
         limit: Int,
         orgId: String,
         role: String
@@ -168,6 +168,7 @@ object PostgresClient {
             document_organization = $orgId and
             embedding_model = ${embedding.model}::embedding_model
           order by distance asc
+          offset $offset
           limit $limit"""
         query
           .query[(Chunk, Float)]

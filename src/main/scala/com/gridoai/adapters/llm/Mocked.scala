@@ -4,6 +4,7 @@ import cats._
 import com.gridoai.domain._
 
 class MockLLM[F[_]: Applicative] extends LLM[F]:
+  val maxInputToken = 16000
 
   def ask(chunks: List[Chunk])(
       messages: List[Message]

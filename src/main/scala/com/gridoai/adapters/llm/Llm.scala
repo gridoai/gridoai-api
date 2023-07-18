@@ -5,6 +5,8 @@ import com.gridoai.domain.Message
 import com.gridoai.domain.Chunk
 
 trait LLM[F[_]]:
+  val maxInputToken: Int
+
   def ask(chunks: List[Chunk])(
       messages: List[Message]
   ): F[Either[String, String]]

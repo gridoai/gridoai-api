@@ -1,0 +1,1 @@
+alter table public.documents add column token_quantity integer not null default 0;

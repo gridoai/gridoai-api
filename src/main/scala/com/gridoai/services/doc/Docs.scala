@@ -21,14 +21,14 @@ import com.gridoai.auth.limitRole
 import com.gridoai.auth.authErrorMsg
 import com.gridoai.auth.AuthData
 
-def searchDoc(auth: AuthData)(text: String)(using
+def searchDoc(auth: AuthData)(tokenLimit: Int)(text: String)(using
     db: DocDB[IO]
 ): IO[Either[String, List[Chunk]]] =
   println(s"Searching for: $text")
 
   getEmbeddingAPI("gridoai-ml")
     .embed(text)
-    .flatMapRight(vec => db.getNearChunks(vec, 5, auth.orgId, auth.role))
+    .flatMapRight(getChunks(tokenLimit, auth.orgId, auth.role))
     .traceRight: chunks =>
       val chunksInfo = chunks
         .map(chunk => s"${chunk.chunk.documentName} (${chunk.distance})")
@@ -165,7 +165,7 @@ def createDoc(auth: AuthData)(
       val embedding = getEmbeddingAPI("gridoai-ml")
       println("Creating doc... ")
       val document =
-        payload.toDocument(UUID.randomUUID(), payload.content.split(" ").length)
+        payload.toDocument(UUID.randomUUID())
       db.addDocument(
         document,
         auth.orgId,
@@ -186,7 +186,7 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
       llm
         .mergeMessages(messages)
         .trace("prompt built by llm")
-        .flatMapRight(searchDoc(auth))
+        .flatMapRight(searchDoc(auth)(llm.maxInputToken))
         .flatMapRight(chunks =>
           val answer = llm.ask(chunks)(messages)
           val sources = chunks.map(_.documentSource).distinct.mkString(", ")
