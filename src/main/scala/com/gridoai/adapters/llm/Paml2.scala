@@ -34,6 +34,8 @@ case class Predictions(candidates: List[Candidates])
 case class Palm2Response(predictions: List[Predictions])
 
 object Paml2Client extends LLM[IO]:
+  val maxInputToken = 4_096
+
   val Http = HttpClient(apiEndpoint)
   var credentials = GoogleCredentials.getApplicationDefault()
 

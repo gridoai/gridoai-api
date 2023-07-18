@@ -9,6 +9,10 @@ import com.gridoai.utils.*
 import com.gridoai.adapters.embeddingApi.*
 import com.gridoai.models.DocDB
 
+def calculateTokenQuantity(content: String): Int =
+  // we are overestimating the amount of tokens
+  content.split(" ").length * 2
+
 def chunkContent(
     content: String,
     chunkSize: Int,
@@ -32,7 +36,7 @@ def makeChunks(document: Document): List[Chunk] =
       documentSource = document.source,
       uid = UUID.randomUUID(),
       content = content,
-      tokenQuantity = content.split(" ").length
+      tokenQuantity = calculateTokenQuantity(content)
     )
   )
 
@@ -55,3 +59,44 @@ def makeAndStoreChunks(
 )(document: Document)(implicit db: DocDB[IO]) =
   val embededChunks = makeChunks(document) |> embedChunks(embedding)
   embededChunks.flatMapRight(db.addChunks(orgId, role))
+
+def getChunks(
+    tokenLimit: Int,
+    orgId: String,
+    role: String,
+    pageSize: Int = 100
+)(
+    vec: Embedding
+)(implicit
+    db: DocDB[IO]
+): IO[Either[String, List[SimilarChunk]]] =
+
+  def getChunksRecursively(
+      offset: Int,
+      tokenLimit: Int
+  ): IO[Either[String, List[SimilarChunk]]] =
+    val similarChunks = db.getNearChunks(vec, offset, pageSize, orgId, role)
+    similarChunks.flatMapRight: chunks =>
+      val tokenQuantity = chunks.map(_.chunk.tokenQuantity).sum
+      val chunkQuantity = chunks.length
+      if (chunkQuantity < pageSize) Right(chunks).pure[IO]
+      else if (tokenQuantity > tokenLimit)
+        Right(filterExcessTokens(chunks, tokenLimit)).pure[IO]
+      else
+        getChunksRecursively(
+          pageSize + offset,
+          tokenLimit - tokenQuantity
+        ).mapRight(newChunks => chunks ++ newChunks)
+
+  getChunksRecursively(0, tokenLimit)
+
+def filterExcessTokens(
+    chunks: List[SimilarChunk],
+    tokenLimit: Int
+): List[SimilarChunk] =
+  chunks
+    .scanLeft((0, chunks.head)) { case ((cumulativeTokens, _), chunk) =>
+      (cumulativeTokens + chunk.chunk.tokenQuantity, chunk)
+    }
+    .filter((cumulativeTokens, _) => cumulativeTokens < tokenLimit)
+    .map(_._2)

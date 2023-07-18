@@ -87,6 +87,7 @@ object MockDocDB extends DocDB[IO]:
 
   def getNearChunks(
       embedding: Embedding,
+      offset: Int,
       limit: Int,
       orgId: String,
       role: String
@@ -95,6 +96,7 @@ object MockDocDB extends DocDB[IO]:
       Right(
         allChunks.toList
           .filter(row => row.orgId == orgId && row.role == role)
+          .drop(offset)
           .take(limit)
           .map(x =>
             SimilarChunk(

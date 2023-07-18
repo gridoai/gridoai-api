@@ -23,8 +23,7 @@ case class Document(
     uid: UID,
     name: String,
     source: String,
-    content: String,
-    tokenQuantity: Int
+    content: String
 )
 
 case class Chunk(
@@ -53,16 +52,13 @@ case class DocumentCreationPayload(
     source: String,
     content: String
 ):
-  def toDocument(
-      uid: UID,
-      tokenQuantity: Int
-  ) = Document(
-    uid,
-    name,
-    source,
-    content,
-    tokenQuantity
-  )
+  def toDocument(uid: UID) =
+    Document(
+      uid,
+      name,
+      source,
+      content
+    )
 
 case class Message(from: MessageFrom, message: String)
 
