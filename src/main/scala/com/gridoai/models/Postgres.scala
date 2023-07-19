@@ -10,7 +10,24 @@ import com.pgvector.PGvector
 
 import com.gridoai.domain.*
 import com.gridoai.utils.*
-
+case class DocRow(
+    uid: UID,
+    name: String,
+    source: String,
+    content: String,
+    organization: String,
+    roles: Array[String]
+)
+extension (x: Document)
+  def toDocRow(orgId: String, role: String) =
+    DocRow(
+      uid = x.uid,
+      name = x.name,
+      source = x.source,
+      content = x.content,
+      organization = orgId,
+      roles = Array(role)
+    )
 case class ChunkRow(
     uid: UID,
     document_uid: UID,
@@ -23,6 +40,21 @@ case class ChunkRow(
     document_organization: String,
     document_roles: List[String]
 )
+
+extension (x: ChunkWithEmbedding)
+  def toChunkRow(role: String, orgId: String) =
+    ChunkRow(
+      uid = x.chunk.uid,
+      document_uid = x.chunk.documentUid,
+      document_name = x.chunk.documentName,
+      document_source = x.chunk.documentSource,
+      content = x.chunk.content,
+      embedding = x.embedding.vector,
+      embedding_model = x.embedding.model,
+      token_quantity = x.chunk.tokenQuantity,
+      document_organization = orgId,
+      document_roles = List(role)
+    )
 
 implicit val getPGvector: Get[PGvector] =
   Get[Array[Float]].map(new PGvector(_))
@@ -42,10 +74,11 @@ val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
 def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
 val documentsTable = table("documents")
 val chunksTable = table("chunks")
-object PostgresClient {
 
+object PostgresClient {
   def apply[F[_]: Async]: DocDB[F] = new DocDB[F] {
     import cats.implicits._
+    given doobie.LogHandler = doobie.util.log.LogHandler.jdkLogHandler
     val xa = Transactor.fromDriverManager[F](
       "org.postgresql.Driver", // driver classname
       s"jdbc:postgresql:$POSTGRES_URI", // connect URL (driver-specific)
@@ -54,21 +87,61 @@ object PostgresClient {
     )
 
     def addDocument(
+        doc: DocumentPersistencePayload,
+        orgId: String,
+        role: String
+    ) =
+      addDocuments(List(doc), orgId, role).mapRight(_.head)
+
+    def addDocuments(
+        docs: List[DocumentPersistencePayload],
+        orgId: String,
+        role: String
+    ): F[Either[String, List[Document]]] =
+      val documentRows = docs.map(_.doc.toDocRow(orgId, role))
+
+      val chunkRows = docs.flatMap(_.chunks.map(_.toChunkRow(role, orgId)))
+
+      (for
+        _ <- Update[DocRow](
+          s"""insert into $POSTGRES_SCHEMA.documents (uid, name, source, content, organization, roles) 
+               values (?, ?, ?, ?, ?, ?)"""
+        ).updateMany(documentRows)
+        _ <- Update[ChunkRow](
+          s"""insert into $POSTGRES_SCHEMA.chunks (
+              uid,
+              document_uid,
+              document_name,
+              document_source,
+              content,
+              embedding,
+              embedding_model,
+              token_quantity,
+              document_organization,
+              document_roles
+            ) values (
+              ?, ?, ?, ?, ?, ?, ?::embedding_model, ?, ?, ?
+            )"""
+        ).updateMany(chunkRows)
+      yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
+
+    def addDocument(
         doc: Document,
         orgId: String,
         role: String
     ): F[Either[String, Document]] =
       sql"""insert into $documentsTable (uid, name, source, content, organization, roles) 
-       values (
-        ${doc.uid},
-        ${doc.name},
-        ${doc.source},
-        ${doc.content},
-        ${orgId},
-        ${Array(role)}
-      )""".update.run
+               values (
+                ${doc.uid},
+                ${doc.name},
+                ${doc.source},
+                ${doc.content},
+                ${orgId},
+                ${Array(role)}
+              )""".update.run
         .transact[F](xa)
-        .map(_ => Right(doc)) |> attempt
+        .map(_ => Right(doc))
+        |> attempt
 
     def listDocuments(
         orgId: String,
@@ -97,32 +170,23 @@ object PostgresClient {
         uid: UID,
         orgId: String,
         role: String
-    ): F[Either[String, Unit]] =
-      sql"delete from $documentsTable where uid = $uid and organization = ${orgId}".update.run
-        .transact(xa)
-        .flatMap(r =>
-          if (r > 0)
-            (Right(())).pure[F]
-          else
-            (Left("No document was deleted")).pure[F]
-        ) |> attempt
+    ): F[Either[String, Unit]] = {
+      (for
+        _ <-
+          sql"delete from $chunksTable where document_uid = $uid".update.run
+        _ <-
+          sql"delete from $documentsTable where uid = $uid and organization = ${orgId}".update.run
+      yield ())
+        .transact[F](xa)
+        .map(Right(_))
+        |> attempt
+    }
 
     def addChunks(orgId: String, role: String)(
         chunks: List[ChunkWithEmbedding]
     ): F[Either[String, List[ChunkWithEmbedding]]] =
-      val rows = chunks.map(x =>
-        ChunkRow(
-          uid = x.chunk.uid,
-          document_uid = x.chunk.documentUid,
-          document_name = x.chunk.documentName,
-          document_source = x.chunk.documentSource,
-          content = x.chunk.content,
-          embedding = x.embedding.vector,
-          embedding_model = x.embedding.model,
-          token_quantity = x.chunk.tokenQuantity,
-          document_organization = orgId,
-          document_roles = List(role)
-        )
+      val rows = chunks.map(
+        _.toChunkRow(orgId, role)
       )
       Update[ChunkRow](
         s"""insert into chunks(
@@ -184,18 +248,5 @@ object PostgresClient {
           )
           .map((Right(_))) |> attempt
 
-    def deleteChunksByDocument(
-        documentUid: UID,
-        orgId: String,
-        role: String
-    ): F[Either[String, Unit]] =
-      sql"delete from $chunksTable where document_uid = $documentUid and organization = ${orgId}".update.run
-        .transact(xa)
-        .flatMap(r =>
-          if (r > 0)
-            (Right(())).pure[F]
-          else
-            (Left("No chunk was deleted")).pure[F]
-        ) |> attempt
   }
 }

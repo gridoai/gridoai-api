@@ -58,6 +58,7 @@ def getChunks(
   ): IO[Either[String, List[SimilarChunk]]] =
     val similarChunks = db.getNearChunks(vec, offset, pageSize, orgId, role)
     similarChunks.flatMapRight: chunks =>
+      println(s"got ${chunks} chunks")
       val tokenQuantity = chunks.map(_.chunk |> calculateChunkTokenQuantity).sum
       val chunkQuantity = chunks.length
       if (chunkQuantity < pageSize) Right(chunks).pure[IO]

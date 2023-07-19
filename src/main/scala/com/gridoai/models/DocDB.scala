@@ -7,12 +7,23 @@ import com.gridoai.domain.SimilarChunk
 import com.gridoai.domain.Document
 import com.gridoai.domain.PaginatedResponse
 
+case class DocumentPersistencePayload(
+    doc: Document,
+    chunks: List[ChunkWithEmbedding]
+)
 trait DocDB[F[_]]:
+
   def addDocument(
-      doc: Document,
+      doc: DocumentPersistencePayload,
       orgId: String,
       role: String
   ): F[Either[String, Document]]
+
+  def addDocuments(
+      docs: List[DocumentPersistencePayload],
+      orgId: String,
+      role: String
+  ): F[Either[String, List[Document]]]
 
   def listDocuments(
       orgId: String,
@@ -27,10 +38,6 @@ trait DocDB[F[_]]:
       role: String
   ): F[Either[String, Unit]]
 
-  def addChunks(orgId: String, role: String)(
-      chunks: List[ChunkWithEmbedding]
-  ): F[Either[String, List[ChunkWithEmbedding]]]
-
   def getNearChunks(
       embedding: Embedding,
       offset: Int,
@@ -38,9 +45,3 @@ trait DocDB[F[_]]:
       orgId: String,
       role: String
   ): F[Either[String, List[SimilarChunk]]]
-
-  def deleteChunksByDocument(
-      documentUid: UID,
-      orgId: String,
-      role: String
-  ): F[Either[String, Unit]]
