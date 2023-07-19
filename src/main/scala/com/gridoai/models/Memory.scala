@@ -6,6 +6,7 @@ import com.gridoai.mock.mockedChunk
 import com.gridoai.mock.mockedDocument
 
 import scala.collection.mutable.ListBuffer
+import com.gridoai.utils.mapRight
 
 case class MockedDocument(
     doc: Document,
@@ -26,16 +27,21 @@ object MockDocDB extends DocDB[IO]:
   private val allChunks = ListBuffer[MockedChunk](
     MockedChunk(mockedChunk, "org1", "admin")
   )
-
   def addDocument(
-      doc: Document,
+      doc: com.gridoai.models.DocumentPersistencePayload,
       orgId: String,
-      roles: String
-  ): IO[Either[String, Document]] =
+      role: String
+  ) = addDocuments(List(doc), orgId, role).mapRight(_.head)
+
+  def addDocuments(
+      docs: List[com.gridoai.models.DocumentPersistencePayload],
+      orgId: String,
+      role: String
+  ) =
     IO.pure {
-      allDocuments += MockedDocument(doc, orgId, roles)
-      println(s"Mock: Adding document $doc")
-      Right(doc)
+      allDocuments ++= docs.map(doc => MockedDocument(doc.doc, orgId, role))
+      println(s"Mock: Adding documents $docs")
+      Right(docs.map(_.doc))
     }
 
   def listDocuments(

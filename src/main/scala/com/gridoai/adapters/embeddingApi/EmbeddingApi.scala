@@ -2,6 +2,7 @@ package com.gridoai.adapters.embeddingApi
 
 import cats.effect.IO
 import com.gridoai.domain.Embedding
+import com.gridoai.adapters.HttpClient
 
 trait EmbeddingAPI[F[_]]:
   def embed(text: String): F[Either[String, Embedding]]
@@ -16,3 +17,8 @@ def getEmbeddingApiByName(name: String) =
   name match
     case "mocked"     => Mocked
     case "gridoai-ml" => GridoAIML
+    case "embaas" =>
+      EmbaasClient(
+        HttpClient("https://api.embaas.io"),
+        sys.env("EMBAAS_API_KEY")
+      )

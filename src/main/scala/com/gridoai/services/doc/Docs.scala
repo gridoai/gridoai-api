@@ -1,32 +1,38 @@
 package com.gridoai.services.doc
 
+import cats.Monad
 import cats.effect.IO
-import cats.implicits._
+import cats.implicits.*
 import com.gridoai.adapters.llm.*
 import com.gridoai.adapters.embeddingApi.*
 import com.gridoai.domain.*
 import com.gridoai.models.DocDB
 import com.gridoai.utils.*
 import com.gridoai.endpoints.*
-import FileUploadError._
+import FileUploadError.*
+
 import java.nio.file.Files
 import com.gridoai.adapters.extractTextFromDocx
 import com.gridoai.adapters.extractTextFromPptx
+
 import java.util.UUID
-import com.gridoai.parsers.{ExtractTextError}
+import com.gridoai.parsers.ExtractTextError
 import com.gridoai.adapters.*
 import com.gridoai.parsers.*
-
+import com.gridoai.models.DocumentPersistencePayload
 import com.gridoai.auth.limitRole
 import com.gridoai.auth.authErrorMsg
 import com.gridoai.auth.AuthData
+import sttp.model.Part
+
+import java.io.File
 
 def searchDoc(auth: AuthData)(text: String, tokenLimit: Int, llmName: String)(
     using db: DocDB[IO]
 ): IO[Either[String, List[Chunk]]] =
   println(s"Searching for: $text")
 
-  getEmbeddingAPI("gridoai-ml")
+  getEmbeddingAPI("embaas")
     .embed(text)
     .flatMapRight(
       getChunks(
@@ -43,8 +49,8 @@ def searchDoc(auth: AuthData)(text: String, tokenLimit: Int, llmName: String)(
       s"result chunks: $chunksInfo"
     .mapRight(_.map(_.chunk))
 
-def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
-  FileParseError(e.format, e.message)
+def mapExtractToUploadError(e: ExtractTextError) =
+  Left(FileParseError(e.format, e.message))
 
 def extractText(
     name: String,
@@ -87,43 +93,34 @@ def extractAndCleanText(
 ): IO[Either[ExtractTextError, String]] =
   extractText(name, body).mapRight(filterNonUtf8)
 
-def uploadFile(
-    auth: AuthData
-)(name: String, body: Array[Byte])(using
-    db: DocDB[IO]
-) =
-  println(s"Uploading document... ${name}")
-
-  extractAndCleanText(name, body)
-    .map(_.left.map(mapExtractToUploadError))
-    .map(extracted =>
-      println(
-        s"Extracted[${name}]: ${extracted.map(_.slice(0, 20))} "
-      )
-      (name, extracted)
-    )
-    .flatMap:
-      case (filename, Right(content)) =>
-        createDoc(auth)(
-          DocumentCreationPayload(
-            name = filename,
-            source = filename,
-            content = content
-          )
-        )
-          .mapLeft(DocumentCreationError.apply)
-
-      case (_, Left(e: FileUploadError)) =>
-        IO.pure(Left(e))
-    .attempt
-    .flatMap:
-      case Left(e) =>
-        println(s"Error uploading file: $e")
-        IO.pure(Left(UnknownError(e.getMessage)))
-      case Right(x) => IO.pure(x)
-
 type FileUpErr = List[Either[FileUploadError, String]]
 type FileUpOutput = List[String]
+
+def parseFileForPersistence(fileRaw: Part[File]) = {
+  val name = fileRaw.fileName.getOrElse("file")
+  extractAndCleanText(
+    name,
+    Files.readAllBytes((fileRaw.body).toPath())
+  )
+    .mapLeft(mapExtractToUploadError)
+    .mapRight(content =>
+      DocumentCreationPayload(
+        name = name,
+        source = name,
+        content = content
+      )
+    )
+}
+
+def saveUploadedDocs(auth: AuthData)(
+    payloads: List[DocumentCreationPayload]
+)(using
+    db: DocDB[IO]
+) = {
+  createDocs(auth)(payloads)
+    .mapRight(_.map(_.uid.toString()))
+    .mapLeft(e => List(FileUploadError.DocumentCreationError(e).asLeft))
+}
 
 def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     db: DocDB[IO]
@@ -135,15 +132,12 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
   ):
     println(s"Uploading files... ${source.files.length}")
     source.files
-      .traverse: f =>
-        uploadFile(auth)(
-          f.fileName.getOrElse("file"),
-          Files.readAllBytes(f.body.toPath())
-        )
-      .map: eithers =>
-        val (errors, successes) = eithers.partitionMap(identity)
-        if (errors.nonEmpty) Left(eithers)
-        else Right(successes)
+      .map(parseFileForPersistence)
+      .parSequence
+      .flatMap: eithers =>
+        val (errors, payloads) = eithers.partitionMap(identity)
+        if (errors.nonEmpty) Left(errors).pure[IO]
+        else saveUploadedDocs(auth)(payloads)
 
 def listDocuments(auth: AuthData)(
     start: Int,
@@ -163,9 +157,6 @@ def deleteDocument(auth: AuthData)(id: String)(using
     traceMappable("deleteDocument"):
       println("Deleting doc... ")
       db.deleteDocument(UUID.fromString(id), auth.orgId, auth.role)
-        .flatMapRight(_ =>
-          db.deleteChunksByDocument(UUID.fromString(id), auth.orgId, auth.role)
-        )
 
 def createDoc(auth: AuthData)(
     payload: DocumentCreationPayload
@@ -174,17 +165,51 @@ def createDoc(auth: AuthData)(
     auth.role,
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
-    traceMappable("createDoc"):
-      val embedding = getEmbeddingAPI("gridoai-ml")
-      println("Creating doc... ")
-      val document =
-        payload.toDocument(UUID.randomUUID())
-      db.addDocument(
-        document,
-        auth.orgId,
-        auth.role
-      ).flatMapRight(makeAndStoreChunks(embedding, auth.orgId, auth.role))
-        .mapRight(x => document.name)
+    createDocs(auth)(List(payload))
+      .mapRight(_.head.uid.toString())
+
+def mapDocumentsToDB[F[_]: Monad](
+    documents: List[Document],
+    embeddingApi: EmbeddingAPI[F]
+) =
+  println("Mapping documents to db... " + documents.length)
+  print(documents.head.content)
+  val chunks = documents.flatMap(makeChunks)
+  println("Got chunks, n: " + chunks.length)
+  embeddingApi
+    .embedMany(chunks.map(_.content))
+    .mapRight: embeddings =>
+      println("Got embeddings: " + embeddings.length)
+      val embeddingChunk =
+        chunks.zip(embeddings).map(ChunkWithEmbedding.apply.tupled)
+      val chunksMap =
+        embeddingChunk.groupBy(_._1.documentUid)
+      documents.map: document =>
+        DocumentPersistencePayload(
+          document,
+          chunksMap.get(document.uid).get
+        )
+
+def createDocs(auth: AuthData)(
+    payload: List[DocumentCreationPayload]
+)(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    traceMappable("createDocs"):
+      println("Creating docs... ")
+      val documents =
+        payload.map(_.toDocument(UUID.randomUUID()))
+      mapDocumentsToDB(documents, getEmbeddingAPI("embaas"))
+        .flatMapRight(persistencePayload =>
+          println("Got persistencePayloads: " + persistencePayload.length)
+          db.addDocuments(
+            persistencePayload,
+            auth.orgId,
+            auth.role
+          )
+        )
 
 def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]
