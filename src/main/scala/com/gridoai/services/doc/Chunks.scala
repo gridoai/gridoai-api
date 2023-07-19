@@ -40,26 +40,6 @@ def makeChunks(document: Document): List[Chunk] =
       val uids = chunks.map(_.uid).mkString(", ")
       s"generated chunks: $uids"
 
-def embedChunks(embedding: EmbeddingAPI[IO])(
-    chunks: List[Chunk]
-): IO[Either[String, List[ChunkWithEmbedding]]] =
-  chunks
-    .traverse(chunk =>
-      embedding
-        .embed(chunk.content)
-        .mapRight(embed => ChunkWithEmbedding(chunk, embed))
-    )
-    .map(partitionEithers)
-    .mapLeft(x => x.mkString(","))
-
-def makeAndStoreChunks(
-    embedding: EmbeddingAPI[IO],
-    orgId: String,
-    role: String
-)(document: Document)(implicit db: DocDB[IO]) =
-  val embededChunks = makeChunks(document) |> embedChunks(embedding)
-  embededChunks.flatMapRight(db.addChunks(orgId, role))
-
 def getChunks(
     calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int,
