@@ -100,3 +100,16 @@ def filterExcessTokens(
     }
     .filter((cumulativeTokens, _) => cumulativeTokens < tokenLimit)
     .map(_._2)
+
+def filterChunksBySize(
+    chunks: List[Chunk],
+    maxTokens: Int = 3000
+): List[Chunk] =
+  chunks
+    .foldLeft((List.empty[Chunk], 0)):
+      case ((acc, size), chunk) =>
+        if (size + chunk.content.length <= maxTokens * 4)
+          (chunk :: acc, size + chunk.content.length)
+        else (acc, size)
+    ._1
+    .reverse
