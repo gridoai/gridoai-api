@@ -78,7 +78,7 @@ val chunksTable = table("chunks")
 object PostgresClient {
   def apply[F[_]: Async]: DocDB[F] = new DocDB[F] {
     import cats.implicits._
-    given doobie.LogHandler = doobie.util.log.LogHandler.jdkLogHandler
+
     val xa = Transactor.fromDriverManager[F](
       "org.postgresql.Driver", // driver classname
       s"jdbc:postgresql:$POSTGRES_URI", // connect URL (driver-specific)
@@ -125,24 +125,6 @@ object PostgresClient {
         ).updateMany(chunkRows)
       yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
 
-    def addDocument(
-        doc: Document,
-        orgId: String,
-        role: String
-    ): F[Either[String, Document]] =
-      sql"""insert into $documentsTable (uid, name, source, content, organization, roles) 
-               values (
-                ${doc.uid},
-                ${doc.name},
-                ${doc.source},
-                ${doc.content},
-                ${orgId},
-                ${Array(role)}
-              )""".update.run
-        .transact[F](xa)
-        .map(_ => Right(doc))
-        |> attempt
-
     def listDocuments(
         orgId: String,
         role: String,
@@ -173,7 +155,7 @@ object PostgresClient {
     ): F[Either[String, Unit]] = {
       (for
         _ <-
-          sql"delete from $chunksTable where document_uid = $uid".update.run
+          sql"delete from $chunksTable where document_uid = $uid and organization = ${orgId} ".update.run
         _ <-
           sql"delete from $documentsTable where uid = $uid and organization = ${orgId}".update.run
       yield ())
