@@ -23,6 +23,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
   def embed(
       text: String
   ): IO[Either[String, Embedding]] =
+    println(s"Calculating embedding for: ${text.slice(0, 20)}")
     Http
       .post(f"/embed")
       .headers(Map("Content-Type" -> "application/json"))

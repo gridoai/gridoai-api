@@ -32,3 +32,6 @@ metals.sbt
 /.worksheet/
 .env
 .env.yaml
+
+# Postgres
+postgres/schema.sql

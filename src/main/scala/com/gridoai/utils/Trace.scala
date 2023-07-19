@@ -7,6 +7,10 @@ extension [T](a: T)
     println(a)
     a
 
+  def traceFn(f: T => String) =
+    println(f(a))
+    a
+
 extension [T](a: IO[T])
   def trace(msg: String = ""): IO[T] =
     a.attempt.flatTap(attempt => IO.println(s"$msg: $attempt")).rethrow
