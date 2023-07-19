@@ -193,9 +193,18 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
         .mergeMessages(messages)
         .trace("prompt built by llm")
         .flatMapRight(prompt => searchDoc(auth)(prompt, llm.maxInputToken))
-        .flatMapRight(chunks =>
-          val answer = llm.ask(chunks)(messages)
+        .flatMapRight: chunks =>
+          println(
+            s"Chunk size: ${(chunks.foldLeft(0)((acc, x) => acc + x.content.length))}"
+          )
+          val answer = llm
+            .ask(chunks)(messages)
+            .flatMap:
+              case Right(x) => (Right(x)).pure[IO]
+              case Left(_) =>
+                println("Failed to answer, reducing chunks")
+                llm.ask(filterChunksBySize(chunks))(messages)
+
           val sources = chunks.map(_.documentSource).distinct.mkString(", ")
           if chunks.length < 1 then answer
-          else answer.mapRight(x => s"$x\nsources: $sources")
-        )
+          else answer.mapRight(x => s"$x\n\n\n\nsources: $sources")
