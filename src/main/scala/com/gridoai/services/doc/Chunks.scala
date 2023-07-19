@@ -32,7 +32,7 @@ def makeChunks(document: Document): List[Chunk] =
       documentSource = document.source,
       uid = UUID.randomUUID(),
       content = content,
-      tokenQuantity = content.filter(c => c != ' ').length / 4
+      tokenQuantity = content.filter(_ != ' ').length / 4
     )
   )
 
