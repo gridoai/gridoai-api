@@ -10,6 +10,7 @@ import io.circe.parser.*
 import io.circe.syntax.*
 import com.gridoai.utils.attempt
 import com.gridoai.utils.|>
+import org.checkerframework.checker.units.qual.m
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
@@ -34,7 +35,7 @@ case class Predictions(candidates: List[Candidates])
 case class Palm2Response(predictions: List[Predictions])
 
 object Paml2Client extends LLM[IO]:
-  val maxInputToken = 4_096
+  val maxInputTokens = 4_096
 
   val Http = HttpClient(apiEndpoint)
   var credentials = GoogleCredentials.getApplicationDefault()
@@ -96,12 +97,25 @@ object Paml2Client extends LLM[IO]:
   ): IO[Either[String, String]] =
     llmOutput.mapRight(_.predictions.head.candidates.head.content)
 
+  def calculateTokenQuantity(text: String): Int =
+    text.filter(c => c != ' ').length / 4
+
+  def calculateChunkTokenQuantity(chunk: Chunk): Int =
+    val contentTokens = 8 + calculateTokenQuantity(chunk.content)
+    val nameTokens = 5 + calculateTokenQuantity(chunk.documentName)
+    contentTokens + nameTokens
+
+  def askMaxTokens(messages: List[Message]): Int =
+    val messageTokens =
+      messages.map(m => 10 + calculateTokenQuantity(m.message)).sum
+    maxInputTokens - messageTokens
+
   def ask(chunks: List[Chunk])(
       messages: List[Message]
   ): IO[Either[String, String]] =
     val mergedChunks = chunks
       .map(chunk =>
-        s"name: ${chunk.documentName} source: ${chunk.documentSource}\n content: ${chunk.content} \n\n"
+        s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
       )
       .mkString("\n")
     val context = s"$baseContextPrompt\n$mergedChunks"
