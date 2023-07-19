@@ -104,10 +104,15 @@ object Paml2Client extends LLM[IO]:
     val nameTokens = 5 + calculateTokenQuantity(chunk.documentName)
     contentTokens + nameTokens
 
+  def calculateMessagesTokenQuantity(messages: List[Message]): Int =
+    messages.map(m => 10 + calculateTokenQuantity(m.message)).sum
+
   def askMaxTokens(messages: List[Message]): Int =
-    val messageTokens =
-      messages.map(m => 10 + calculateTokenQuantity(m.message)).sum
-    maxInputTokens - messageTokens
+    val contextTokens = calculateTokenQuantity(baseContextPrompt)
+    val messageTokens = calculateMessagesTokenQuantity(messages)
+    val res = maxInputTokens - messageTokens - contextTokens
+    println(s"askMaxTokens: $res")
+    res
 
   def ask(chunks: List[Chunk])(
       messages: List[Message]
@@ -118,6 +123,12 @@ object Paml2Client extends LLM[IO]:
       )
       .mkString("\n")
     val context = s"$baseContextPrompt\n$mergedChunks"
+    println(
+      s"Total tokens in chunks: ${calculateTokenQuantity(mergedChunks)}"
+    )
+    println(
+      s"Total tokens in messages: ${calculateMessagesTokenQuantity(messages)}"
+    )
     messages |> makePayloadWithContext(context) |> call |> getAnswer
 
   def mergeMessages(messages: List[Message]): IO[Either[String, String]] =

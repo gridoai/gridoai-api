@@ -25,16 +25,20 @@ def chunkContent(
     .map(i => words.slice(i, i + chunkSize).mkString(" "))
 
 def makeChunks(document: Document): List[Chunk] =
-  chunkContent(document.content, 500, 100).map(content =>
-    Chunk(
-      documentUid = document.uid,
-      documentName = document.name,
-      documentSource = document.source,
-      uid = UUID.randomUUID(),
-      content = content,
-      tokenQuantity = content.filter(_ != ' ').length / 4
+  chunkContent(document.content, 500, 100)
+    .map(content =>
+      Chunk(
+        documentUid = document.uid,
+        documentName = document.name,
+        documentSource = document.source,
+        uid = UUID.randomUUID(),
+        content = content,
+        tokenQuantity = content.filter(_ != ' ').length / 4
+      )
     )
-  )
+    .traceFn: chunks =>
+      val uids = chunks.map(_.uid).mkString(", ")
+      s"generated chunks: $uids"
 
 def embedChunks(embedding: EmbeddingAPI[IO])(
     chunks: List[Chunk]
@@ -95,7 +99,7 @@ def filterExcessTokens(
     tokenLimit: Int
 ): List[SimilarChunk] =
   chunks
-    .scanLeft((0, chunks.head)):
+    .scanLeft((calculateChunkTokenQuantity(chunks.head.chunk), chunks.head)):
       case ((cumulativeTokens, _), chunk) =>
         (cumulativeTokens + calculateChunkTokenQuantity(chunk.chunk), chunk)
     .filter((cumulativeTokens, _) => cumulativeTokens < tokenLimit)

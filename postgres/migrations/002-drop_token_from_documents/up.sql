@@ -1,0 +1,1 @@
+alter table public.documents drop column token_quantity;
