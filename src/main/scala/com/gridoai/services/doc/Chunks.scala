@@ -9,10 +9,6 @@ import com.gridoai.utils.*
 import com.gridoai.adapters.embeddingApi.*
 import com.gridoai.models.DocDB
 
-def calculateTokenQuantity(content: String): Int =
-  // we are overestimating the amount of tokens
-  content.split(" ").length * 2
-
 def chunkContent(
     content: String,
     chunkSize: Int,
@@ -36,7 +32,7 @@ def makeChunks(document: Document): List[Chunk] =
       documentSource = document.source,
       uid = UUID.randomUUID(),
       content = content,
-      tokenQuantity = calculateTokenQuantity(content)
+      tokenQuantity = content.filter(c => c != ' ').length / 4
     )
   )
 
@@ -61,6 +57,7 @@ def makeAndStoreChunks(
   embededChunks.flatMapRight(db.addChunks(orgId, role))
 
 def getChunks(
+    calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int,
     orgId: String,
     role: String,
@@ -77,11 +74,13 @@ def getChunks(
   ): IO[Either[String, List[SimilarChunk]]] =
     val similarChunks = db.getNearChunks(vec, offset, pageSize, orgId, role)
     similarChunks.flatMapRight: chunks =>
-      val tokenQuantity = chunks.map(_.chunk.tokenQuantity).sum
+      val tokenQuantity = chunks.map(_.chunk |> calculateChunkTokenQuantity).sum
       val chunkQuantity = chunks.length
       if (chunkQuantity < pageSize) Right(chunks).pure[IO]
       else if (tokenQuantity > tokenLimit)
-        Right(filterExcessTokens(chunks, tokenLimit)).pure[IO]
+        Right(
+          filterExcessTokens(chunks, calculateChunkTokenQuantity, tokenLimit)
+        ).pure[IO]
       else
         getChunksRecursively(
           pageSize + offset,
@@ -92,24 +91,12 @@ def getChunks(
 
 def filterExcessTokens(
     chunks: List[SimilarChunk],
+    calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int
 ): List[SimilarChunk] =
   chunks
-    .scanLeft((0, chunks.head)) { case ((cumulativeTokens, _), chunk) =>
-      (cumulativeTokens + chunk.chunk.tokenQuantity, chunk)
-    }
+    .scanLeft((0, chunks.head)):
+      case ((cumulativeTokens, _), chunk) =>
+        (cumulativeTokens + calculateChunkTokenQuantity(chunk.chunk), chunk)
     .filter((cumulativeTokens, _) => cumulativeTokens < tokenLimit)
     .map(_._2)
-
-def filterChunksBySize(
-    chunks: List[Chunk],
-    maxTokens: Int = 3000
-): List[Chunk] =
-  chunks
-    .foldLeft((List.empty[Chunk], 0)):
-      case ((acc, size), chunk) =>
-        if (size + chunk.content.length <= maxTokens * 4)
-          (chunk :: acc, size + chunk.content.length)
-        else (acc, size)
-    ._1
-    .reverse
