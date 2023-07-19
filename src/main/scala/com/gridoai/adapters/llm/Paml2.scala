@@ -101,7 +101,7 @@ object Paml2Client extends LLM[IO]:
   ): IO[Either[String, String]] =
     val mergedChunks = chunks
       .map(chunk =>
-        s"document name: ${chunk.documentName}\ndocument source: ${chunk.documentSource}\nchunk content: ${chunk.content}"
+        s"name: ${chunk.documentName} source: ${chunk.documentSource}\n content: ${chunk.content} \n\n"
       )
       .mkString("\n")
     val context = s"$baseContextPrompt\n$mergedChunks"
