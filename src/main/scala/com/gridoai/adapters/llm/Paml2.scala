@@ -10,7 +10,6 @@ import io.circe.parser.*
 import io.circe.syntax.*
 import com.gridoai.utils.attempt
 import com.gridoai.utils.|>
-import org.checkerframework.checker.units.qual.m
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
