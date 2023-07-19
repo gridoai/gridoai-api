@@ -5,6 +5,7 @@ import com.gridoai.domain.Embedding
 
 trait EmbeddingAPI[F[_]]:
   def embed(text: String): F[Either[String, Embedding]]
+  def embedMany(text: List[String]): F[Either[String, List[Embedding]]]
 
 def getEmbeddingAPI(name: String): EmbeddingAPI[IO] =
   sys.env.get("USE_MOCKED_EMBEDDINGS_API") match
