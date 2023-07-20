@@ -12,7 +12,7 @@ import com.gridoai.utils.attempt
 // Define case classes for request and response
 import com.gridoai.utils.|>
 import sttp.model.MediaType
-
+import concurrent.duration.DurationInt
 case class EmbeddingRequest(
     texts: List[String],
     model: String = "instructor-large",
@@ -37,14 +37,16 @@ object EmbaasClient:
 
       private val authHeader = Header("Authorization", s"Bearer $apiKey")
 
-      def embedMany(texts: List[String]): IO[Either[String, List[Embedding]]] =
+      def embedMany(
+          texts: List[String]
+      ): IO[Either[String, List[Embedding]]] =
         val request = EmbeddingRequest(texts)
         val response = httpClient
           .post("/v1/embeddings/")
           .body(request.asJson.noSpaces)
           .header(authHeader)
           .contentType(MediaType.ApplicationJson)
-          .sendReq()
+          .sendReq(retries = 4, retryDelay = 1.seconds)
           .map(
             _.body.flatMap(decode[EmbeddingResponse](_))
           ) |> attempt
