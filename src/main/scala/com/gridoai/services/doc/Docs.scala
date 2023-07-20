@@ -50,7 +50,7 @@ def searchDoc(auth: AuthData)(text: String, tokenLimit: Int, llmName: String)(
     .mapRight(_.map(_.chunk))
 
 def mapExtractToUploadError(e: ExtractTextError) =
-  Left(FileParseError(e.format, e.message))
+  (FileParseError(e.format, e.message))
 
 def extractText(
     name: String,
@@ -96,7 +96,9 @@ def extractAndCleanText(
 type FileUpErr = List[Either[FileUploadError, String]]
 type FileUpOutput = List[String]
 
-def parseFileForPersistence(fileRaw: Part[File]) = {
+def parseFileForPersistence[R](
+    fileRaw: Part[File]
+): IO[Either[FileUploadError, DocumentCreationPayload]] =
   val name = fileRaw.fileName.getOrElse("file")
   extractAndCleanText(
     name,
@@ -110,13 +112,12 @@ def parseFileForPersistence(fileRaw: Part[File]) = {
         content = content
       )
     )
-}
 
 def saveUploadedDocs(auth: AuthData)(
     payloads: List[DocumentCreationPayload]
 )(using
     db: DocDB[IO]
-) = {
+): IO[Either[FileUpErr, FileUpOutput]] = {
   createDocs(auth)(payloads)
     .mapRight(_.map(_.uid.toString()))
     .mapLeft(e => List(FileUploadError.DocumentCreationError(e).asLeft))
@@ -136,7 +137,7 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
       .parSequence
       .flatMap: eithers =>
         val (errors, payloads) = eithers.partitionMap(identity)
-        if (errors.nonEmpty) Left(errors).pure[IO]
+        if (errors.nonEmpty) Left(eithers.map(_.map(_.name))).pure[IO]
         else saveUploadedDocs(auth)(payloads)
 
 def listDocuments(auth: AuthData)(
