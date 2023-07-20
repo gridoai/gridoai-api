@@ -178,7 +178,7 @@ def mapDocumentsToDB[F[_]: Monad](
     embeddingApi: EmbeddingAPI[F]
 ): F[Either[String, List[DocumentPersistencePayload]]] =
   println("Mapping documents to db... " + documents.length)
-  print(documents.head.content)
+
   val chunks = documents.flatMap(makeChunks)
   println("Got chunks, n: " + chunks.length)
   embeddingApi
