@@ -155,7 +155,7 @@ object PostgresClient {
     ): F[Either[String, Unit]] = {
       (for
         _ <-
-          sql"delete from $chunksTable where document_uid = $uid and organization = ${orgId} ".update.run
+          sql"delete from $chunksTable where document_uid = $uid and document_organization = ${orgId} ".update.run
         _ <-
           sql"delete from $documentsTable where uid = $uid and organization = ${orgId}".update.run
       yield ())
