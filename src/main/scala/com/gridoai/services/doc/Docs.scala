@@ -30,8 +30,6 @@ import java.io.File
 def searchDoc(auth: AuthData)(text: String, tokenLimit: Int, llmName: String)(
     using db: DocDB[IO]
 ): IO[Either[String, List[Chunk]]] =
-  println(s"Searching for: $text")
-
   getEmbeddingAPI("embaas")
     .embed(text)
     .flatMapRight(

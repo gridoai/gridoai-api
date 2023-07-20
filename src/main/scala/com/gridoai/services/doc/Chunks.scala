@@ -48,39 +48,67 @@ def getChunks(
     pageSize: Int = 100
 )(
     vec: Embedding
-)(implicit
-    db: DocDB[IO]
-): IO[Either[String, List[SimilarChunk]]] =
+)(implicit db: DocDB[IO]): IO[Either[String, List[SimilarChunk]]] =
 
   def getChunksRecursively(
       offset: Int,
-      tokenLimit: Int
+      acc: List[SimilarChunk],
+      totalTokens: Int
   ): IO[Either[String, List[SimilarChunk]]] =
-    val similarChunks = db.getNearChunks(vec, offset, pageSize, orgId, role)
-    similarChunks.flatMapRight: chunks =>
-      val tokenQuantity = chunks.map(_.chunk |> calculateChunkTokenQuantity).sum
-      val chunkQuantity = chunks.length
-      if (chunkQuantity < pageSize) Right(chunks).pure[IO]
-      else if (tokenQuantity > tokenLimit)
-        Right(
-          filterExcessTokens(chunks, calculateChunkTokenQuantity, tokenLimit)
-        ).pure[IO]
-      else
-        getChunksRecursively(
-          pageSize + offset,
-          tokenLimit - tokenQuantity
-        ).mapRight(newChunks => chunks ++ newChunks)
+    if (totalTokens == tokenLimit) IO.pure(Right(acc))
+    else if (totalTokens > tokenLimit)
+      IO.pure(
+        Right(filterExcessTokens(acc, calculateChunkTokenQuantity, tokenLimit))
+      )
+    else
+      db.getNearChunks(vec, offset, pageSize, orgId, role)
+        .flatMapRight: chunks =>
+          println(
+            s"getChunks: offset:$offset pageSize:$pageSize totalTokens:$totalTokens tokenLimit:$tokenLimit"
+          )
+          val newTotalTokens = chunks
+            .map(chunk => calculateChunkTokenQuantity(chunk.chunk))
+            .sum + totalTokens
+          getChunksRecursively(offset + pageSize, acc ++ chunks, newTotalTokens)
 
-  getChunksRecursively(0, tokenLimit)
+  getChunksRecursively(0, List.empty, 0)
 
+/** This function filters out excess tokens from a list of chunks, starting from
+  * the end of the list.
+  *
+  * @param chunks
+  *   A list of chunks from which excess tokens need to be removed.
+  * @param calculateChunkTokenQuantity
+  *   A function that calculates the number of tokens in a chunk.
+  * @param tokenLimit
+  *   The maximum number of tokens allowed in the final list of chunks.
+  * @return
+  *   A list of chunks where the total number of tokens does not exceed the
+  *   token limit. Excess tokens are removed starting from the end of the input
+  *   list.
+  */
 def filterExcessTokens(
     chunks: List[SimilarChunk],
     calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int
 ): List[SimilarChunk] =
-  chunks
-    .scanLeft((calculateChunkTokenQuantity(chunks.head.chunk), chunks.head)):
-      case ((cumulativeTokens, _), chunk) =>
-        (cumulativeTokens + calculateChunkTokenQuantity(chunk.chunk), chunk)
-    .filter((cumulativeTokens, _) => cumulativeTokens < tokenLimit)
-    .map(_._2)
+  @annotation.tailrec
+  def loop(
+      remainingChunks: List[SimilarChunk],
+      totalTokens: Int,
+      acc: List[SimilarChunk]
+  ): List[SimilarChunk] =
+    remainingChunks match
+      case head :: tail
+          if totalTokens + calculateChunkTokenQuantity(
+            head.chunk
+          ) <= tokenLimit =>
+        loop(
+          tail,
+          totalTokens + calculateChunkTokenQuantity(head.chunk),
+          head :: acc
+        )
+      case _ =>
+        acc
+
+  loop(chunks.reverse, 0, List.empty)
