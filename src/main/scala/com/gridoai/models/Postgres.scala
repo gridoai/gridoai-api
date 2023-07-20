@@ -164,32 +164,6 @@ object PostgresClient {
         |> attempt
     }
 
-    def addChunks(orgId: String, role: String)(
-        chunks: List[ChunkWithEmbedding]
-    ): F[Either[String, List[ChunkWithEmbedding]]] =
-      val rows = chunks.map(
-        _.toChunkRow(orgId, role)
-      )
-      Update[ChunkRow](
-        s"""insert into chunks(
-        uid,
-        document_uid,
-        document_name,
-        document_source,
-        content,
-        embedding,
-        embedding_model,
-        token_quantity,
-        document_organization,
-        document_roles
-      ) values (
-        ?, ?, ?, ?, ?, ?, ?::embedding_model, ?, ?, ?
-      )"""
-      )
-        .updateMany(rows)
-        .transact[F](xa)
-        .map(_ => Right(chunks)) |> attempt
-
     def getNearChunks(
         embedding: Embedding,
         offset: Int,
