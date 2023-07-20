@@ -168,16 +168,21 @@ def createDoc(auth: AuthData)(
     createDocs(auth)(List(payload))
       .mapRight(_.head.uid.toString())
 
+def validateSize[A, B](a: List[A])(b: List[B]) =
+  if a.length == b.length then Right(b)
+  else Left("Got wrong number of embeddings")
+
 def mapDocumentsToDB[F[_]: Monad](
     documents: List[Document],
     embeddingApi: EmbeddingAPI[F]
-) =
+): F[Either[String, List[DocumentPersistencePayload]]] =
   println("Mapping documents to db... " + documents.length)
   print(documents.head.content)
   val chunks = documents.flatMap(makeChunks)
   println("Got chunks, n: " + chunks.length)
   embeddingApi
     .embedMany(chunks.map(_.content))
+    .map(_.flatMap(validateSize(chunks)))
     .mapRight: embeddings =>
       println("Got embeddings: " + embeddings.length)
       val embeddingChunk =
