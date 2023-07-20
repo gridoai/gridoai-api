@@ -117,6 +117,7 @@ object Paml2Client extends LLM[IO]:
   def ask(chunks: List[Chunk])(
       messages: List[Message]
   ): IO[Either[String, String]] =
+
     val mergedChunks = chunks
       .map(chunk =>
         s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
@@ -144,8 +145,7 @@ object Paml2Client extends LLM[IO]:
           s"$chatMergePrompt\n\nProvide a laconic summary for the following conversation: $mergedMessages"
       )
     )
-    singleMessage |> makePayloadWithContext(
-      "",
-      topP = 0.95,
-      topK = 40
-    ) |> call |> getAnswer
+    singleMessage
+      |> makePayloadWithContext("", topP = 0.95, topK = 40)
+      |> call
+      |> getAnswer
