@@ -169,7 +169,10 @@ def createDoc(auth: AuthData)(
 
 def validateSize[A, B](a: List[A])(b: List[B]) =
   if a.length == b.length then Right(b)
-  else Left("Got wrong number of embeddings")
+  else
+    Left(
+      s"Got wrong number of embeddings (${a.length} chunks != ${b.length} embeddings)"
+    )
 
 def mapDocumentsToDB[F[_]: Monad](
     documents: List[Document],
