@@ -84,6 +84,17 @@ val createDocumentEndpoint
     .in(jsonBody[DocumentCreationPayload])
     .out(stringBody)
 
+val importGDriveEndpoint
+    : SecuredEndpoint[gdriveImportPayload, String, List[String], Any] =
+  auth.securedWithBearer
+    .name("Import data from Google Drive")
+    .description("Import google drive documents in the knowledge base")
+    .post
+    .in("import")
+    .in("gdrive")
+    .in(jsonBody[gdriveImportPayload])
+    .out(jsonBody[List[String]])
+
 val askEndpoint: SecuredEndpoint[List[Message], String, String, Any] =
   auth.securedWithBearer
     .name("Ask to LLM")
@@ -101,6 +112,7 @@ val allEndpoints: List[AnyEndpoint] =
     searchEndpoint.endpoint,
     healthCheckEndpoint,
     createDocumentEndpoint.endpoint,
+    importGDriveEndpoint.endpoint,
     askEndpoint.endpoint
   )
 
