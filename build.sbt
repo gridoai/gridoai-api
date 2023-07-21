@@ -16,12 +16,11 @@ val deployRegion = "southamerica-east1"
 val gcpProject = "lucid-arch-387422"
 def bashCommand(name: String, command: String) = Command.command(name) {
   state =>
-    println(s"> $command")
-    val output = command.lineStream_!(state.log).toString match {
-      case _   => state
-      case "1" => state.fail
+    val output = command.!(state.log)
+    output match {
+      case 0 => state
+      case _ => state.fail
     }
-    output
 }
 
 val deployGcpFunction = bashCommand(
