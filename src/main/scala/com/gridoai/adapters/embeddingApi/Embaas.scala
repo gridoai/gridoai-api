@@ -38,10 +38,13 @@ object EmbaasClient:
       def embedMany(
           texts: List[String]
       ): IO[Either[String, List[Embedding]]] =
+        println(s"trying to get ${texts.length} embeddings...")
         if texts.length <= 256 then embedLessThan256(texts)
         else
           embedLessThan256(texts.slice(0, 256)).flatMapRight(embeddings =>
             embedMany(texts.slice(256, texts.length)).mapRight(newEmbeddings =>
+              println(s"last batch size: ${embeddings.length}")
+              println(s"current batch size: ${newEmbeddings.length}")
               embeddings ++ newEmbeddings
             )
           )
@@ -66,5 +69,7 @@ object EmbaasClient:
               .map(d =>
                 (Embedding(d.embedding, EmbeddingModel.InstructorLarge))
               )
+              .traceFn: e =>
+                s"input batch size: ${texts.length}, output batch size: ${e.length}"
               .asRight
           case Left(e) => (Left(e.toString()))
