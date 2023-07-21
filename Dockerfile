@@ -14,4 +14,4 @@ RUN sbt assembly
 EXPOSE 8080
 
 # Command to run the application
-CMD ["java", "-jar", "target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-jar", "target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar"]
