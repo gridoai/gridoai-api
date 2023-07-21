@@ -1,5 +1,5 @@
 # Use the specified base image
-FROM sbtscala/scala-sbt:graalvm-ce-17.0.4_1.8.2_3.3.0
+FROM sbtscala/scala-sbt:graalvm-ce-22.3.0-b2-java17_1.9.2_3.3.0
 
 # Set the working directory in the Docker image
 WORKDIR /app
