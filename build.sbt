@@ -13,18 +13,30 @@ val jarPath =
   s"target/scala-${scala3Version}/API-assembly-${currentVersion}.jar"
 val deployRegion = "southamerica-east1"
 
+val gcpProject = "lucid-arch-387422"
 def bashCommand(name: String, command: String) = Command.command(name) {
   state =>
-    val output = command.!(state.log)
-    output match {
-      case 0 => state
-      case _ => state.fail
+    println(s"> $command")
+    val output = command.lineStream_!(state.log).toString match {
+      case _   => state
+      case "1" => state.fail
     }
+    output
 }
 
 val deployGcpFunction = bashCommand(
   "deployGcpFunction",
   s"gcloud functions deploy api --region=$deployRegion --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/deployment"
+)
+
+val buildGcpContainer = bashCommand(
+  "buildGcpContainer",
+  s"gcloud builds submit --tag gcr.io/${gcpProject}/api --project ${gcpProject}"
+)
+
+val submitGcpContainer = bashCommand(
+  "submitGcpContainer",
+  s"gcloud run deploy api --image gcr.io/${gcpProject}/api --platform managed --region=$deployRegion --allow-unauthenticated --memory=512Mi --project ${gcpProject}"
 )
 
 val makeJar = bashCommand("makeJar", s"cp $jarPath target/deployment/app.jar")
@@ -40,7 +52,13 @@ lazy val root = project
     name := projectName,
     version := currentVersion,
     scalaVersion := scala3Version,
-    commands ++= Seq(deployGcpFunction, makeJar, deploy),
+    commands ++= Seq(
+      deployGcpFunction,
+      makeJar,
+      deploy,
+      submitGcpContainer,
+      buildGcpContainer
+    ),
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "com.google.cloud.functions" % "functions-framework-api" % "1.0.4" % "provided",
     libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "5.8.0",
@@ -60,7 +78,9 @@ lazy val root = project
     libraryDependencies += "com.google.auth" % "google-auth-library-oauth2-http" % "1.3.0",
     libraryDependencies += "com.github.jwt-scala" %% "jwt-core" % "9.4.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-sttp-stub-server" % "1.5.0" % Test,
-    libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.3.0"
+    libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.3.0",
+    libraryDependencies += ("org.scalamock" %% "scalamock" % "5.1.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
   )
   .enablePlugins(GraalVMNativeImagePlugin)
 
