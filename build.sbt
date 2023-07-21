@@ -15,6 +15,7 @@ val deployRegion = "southamerica-east1"
 
 val gcpProject = "lucid-arch-387422"
 def bashCommand(name: String, command: String) = Command.command(name) {
+  println(s"> $command")
   state =>
     val output = command.!(state.log)
     output match {
@@ -25,17 +26,17 @@ def bashCommand(name: String, command: String) = Command.command(name) {
 
 val deployGcpFunction = bashCommand(
   "deployGcpFunction",
-  s"gcloud functions deploy api --region=$deployRegion --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/deployment"
+  s"gcloud functions deploy gridoai-api --region=$deployRegion --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/deployment"
 )
 
 val buildGcpContainer = bashCommand(
   "buildGcpContainer",
-  s"gcloud builds submit --tag gcr.io/${gcpProject}/api --project ${gcpProject}"
+  s"gcloud builds submit --tag gcr.io/${gcpProject}/gridoai-api --project ${gcpProject}"
 )
 
 val submitGcpContainer = bashCommand(
   "submitGcpContainer",
-  s"gcloud run deploy api --image gcr.io/${gcpProject}/api --platform managed --region=$deployRegion --allow-unauthenticated --memory=512Mi --project ${gcpProject}"
+  s"gcloud run deploy gridoai-api --image gcr.io/${gcpProject}/gridoai-api --platform managed --region=$deployRegion --allow-unauthenticated --memory=512Mi --project ${gcpProject}"
 )
 
 val makeJar = bashCommand("makeJar", s"cp $jarPath target/deployment/app.jar")
