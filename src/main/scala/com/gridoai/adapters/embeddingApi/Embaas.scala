@@ -8,9 +8,7 @@ import sttp.model.Header
 import com.gridoai.adapters.sendReq
 import com.gridoai.domain.EmbeddingModel
 import cats.implicits._
-import com.gridoai.utils.attempt
-// Define case classes for request and response
-import com.gridoai.utils.|>
+import com.gridoai.utils.*
 import sttp.model.MediaType
 import concurrent.duration.DurationInt
 case class EmbeddingRequest(
@@ -38,6 +36,17 @@ object EmbaasClient:
       private val authHeader = Header("Authorization", s"Bearer $apiKey")
 
       def embedMany(
+          texts: List[String]
+      ): IO[Either[String, List[Embedding]]] =
+        if texts.length <= 256 then embedLessThan256(texts)
+        else
+          embedLessThan256(texts.slice(0, 256)).flatMapRight(embeddings =>
+            embedMany(texts.slice(256, texts.length)).mapRight(newEmbeddings =>
+              embeddings ++ newEmbeddings
+            )
+          )
+
+      def embedLessThan256(
           texts: List[String]
       ): IO[Either[String, List[Embedding]]] =
         val request = EmbeddingRequest(texts)
