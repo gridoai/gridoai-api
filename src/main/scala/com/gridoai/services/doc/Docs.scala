@@ -94,7 +94,7 @@ def extractAndCleanText(
 type FileUpErr = List[Either[FileUploadError, String]]
 type FileUpOutput = List[String]
 
-def parseFileForPersistence[R](
+def parseFileForPersistence(
     fileRaw: Part[File]
 ): IO[Either[FileUploadError, DocumentCreationPayload]] =
   val name = fileRaw.fileName.getOrElse("file")

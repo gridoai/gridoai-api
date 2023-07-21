@@ -2,7 +2,6 @@ package com.gridoai.adapters.embeddingApi
 
 import com.gridoai.domain.*
 import cats.effect.IO
-import cats.implicits.*
 
 object Mocked extends EmbeddingAPI[IO]:
   private val mockResponse = Embedding(
