@@ -26,9 +26,10 @@ def bashCommand(name: String, command: String) = Command.command(name) {
 
 val deployGcpFunction = bashCommand(
   "deployGcpFunction",
-  s"gcloud functions deploy gridoai-api --region=$deployRegion --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=target/deployment"
+  s"gcloud functions deploy gridoai-api --region=$deployRegion --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=deployment"
 )
 
+val makeJar = bashCommand("makeJar", s"cp $jarPath deployment/app.jar")
 val buildGcpContainer = bashCommand(
   "buildGcpContainer",
   s"gcloud builds submit --tag gcr.io/${gcpProject}/gridoai-api --project ${gcpProject}"
@@ -38,8 +39,6 @@ val submitGcpContainer = bashCommand(
   "submitGcpContainer",
   s"gcloud run deploy gridoai-api --image gcr.io/${gcpProject}/gridoai-api --platform managed --region=$deployRegion --allow-unauthenticated --memory=512Mi --project ${gcpProject}"
 )
-
-val makeJar = bashCommand("makeJar", s"cp $jarPath target/deployment/app.jar")
 
 val deploy = Command.command("deploy") { (state: State) =>
   state.:::(List("assembly", "makeJar", "deployGcpFunction"))
