@@ -1,0 +1,64 @@
+package com.gridoai.endpoints
+
+import com.gridoai.models.DocDB
+import sttp.tapir._
+import sttp.tapir.server.vertx.cats.VertxCatsServerOptions
+import cats.effect._
+import cats.effect.std.Dispatcher
+import io.vertx.core.Vertx
+import io.vertx.ext.web.Router
+import sttp.tapir.server.ServerEndpoint
+import sttp.tapir.server.vertx.cats.VertxCatsServerInterpreter
+import sttp.tapir.server.vertx.cats.VertxCatsServerInterpreter._
+import sttp.tapir.server.interceptor.cors.{CORSInterceptor, CORSConfig}
+import sttp.capabilities.fs2.Fs2Streams
+import sttp.tapir.server.interceptor.cors.CORSConfig.AllowedCredentials.Allow
+import sttp.tapir.server.interceptor.cors.CORSConfig.AllowedOrigin
+import sttp.tapir.server.interceptor.cors.CORSConfig.AllowedHeaders
+import sttp.tapir.server.interceptor.cors.CORSConfig.AllowedMethods
+import sttp.tapir.server.interceptor.cors.CORSConfig.ExposedHeaders
+import sttp.model.StatusCode
+
+def runVertxWithEndpoint(
+    endpoints: List[ServerEndpoint[Fs2Streams[IO], cats.effect.IO]]
+) =
+  val port = sys.env.get("HTTP_PORT").flatMap(_.toIntOption).getOrElse(8080)
+
+  Dispatcher
+    .parallel[IO]
+    .map(d => {
+      VertxCatsServerOptions
+        .customiseInterceptors[IO](d)
+        .corsInterceptor(
+          CORSInterceptor.customOrThrow(
+            CORSConfig.default.copy(
+              allowedCredentials = Allow,
+              allowedOrigin = AllowedOrigin.Matching(_ => true)
+            )
+          )
+        )
+        .options
+    })
+    .flatMap { dispatcher =>
+      Resource
+        .make(
+          IO.delay {
+            val vertx = Vertx.vertx()
+            val server = vertx.createHttpServer()
+            val router = Router.router(vertx)
+
+            endpoints.foreach(endpoint => {
+              VertxCatsServerInterpreter[IO](dispatcher)
+                .route(endpoint)
+                .apply(router)
+            })
+            server.requestHandler(router).listen(port)
+          }.flatMap(_.asF[IO])
+        )({ server =>
+          IO.delay(server.close).flatMap(_.asF[IO].void)
+        })
+    }
+    .use(_ => IO.never)
+    .as(ExitCode.Success)
+
+def runVertex(using DocDB[IO]) = runVertxWithEndpoint(withService.allEndpoints)

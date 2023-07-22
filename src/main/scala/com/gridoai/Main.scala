@@ -30,13 +30,6 @@ object Main extends IOApp {
 
       given docDb: DocDB[IO] = PostgresClient[IO]
 
-      EmberServerBuilder
-        .default[IO]
-        .withHost(ipv4"0.0.0.0")
-        .withPort(port"8080")
-        .withHttpApp(endpoints.http4s.httpApp)
-        .build
-        .use(_ => IO.never)
-        .as(ExitCode.Success)
+      endpoints.runVertex
 
 }
