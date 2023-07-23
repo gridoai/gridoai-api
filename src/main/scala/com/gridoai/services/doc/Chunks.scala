@@ -109,6 +109,6 @@ def filterExcessTokens(
           head :: acc
         )
       case _ =>
-        acc
+        acc.reverse
 
-  loop(chunks.reverse, 0, List.empty)
+  loop(chunks, 0, List.empty)
