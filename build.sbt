@@ -78,6 +78,7 @@ lazy val root = project
     libraryDependencies += "com.github.jwt-scala" %% "jwt-core" % "9.4.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-sttp-stub-server" % "1.5.0" % Test,
     libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.3.0",
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-vertx-server-cats" % "1.6.0",
     libraryDependencies += ("org.scalamock" %% "scalamock" % "5.1.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )

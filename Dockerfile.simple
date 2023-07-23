@@ -1,0 +1,11 @@
+# Use an official OpenJDK base image
+FROM ghcr.io/graalvm/jdk-community:20.0.1-ol9
+
+# Set the working directory
+WORKDIR /app
+
+COPY ./deployment/app.jar /app/api.jar
+EXPOSE 8080
+
+# Define the ENTRYPOINT to run the .jar file with the specified argument
+ENTRYPOINT ["java", "-jar", "/app/api.jar"]
