@@ -30,6 +30,6 @@ object Main extends IOApp {
 
       given docDb: DocDB[IO] = PostgresClient[IO]
 
-      endpoints.runVertex
+      endpoints.http4s.runHttp4s
 
 }
