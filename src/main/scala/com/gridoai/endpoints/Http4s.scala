@@ -12,7 +12,9 @@ import org.http4s.server.middleware.ErrorAction
 import org.http4s.server.middleware.ErrorHandling
 import sttp.tapir._
 import sttp.tapir.server.http4s.Http4sServerInterpreter
-
+import org.http4s.ember.server.EmberServerBuilder
+import com.comcast.ip4s.{ipv4, port}
+import cats.effect.ExitCode
 def routes(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(endpoints.withService.allEndpoints)
 
@@ -30,3 +32,16 @@ def httpApp(implicit db: DocDB[IO]): HttpApp[IO] =
           IO.println(t)
     )
   )
+
+def http4sAppBuilder(using DocDB[IO]) =
+  EmberServerBuilder
+    .default[IO]
+    .withHost(ipv4"0.0.0.0")
+    .withHttp2
+    .withPort(port"8080")
+    .withHttpApp(httpApp)
+
+def runHttp4s(using DocDB[IO]) =
+  http4sAppBuilder.build
+    .use(_ => IO.never)
+    .as(ExitCode.Success)

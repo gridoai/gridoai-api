@@ -18,6 +18,8 @@ import sttp.tapir.server.interceptor.cors.CORSConfig.AllowedHeaders
 import sttp.tapir.server.interceptor.cors.CORSConfig.AllowedMethods
 import sttp.tapir.server.interceptor.cors.CORSConfig.ExposedHeaders
 import sttp.model.StatusCode
+import io.vertx.core.http.HttpServerOptions
+import sttp.model.Method
 
 def runVertxWithEndpoint(
     endpoints: List[ServerEndpoint[Fs2Streams[IO], cats.effect.IO]]
@@ -33,7 +35,26 @@ def runVertxWithEndpoint(
           CORSInterceptor.customOrThrow(
             CORSConfig.default.copy(
               allowedCredentials = Allow,
-              allowedOrigin = AllowedOrigin.Matching(_ => true)
+              allowedOrigin = AllowedOrigin.Matching(_ => true),
+              allowedMethods = AllowedMethods.Some(
+                Set(
+                  Method.POST,
+                  Method.GET,
+                  Method.OPTIONS,
+                  Method.DELETE,
+                  Method.PUT
+                )
+              ),
+              allowedHeaders = AllowedHeaders.Some(
+                Set(
+                  "Content-Type",
+                  "Authorization",
+                  "Access-Control-Allow-Origin",
+                  "Access-Control-Allow-Headers",
+                  "Access-Control-Allow-Methods",
+                  "Access-Control-Allow-Credentials"
+                )
+              )
             )
           )
         )
@@ -43,8 +64,9 @@ def runVertxWithEndpoint(
       Resource
         .make(
           IO.delay {
+            val opts = HttpServerOptions().setUseAlpn(true)
             val vertx = Vertx.vertx()
-            val server = vertx.createHttpServer()
+            val server = vertx.createHttpServer(opts)
             val router = Router.router(vertx)
 
             endpoints.foreach(endpoint => {
