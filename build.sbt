@@ -111,6 +111,12 @@ libraryDependencies ++= Seq(
 
 libraryDependencies += "com.pgvector" % "pgvector" % "0.1.2"
 
+libraryDependencies ++= Seq(
+  "com.google.api-client" % "google-api-client" % "1.31.5",
+  "com.google.oauth-client" % "google-oauth-client-jetty" % "1.31.5",
+  "com.google.apis" % "google-api-services-drive" % "v3-rev173-1.25.0"
+)
+
 lazy val app = (project in file("app"))
   .settings(
     assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")
