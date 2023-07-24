@@ -5,11 +5,14 @@ import sttp.client3.httpclient.cats.HttpClientCatsBackend
 import java.net.InetAddress
 import scala.concurrent.duration.Duration
 import concurrent.duration.DurationInt
+import cats.effect.unsafe.implicits.global
 
 val catsBackend =
   HttpClientCatsBackend
     .resource[IO]()
     .use(IO.pure)
+
+val catsBackendSync = catsBackend.unsafeRunSync()
 
 def sendRequest[T] = (r: Request[T, Any]) => catsBackend.flatMap(r.send)
 
