@@ -2,21 +2,32 @@ package com.gridoai.adapters.fileStorage
 
 import cats.effect.IO
 import com.gridoai.utils.*
+import com.google.api.client.http.javanet.NetHttpTransport
+import com.google.api.client.json.gson.GsonFactory
+import com.google.auth.http.HttpCredentialsAdapter
+import com.google.auth.oauth2.GoogleCredentials
+import com.google.auth.oauth2.AccessToken
 import com.google.api.services.drive.Drive
-import com.google.api.services.drive.model.File
-import java.io.{ByteArrayOutputStream, IOException}
-import cats.effect.IO
+import java.util.Date
+import java.io.ByteArrayOutputStream
 import scala.jdk.CollectionConverters._
 
 object GDriveClient:
 
   private def buildDriveService(token: String): Drive =
-    val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
-    val jsonFactory = JacksonFactory.getDefaultInstance
-    val credential = new GoogleCredential().setAccessToken(accessToken)
+    val expiryTime =
+      new Date(System.currentTimeMillis() + 3600 * 1000) // 1 hour later
+    val accessToken = new AccessToken(token, expiryTime)
+    val credentials = GoogleCredentials.create(accessToken)
+    val jsonFactory = GsonFactory.getDefaultInstance()
+    val httpTransport = new NetHttpTransport()
 
-    new Drive.Builder(httpTransport, jsonFactory, credential)
-      .setApplicationName("Your App Name")
+    new Drive.Builder(
+      httpTransport,
+      jsonFactory,
+      new HttpCredentialsAdapter(credentials)
+    )
+      .setApplicationName("GridoAI")
       .build()
 
   def apply(token: String) = new FileStorage[IO]:
