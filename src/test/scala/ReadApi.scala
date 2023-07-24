@@ -20,13 +20,14 @@ import sttp.model.StatusCode
 import sttp.tapir.integ.cats.effect.CatsMonadError
 import sttp.tapir.server.stub.TapirStubInterpreter
 import sttp.tapir.server.ServerEndpoint
+import com.gridoai.models.PostgresClient
 
 val mockedDocsResponse =
   """[{"documentUid":"694b8567-8c93-45c6-8051-34be4337e740","documentName":"Sky observations","documentSource":"https://www.nasa.gov/planetarydefense/faq/asteroid","uid":"694b8567-8c93-45c6-8051-34be4337e740","content":"The sky is blue","tokenQuantity":4}]"""
 
 val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
 class API extends CatsEffectSuite {
-  given db: DocDB[IO] = MockDocDB
+  given db: DocDB[IO] = PostgresClient[IO]
 
   val searchDocsBE = serverStubOf(withService.searchDocs)
 

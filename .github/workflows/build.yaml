@@ -14,6 +14,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v6
+
+      - name: Get Stage and Branch Name
+        id: stage-name
+        run: |
+          BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}
+          if [ "${BRANCH_NAME}" == "master" ]; then
+            STAGE_NAME="prod"
+          elif [ "${BRANCH_NAME}" == "staging" ] && [ -z "${{ github.event.pull_request }}" ]; then
+            STAGE_NAME="staging"
+          else
+            SANITIZED_BRANCH_NAME=${BRANCH_NAME//\//-}
+            STAGE_NAME="preview-$SANITIZED_BRANCH_NAME"
+          fi
+          echo "stage-name=${STAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}" >> $GITHUB_ENV
+          echo "Stage is ${STAGE_NAME}"
+
       - uses: actions/checkout@v3
       - name: Set up JDK 17
         uses: graalvm/setup-graalvm@v1
@@ -21,22 +41,35 @@ jobs:
           java-version: "17" # for a specific JDK 17; or '17' for the latest JDK 17
           distribution: "graalvm" # New 'distribution' option
           cache: "sbt"
-          components: native-image
+
       - name: Generate .jar
         run: sbt assembly
+
       - name: Save jar
         uses: actions/upload-artifact@v2
         with:
           name: jar
           path: target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar
-      - name: Build native image
-        run: sbt graalvm-native-image:packageBin
-      - name: Save native image
-        uses: actions/upload-artifact@v2
-        with:
-          name: native-image
-          path: target/graalvm-native-image/API
+      - name: Start server
+        env:
+          POSTGRES_SCHEMA: ${{ steps.stage-name.outputs.stage-name }}
+          EMBAAS_API_KEY: ${{ secrets.EMBAAS_API_KEY }}
+          EMBEDDING_API_ENDPOINT: ${{ secrets.EMBEDDING_API_ENDPOINT }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_URI: ${{ secrets.POSTGRES_URI }}
+        run: |
+          java -jar target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar &
+          sleep 3
+
       - name: Run tests
+        env:
+          POSTGRES_SCHEMA: ${{ steps.stage-name.outputs.stage-name }}
+          EMBAAS_API_KEY: ${{ secrets.EMBAAS_API_KEY }}
+          EMBEDDING_API_ENDPOINT: ${{ secrets.EMBEDDING_API_ENDPOINT }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_URI: ${{ secrets.POSTGRES_URI }}
         run: sbt test
         # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
       - name: Upload dependency graph

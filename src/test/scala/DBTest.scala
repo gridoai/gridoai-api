@@ -2,6 +2,8 @@ import cats.effect.IO
 import munit.CatsEffectSuite
 import doobie.implicits._
 import com.gridoai.domain._
+import com.gridoai.models._
+
 import com.gridoai.utils._
 import cats.implicits._
 import java.util.UUID
@@ -24,14 +26,22 @@ class DocumentModel extends CatsEffectSuite {
   val doc = mock.mockedDocument.copy(uid = doc1Id)
   val doc2 = mock.mockedDocument.copy(uid = doc2Id)
 
-  // test("Add a document") {
-  //   val results = List(
-  //     DocsDB.addDocument(doc, "org1", "admin"),
-  //     DocsDB.addDocument(doc2, "org2", "admin")
-  //   ).parSequence
+  test("Add a document") {
+    val results = List(
+      DocsDB.addDocuments(
+        List(DocumentPersistencePayload(doc, List.empty)),
+        "org1",
+        "admin"
+      ),
+      DocsDB.addDocuments(
+        List(DocumentPersistencePayload(doc2, List.empty)),
+        "org2",
+        "admin"
+      )
+    ).parSequence
 
-  //   assertIO(results, List(Right(doc), Right(doc2)))
-  // }
+    assertIO(results, List(Right(List(doc)), Right(List(doc2))))
+  }
 
   test("Get near chunks") {
     for
