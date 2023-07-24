@@ -117,6 +117,8 @@ libraryDependencies ++= Seq(
   "com.google.apis" % "google-api-services-drive" % "v3-rev20181213-1.28.0"
 )
 
+libraryDependencies += "dev.maxmelnyk" %% "openai-scala" % "0.3.0"
+
 lazy val app = (project in file("app"))
   .settings(
     assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")

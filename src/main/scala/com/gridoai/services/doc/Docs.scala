@@ -225,7 +225,7 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
     case MessageFrom.Bot =>
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
-      val llmName = "palm2"
+      val llmName = "gpt3.5turbo"
       val llm = getLLM(llmName)
       println("Used llm: " + llm.toString())
 

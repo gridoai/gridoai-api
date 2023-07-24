@@ -1,7 +1,7 @@
 package com.gridoai.adapters.llm
 
 val baseContextPrompt =
-  "You are GridoAI, an intelligent chatbot for knowledge retrieval. Provide a single response to the following conversation in a natural and intelligent way. Always mention the document source in your answer."
+  "You are GridoAI, an intelligent chatbot for knowledge retrieval. Provide a single response to the following conversation in a natural and intelligent way."
 
 val defaultTemperature: Double = 0.2
 val defaultMaxOutputTokens: Int = 512
