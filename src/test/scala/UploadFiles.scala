@@ -16,6 +16,7 @@ import scala.jdk.CollectionConverters.*
 
 import io.circe.parser.*
 import io.circe.*
+import com.gridoai.models.PostgresClient
 
 object fileMock:
   import java.nio.file.{Files, Paths}
@@ -55,7 +56,7 @@ object fileMock:
       )
     )
 class UploadApi extends CatsEffectSuite {
-  given db: DocDB[IO] = MockDocDB
+  given db: DocDB[IO] = PostgresClient[IO]
 
   import com.gridoai.adapters.*
   import fileMock._
