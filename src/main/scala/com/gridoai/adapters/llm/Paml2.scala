@@ -97,7 +97,7 @@ object Paml2Client extends LLM[IO]:
     llmOutput.mapRight(_.predictions.head.candidates.head.content)
 
   def calculateTokenQuantity(text: String): Int =
-    text.filter(c => c != ' ').length / 4
+    text.filter(_ != ' ').length / 4
 
   def calculateChunkTokenQuantity(chunk: Chunk): Int =
     val contentTokens = 8 + calculateTokenQuantity(chunk.content)
