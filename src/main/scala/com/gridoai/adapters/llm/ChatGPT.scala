@@ -45,7 +45,8 @@ object ChatGPTClient:
     llmOutput.map(_.choices.head.message.content).map(Right(_)) |> attempt
 
   def calculateTokenQuantity(text: String): Int =
-    text.filter(c => c != ' ').length / 4
+    // TODO: Improve GPT token counting to get more precise chunk allocations
+    text.filter(_ != ' ').length / 4
 
   def calculateMessagesTokenQuantity(messages: List[Message]): Int =
     messages.map(m => 10 + calculateTokenQuantity(m.message)).sum
