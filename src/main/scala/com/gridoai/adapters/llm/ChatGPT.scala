@@ -47,16 +47,21 @@ object ChatGPTClient:
     // TODO: Improve GPT token counting to get more precise chunk allocations
     text.filter(_ != ' ').length / 4
 
+  def calculateMessageTokenQuantity(message: Message): Int =
+    calculateTokenQuantity(s"${message.from.toString()}: ${message.message}")
+
   def calculateMessagesTokenQuantity(messages: List[Message]): Int =
-    messages.map(m => 10 + calculateTokenQuantity(m.message)).sum
+    messages
+      .map(calculateMessageTokenQuantity)
+      .sum
 
   def apply(sttpBackend: SttpBackend[IO, WebSockets]) = new LLM[IO]:
     val client = OpenAIClient(sttpBackend)
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
-      val contentTokens = 8 + calculateTokenQuantity(chunk.content)
-      val nameTokens = 5 + calculateTokenQuantity(chunk.documentName)
-      contentTokens + nameTokens
+      calculateTokenQuantity(
+        s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
+      )
 
     def askMaxTokens(messages: List[Message]): Int =
       val contextTokens = calculateTokenQuantity(baseContextPrompt)
