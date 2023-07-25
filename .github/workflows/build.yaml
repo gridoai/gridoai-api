@@ -24,11 +24,9 @@ jobs:
           BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}
           if [ "${BRANCH_NAME}" == "master" ]; then
             STAGE_NAME="prod"
-          elif [ "${BRANCH_NAME}" == "staging" ] && [ -z "${{ github.event.pull_request }}" ]; then
-            STAGE_NAME="staging"
           else
-            SANITIZED_BRANCH_NAME=${BRANCH_NAME//\//-}
-            STAGE_NAME="preview-$SANITIZED_BRANCH_NAME"
+            SANITIZED_BRANCH_NAME=${BRANCH_NAME//\//_}
+            STAGE_NAME="preview_$SANITIZED_BRANCH_NAME"
           fi
           echo "stage-name=${STAGE_NAME}" >> $GITHUB_OUTPUT
           echo "BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}" >> $GITHUB_ENV
