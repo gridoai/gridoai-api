@@ -1,13 +1,13 @@
 package com.gridoai.adapters.llm
 
-import cats.effect.IO
 import com.gridoai.adapters.*
 import com.gridoai.domain.*
 import com.gridoai.utils.*
 import dev.maxmelnyk.openaiscala.models.text.completions.chat._
 import dev.maxmelnyk.openaiscala.client.OpenAIClient
 import sttp.client3.*
-import sttp.capabilities.WebSockets
+import cats.MonadError
+import cats.implicits.toFunctorOps
 
 object ChatGPTClient:
   val maxInputTokens = 2_000
@@ -38,11 +38,6 @@ object ChatGPTClient:
     val fullSeq = (contextMessage ++ chat).toSeq
     (fullSeq, ChatCompletionSettings())
 
-  def getAnswer(
-      llmOutput: IO[ChatCompletion]
-  ): IO[Either[String, String]] =
-    llmOutput.map(_.choices.head.message.content).map(Right(_)) |> attempt
-
   def calculateTokenQuantity(text: String): Int =
     // TODO: Improve GPT token counting to get more precise chunk allocations
     text.filter(_ != ' ').length / 4
@@ -55,8 +50,15 @@ object ChatGPTClient:
       .map(calculateMessageTokenQuantity)
       .sum
 
-  def apply(sttpBackend: SttpBackend[IO, WebSockets]) = new LLM[IO]:
+  def apply[F[_]](sttpBackend: SttpBackend[F, Any])(using
+      MonadError[F, Throwable]
+  ) = new LLM[F]:
     val client = OpenAIClient(sttpBackend)
+
+    def getAnswer(
+        llmOutput: F[ChatCompletion]
+    ): F[Either[String, String]] =
+      llmOutput.map(_.choices.head.message.content).map(Right(_)) |> attempt
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
       calculateTokenQuantity(
@@ -72,7 +74,7 @@ object ChatGPTClient:
 
     def ask(chunks: List[Chunk])(
         messages: List[Message]
-    ): IO[Either[String, String]] =
+    ): F[Either[String, String]] =
 
       val mergedChunks = chunks
         .map(chunk =>
@@ -91,7 +93,7 @@ object ChatGPTClient:
         |> client.createChatCompletion
         |> getAnswer
 
-    def mergeMessages(messages: List[Message]): IO[Either[String, String]] =
+    def mergeMessages(messages: List[Message]): F[Either[String, String]] =
 
       val mergedMessages =
         messages
