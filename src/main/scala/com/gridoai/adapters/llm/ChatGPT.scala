@@ -12,10 +12,9 @@ import sttp.capabilities.WebSockets
 object ChatGPTClient:
   val maxInputTokens = 2_000
 
-  def messageFromToRole(m: MessageFrom): ChatCompletion.Message.Role =
-    m match
-      case MessageFrom.Bot  => ChatCompletion.Message.Role.Assistant
-      case MessageFrom.User => ChatCompletion.Message.Role.User
+  def messageFromToRole: MessageFrom => ChatCompletion.Message.Role =
+    case MessageFrom.Bot  => ChatCompletion.Message.Role.Assistant
+    case MessageFrom.User => ChatCompletion.Message.Role.User
 
   def messageToClientMessage(m: Message): ChatCompletion.Message =
     ChatCompletion.Message(
