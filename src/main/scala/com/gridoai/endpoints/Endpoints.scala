@@ -64,7 +64,9 @@ val searchEndpoint
     .in("search")
     .in(query[String]("query"))
     .in(query[Int]("tokenLimit"))
-    .in(query[Option[String]]("llmName").map(_.getOrElse("palm2"))(Some(_)))
+    .in(
+      query[Option[String]]("llmName").map(_.getOrElse("Gpt35Turbo"))(Some(_))
+    )
     .out(jsonBody[List[Chunk]])
 
 val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =
