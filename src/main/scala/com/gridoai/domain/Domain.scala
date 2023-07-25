@@ -19,6 +19,15 @@ def strToEmbedding(model: String): EmbeddingModel =
 def embeddingToStr(model: EmbeddingModel): String =
   model.toString()
 
+enum LLMModel:
+  case Palm2, Gpt35Turbo, Mocked
+
+def strToLLM(model: String): LLMModel =
+  Try(LLMModel.valueOf(model)).getOrElse(LLMModel.Mocked)
+
+def llmToStr(model: LLMModel): String =
+  model.toString()
+
 case class Document(
     uid: UID,
     name: String,

@@ -27,14 +27,16 @@ import sttp.model.Part
 
 import java.io.File
 
-def searchDoc(auth: AuthData)(text: String, tokenLimit: Int, llmName: String)(
-    using db: DocDB[IO]
+def searchDoc(
+    auth: AuthData
+)(text: String, tokenLimit: Int, llmModel: String)(using
+    db: DocDB[IO]
 ): IO[Either[String, List[Chunk]]] =
   getEmbeddingAPI("embaas")
     .embed(text)
     .flatMapRight(
       getChunks(
-        getLLM(llmName).calculateChunkTokenQuantity,
+        getLLM(llmModel |> strToLLM).calculateChunkTokenQuantity,
         tokenLimit,
         auth.orgId,
         auth.role
@@ -225,15 +227,19 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
     case MessageFrom.Bot =>
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
-      val llmName = "gpt3.5turbo"
-      val llm = getLLM(llmName)
+      val llmModel = LLMModel.Gpt35Turbo
+      val llm = getLLM(llmModel)
       println("Used llm: " + llm.toString())
 
       llm
         .mergeMessages(messages)
         .trace("prompt built by llm")
         .flatMapRight: prompt =>
-          searchDoc(auth)(prompt, llm.askMaxTokens(messages), llmName)
+          searchDoc(auth)(
+            prompt,
+            llm.askMaxTokens(messages),
+            llmModel |> llmToStr
+          )
         .flatMapRight: chunks =>
           val answer = llm.ask(chunks)(messages)
           val sources = chunks.map(_.documentSource).distinct.mkString(", ")
