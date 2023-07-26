@@ -35,3 +35,5 @@ metals.sbt
 
 # Postgres
 postgres/schema.sql
+
+deployment/app.jar
