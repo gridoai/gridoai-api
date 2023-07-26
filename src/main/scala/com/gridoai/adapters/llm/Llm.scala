@@ -23,5 +23,5 @@ def getLLMByName(llm: LLMModel): LLM[IO] =
 
 def getLLM(llm: LLMModel): LLM[IO] =
   sys.env.get("USE_MOCKED_LLM") match
-    case Some("1") => MockLLM[IO]
-    case _         => getLLMByName(llm)
+    case Some("true") => MockLLM[IO]
+    case _            => getLLMByName(llm)

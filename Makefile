@@ -11,3 +11,7 @@ makejar:
 	@sbt assembly; cp ./target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar ./deployment/app.jar 
 
 redeploy: makejar submit-img deploy
+
+start: 
+	export $(grep -v '^#' .env | xargs) && java -jar target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar
+

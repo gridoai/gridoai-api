@@ -19,6 +19,8 @@ extension [E, T, F[_]: Monad](x: F[Either[E, T]])
   def flatMapRight[V](f: T => F[Either[E, V]]) =
     x.map(_.fold(Left(_).pure, f)).flatten
 
+  def !>[V](f: T => F[Either[E, V]]): F[Either[E, V]] = flatMapRight[V](f)
+
 def attempt[T, F[_], E <: Either[Any, T]](
     x: F[E]
 )(using

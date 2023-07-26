@@ -76,12 +76,14 @@ val documentsTable = table("documents")
 val chunksTable = table("chunks")
 
 object PostgresClient {
-  def apply[F[_]: Async]: DocDB[F] = new DocDB[F] {
+  def apply[F[_]: Async](implicit
+      lh: doobie.LogHandler = doobie.LogHandler.nop
+  ): DocDB[F] = new DocDB[F] {
     import cats.implicits._
 
     val xa = Transactor.fromDriverManager[F](
-      "org.postgresql.Driver", // driver classname
-      s"jdbc:postgresql:$POSTGRES_URI", // connect URL (driver-specific)
+      "org.postgresql.Driver",
+      s"jdbc:postgresql:$POSTGRES_URI",
       POSTGRES_USER,
       POSTGRES_PASSWORD
     )

@@ -63,14 +63,21 @@ def getChunks(
     else if (acc.length < pageSize) IO.pure(Right(acc))
     else
       db.getNearChunks(vec, offset, pageSize, orgId, role)
-        .flatMapRight: chunks =>
-          println(
-            s"getChunks: offset:$offset pageSize:$pageSize totalTokens:$totalTokens tokenLimit:$tokenLimit"
-          )
-          val newTotalTokens = chunks
-            .map(chunk => calculateChunkTokenQuantity(chunk.chunk))
-            .sum + totalTokens
-          getChunksRecursively(offset + pageSize, acc ++ chunks, newTotalTokens)
+        .flatMapRight:
+          case Nil =>
+            IO.pure(Right(acc))
+          case chunks =>
+            println(
+              s"getChunks: offset:$offset pageSize:$pageSize totalTokens:$totalTokens tokenLimit:$tokenLimit"
+            )
+            val newTotalTokens = chunks
+              .map(chunk => calculateChunkTokenQuantity(chunk.chunk))
+              .sum + totalTokens
+            getChunksRecursively(
+              offset + pageSize,
+              acc ++ chunks,
+              newTotalTokens
+            )
 
   getChunksRecursively(0, List.empty, 0)
 
