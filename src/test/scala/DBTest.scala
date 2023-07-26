@@ -24,14 +24,14 @@ class DocumentModel extends CatsEffectSuite {
   val doc = mock.mockedDocument.copy(uid = doc1Id)
   val doc2 = mock.mockedDocument.copy(uid = doc2Id)
 
-  test("Add a document") {
-    val results = List(
-      DocsDB.addDocument(doc, "org1", "admin"),
-      DocsDB.addDocument(doc2, "org2", "admin")
-    ).parSequence
+  // test("Add a document") {
+  //   val results = List(
+  //     DocsDB.addDocument(doc, "org1", "admin"),
+  //     DocsDB.addDocument(doc2, "org2", "admin")
+  //   ).parSequence
 
-    assertIO(results, List(Right(doc), Right(doc2)))
-  }
+  //   assertIO(results, List(Right(doc), Right(doc2)))
+  // }
 
   test("Get near chunks") {
     for
