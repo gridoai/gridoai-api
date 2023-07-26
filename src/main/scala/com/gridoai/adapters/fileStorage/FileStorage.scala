@@ -13,5 +13,5 @@ def getFileStorageByName(name: String): String => FileStorage[IO] =
 
 def getFileStorage(name: String): String => FileStorage[IO] =
   sys.env.get("USE_LOCAL_FILESTORAGE") match
-    case Some("1") => _ => LocalFileStorage
-    case _         => getFileStorageByName(name)
+    case Some("true") => _ => LocalFileStorage
+    case _            => getFileStorageByName(name)

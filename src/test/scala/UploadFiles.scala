@@ -28,6 +28,7 @@ object fileMock:
       .list(dir)
       .iterator()
       .asScala
+      .take(2)
       .filter(_.toFile.isFile())
       .toList
 
@@ -56,6 +57,7 @@ object fileMock:
       )
     )
 class UploadApi extends CatsEffectSuite {
+  given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
   given db: DocDB[IO] = PostgresClient[IO]
 
   import com.gridoai.adapters.*

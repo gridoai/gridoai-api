@@ -13,4 +13,5 @@ object Mocked extends EmbeddingAPI[IO]:
       text: String
   ) =
     IO.pure(Right(mockResponse))
-  def embedMany(text: List[String]) = IO.pure(Right(List(mockResponse)))
+  def embedMany(text: List[String]) =
+    IO.pure(Right(text.map(_ => mockResponse)))

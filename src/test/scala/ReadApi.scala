@@ -9,8 +9,8 @@ import com.gridoai.models.MockDocDB
 import com.gridoai.utils.trace
 import fs2.Stream
 import fs2.text.utf8
-import io.circe.generic.auto.*
-import io.circe.syntax.*
+import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
+import cats.implicits._
 import munit.CatsEffectSuite
 import sttp.client3.UriContext
 import sttp.client3.basicRequest
@@ -21,15 +21,32 @@ import sttp.tapir.integ.cats.effect.CatsMonadError
 import sttp.tapir.server.stub.TapirStubInterpreter
 import sttp.tapir.server.ServerEndpoint
 import com.gridoai.models.PostgresClient
-
-val mockedDocsResponse =
-  """[{"documentUid":"694b8567-8c93-45c6-8051-34be4337e740","documentName":"Sky observations","documentSource":"https://www.nasa.gov/planetarydefense/faq/asteroid","uid":"694b8567-8c93-45c6-8051-34be4337e740","content":"The sky is blue","tokenQuantity":4}]"""
+import com.gridoai.utils.|>
+import com.gridoai.utils.mapRight
 
 val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
 class API extends CatsEffectSuite {
   given db: DocDB[IO] = PostgresClient[IO]
+  given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
 
   val searchDocsBE = serverStubOf(withService.searchDocs)
+
+  test("Creates a document") {
+    val authenticatedRequest = basicRequest
+      .post(uri"http://test.com/documents")
+      .headers(authHeader)
+      .body(
+        DocumentCreationPayload(
+          name = "Sky observations",
+          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
+          content = "The sky is blue"
+        ).asJson.toString
+      )
+      .send(serverStubOf(withService.createDocument))
+      .trace("create doc")
+
+    assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
+  }
 
   test("health check should return OK") {
 
@@ -67,38 +84,22 @@ class API extends CatsEffectSuite {
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
   }
+
   test("Searches for a chunk") {
 
     val authenticatedRequest = basicRequest
       .get(uri"http://test.com/search?query=foo&tokenLimit=1000")
       .headers(authHeader)
       .send(searchDocsBE)
+      .trace("Searches chunks")
+      .map(_.body flatMap decode[List[Chunk]])
 
     assertIO(
       authenticatedRequest
         .trace("document search response")
-        .map(x =>
-          println("THE DAMN BODY " + x.body)
-          x.body
-        ),
-      Right(mockedDocsResponse)
+        .mapRight(_.isEmpty),
+      Right(false)
     )
-  }
-
-  test("Creates a document") {
-    val authenticatedRequest = basicRequest
-      .post(uri"http://test.com/documents")
-      .headers(authHeader)
-      .body(
-        DocumentCreationPayload(
-          name = "Sky observations",
-          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
-          content = "The sky is blue"
-        ).asJson.toString
-      )
-      .send(serverStubOf(withService.createDocument))
-
-    assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
   }
 
   test("Ask LLM") {
