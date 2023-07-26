@@ -8,6 +8,8 @@ import dev.maxmelnyk.openaiscala.client.OpenAIClient
 import sttp.client3.*
 import cats.MonadError
 import cats.implicits.toFunctorOps
+import com.knuddels.jtokkit.Encodings
+import com.knuddels.jtokkit.api.ModelType
 
 object ChatGPTClient:
   val maxInputTokens = 2_000
@@ -38,22 +40,24 @@ object ChatGPTClient:
     val fullSeq = (contextMessage ++ chat).toSeq
     (fullSeq, ChatCompletionSettings())
 
-  def calculateTokenQuantity(text: String): Int =
-    // TODO: Improve GPT token counting to get more precise chunk allocations
-    text.filter(_ != ' ').length / 4
-
-  def calculateMessageTokenQuantity(message: Message): Int =
-    calculateTokenQuantity(s"${message.from.toString()}: ${message.message}")
-
-  def calculateMessagesTokenQuantity(messages: List[Message]): Int =
-    messages
-      .map(calculateMessageTokenQuantity)
-      .sum
-
   def apply[F[_]](sttpBackend: SttpBackend[F, Any])(using
       MonadError[F, Throwable]
   ) = new LLM[F]:
     val client = OpenAIClient(sttpBackend)
+    val enc = Encodings
+      .newDefaultEncodingRegistry()
+      .getEncodingForModel(ModelType.GPT_3_5_TURBO)
+
+    def calculateTokenQuantity(text: String): Int =
+      enc.countTokens(text)
+
+    def calculateMessageTokenQuantity(message: Message): Int =
+      calculateTokenQuantity(s"${message.from.toString()}: ${message.message}")
+
+    def calculateMessagesTokenQuantity(messages: List[Message]): Int =
+      messages
+        .map(calculateMessageTokenQuantity)
+        .sum
 
     def getAnswer(
         llmOutput: F[ChatCompletion]
