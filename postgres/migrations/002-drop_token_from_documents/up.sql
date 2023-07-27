@@ -1,1 +1,1 @@
-alter table documents drop column token_quantity;
+alter table {schema}.documents drop column token_quantity;
