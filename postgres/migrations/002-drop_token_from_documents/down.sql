@@ -1,1 +1,1 @@
-alter table documents add column token_quantity integer not null default 0;
+alter table {schema}.documents add column token_quantity integer not null default 0;
