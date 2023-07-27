@@ -65,8 +65,12 @@ implicit val getEmbeddingModel: Get[EmbeddingModel] =
 implicit val putEmbeddingModel: Put[EmbeddingModel] =
   Put[String].tcontramap(embeddingToStr(_))
 
-val POSTGRES_URI =
-  sys.env.getOrElse("POSTGRES_URI", "//localhost:5432/gridoai")
+val POSTGRES_HOST =
+  sys.env.getOrElse("POSTGRES_HOST", "localhost")
+val POSTGRES_PORT =
+  sys.env.getOrElse("POSTGRES_PORT", "5432")
+val POSTGRES_DATABASE =
+  sys.env.getOrElse("POSTGRES_DATABASE", "gridoai")
 val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
 val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
 val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
@@ -83,7 +87,7 @@ object PostgresClient {
 
     val xa = Transactor.fromDriverManager[F](
       "org.postgresql.Driver",
-      s"jdbc:postgresql:$POSTGRES_URI",
+      s"jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DATABASE",
       POSTGRES_USER,
       POSTGRES_PASSWORD
     )

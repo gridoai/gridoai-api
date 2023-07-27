@@ -60,6 +60,19 @@ jobs:
           java -jar target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar &
           sleep 3
 
+      - name: Set up PostgreSQL CLI
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Merge migrations into schema
+        run: |
+          echo "SET SEARCH_PATH = ${{ steps.stage-name.outputs.stage-name }};" > schema.sql
+          cat postgres/migrations/*/up.sql >> schema.sql
+
+      - name: Run schema
+        env:
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: psql -h ${{ secrets.POSTGRES_HOST }} -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DATABASE }} -f schema.sql
+
       - name: Run tests
         env:
           POSTGRES_SCHEMA: ${{ steps.stage-name.outputs.stage-name }}
@@ -67,7 +80,9 @@ jobs:
           EMBEDDING_API_ENDPOINT: ${{ secrets.EMBEDDING_API_ENDPOINT }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_URI: ${{ secrets.POSTGRES_URI }}
+          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
         run: sbt test
         # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
       - name: Upload dependency graph
