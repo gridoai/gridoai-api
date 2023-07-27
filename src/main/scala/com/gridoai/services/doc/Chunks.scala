@@ -60,7 +60,6 @@ def getChunks(
       IO.pure(
         Right(filterExcessTokens(acc, calculateChunkTokenQuantity, tokenLimit))
       )
-    else if (acc.length < pageSize) IO.pure(Right(acc))
     else
       db.getNearChunks(vec, offset, pageSize, orgId, role)
         .flatMapRight:
