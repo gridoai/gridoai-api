@@ -10,8 +10,7 @@ create type embedding_model AS ENUM (
   'Mocked'
 );
 
-create table
-  documents (
+create table documents (
     uid uuid not null default uuid_generate_v4 (),
     name text not null,
     source text not null,
@@ -23,8 +22,7 @@ create table
     constraint documents_pkey primary key (uid)
   ) tablespace pg_default;
 
-create table
-  chunks (
+create table chunks (
     uid uuid not null default uuid_generate_v4 (),
     document_uid uuid not null,
     document_name text not null,

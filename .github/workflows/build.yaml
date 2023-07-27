@@ -65,7 +65,8 @@ jobs:
 
       - name: Merge migrations into schema
         run: |
-          echo "SET SEARCH_PATH = ${{ steps.stage-name.outputs.stage-name }};" > schema.sql
+          echo "CREATE SCHEMA ${{ steps.stage-name.outputs.stage-name }};" > schema.sql
+          echo "SET SEARCH_PATH = ${{ steps.stage-name.outputs.stage-name }};" >> schema.sql
           cat postgres/migrations/*/up.sql >> schema.sql
 
       - name: Run schema
