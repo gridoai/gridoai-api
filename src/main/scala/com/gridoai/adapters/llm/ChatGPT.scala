@@ -7,7 +7,7 @@ import dev.maxmelnyk.openaiscala.models.text.completions.chat._
 import dev.maxmelnyk.openaiscala.client.OpenAIClient
 import sttp.client3.*
 import cats.MonadError
-import cats.implicits.toFunctorOps
+import cats.implicits.*
 import com.knuddels.jtokkit.Encodings
 import com.knuddels.jtokkit.api.ModelType
 
@@ -103,14 +103,17 @@ object ChatGPTClient:
         messages
           .map(m => s"${m.from.toString()}: ${m.message}")
           .mkString("\n")
-      val singleMessage = List(
-        Message(
-          from = MessageFrom.User,
-          message =
-            s"$chatMergePrompt\n\nProvide a laconic summary for the following conversation: $mergedMessages"
+
+      if messages.length <= 5 then Right(mergedMessages).pure[F]
+      else
+        val singleMessage = List(
+          Message(
+            from = MessageFrom.User,
+            message =
+              s"$chatMergePrompt\n\nProvide a laconic summary for the following conversation: $mergedMessages"
+          )
         )
-      )
-      singleMessage
-        |> makePayloadWithContext()
-        |> client.createChatCompletion
-        |> getAnswer
+        singleMessage
+          |> makePayloadWithContext()
+          |> client.createChatCompletion
+          |> getAnswer
