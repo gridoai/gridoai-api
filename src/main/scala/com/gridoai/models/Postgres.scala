@@ -126,7 +126,7 @@ object PostgresClient {
               document_organization,
               document_roles
             ) values (
-              ?, ?, ?, ?, ?, ?, ?::embedding_model, ?, ?, ?
+              ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
             )"""
         ).updateMany(chunkRows)
       yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
@@ -192,7 +192,7 @@ object PostgresClient {
           from $chunksTable
           where
             document_organization = $orgId and
-            embedding_model = ${embedding.model}::embedding_model
+            embedding_model = ${embedding.model}::$POSTGRES_SCHEMA.embedding_model
           order by distance asc
           offset $offset
           limit $limit"""
