@@ -75,9 +75,10 @@ val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
 val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
 val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
 
-def table(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
-val documentsTable = table("documents")
-val chunksTable = table("chunks")
+def pgObj(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
+val documentsTable = pgObj("documents")
+val chunksTable = pgObj("chunks")
+val EmbeddingModelEnum = pgObj("embedding_model")
 
 object PostgresClient {
   def apply[F[_]: Async](implicit
@@ -126,7 +127,7 @@ object PostgresClient {
               document_organization,
               document_roles
             ) values (
-              ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
+              ?, ?, ?, ?, ?, ?, ?::$EmbeddingModelEnum, ?, ?, ?
             )"""
         ).updateMany(chunkRows)
       yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
@@ -192,7 +193,7 @@ object PostgresClient {
           from $chunksTable
           where
             document_organization = $orgId and
-            embedding_model = ${embedding.model}::$POSTGRES_SCHEMA.embedding_model
+            embedding_model = ${embedding.model}::$EmbeddingModelEnum
           order by distance asc
           offset $offset
           limit $limit"""
