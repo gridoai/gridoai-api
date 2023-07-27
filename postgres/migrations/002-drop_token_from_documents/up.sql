@@ -1,1 +1,1 @@
-alter table public.documents drop column token_quantity;
+alter table documents drop column token_quantity;
