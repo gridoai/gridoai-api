@@ -159,17 +159,19 @@ object PostgresClient {
         uid: UID,
         orgId: String,
         role: String
-    ): F[Either[String, Unit]] = {
+    ): F[Either[String, Unit]] =
       (for
-        _ <-
+        deletedChunks <-
           sql"delete from $chunksTable where document_uid = $uid and document_organization = ${orgId} ".update.run
-        _ <-
+        deletedDocuments <-
           sql"delete from $documentsTable where uid = $uid and organization = ${orgId}".update.run
-      yield ())
+      yield (deletedChunks, deletedDocuments))
         .transact[F](xa)
-        .map(Right(_))
-        |> attempt
-    }
+        .map((deletedChunks, deletedDocuments) =>
+          if (deletedDocuments == 0) Left("No document was deleted")
+          else if (deletedChunks == 0) Left("No chunk was deleted")
+          else Right(())
+        ) |> attempt
 
     def getNearChunks(
         embedding: Embedding,
