@@ -3,7 +3,7 @@ package com.gridoai.test
 import cats.effect.IO
 
 import com.gridoai.models.DocDB
-import com.gridoai.models.MockDocDB
+import com.gridoai.utils.*
 import munit.CatsEffectSuite
 import sttp.client3.UriContext
 import sttp.client3.basicRequest
@@ -31,6 +31,7 @@ object fileMock:
       .take(2)
       .filter(_.toFile.isFile())
       .toList
+      .trace
 
     files.map { path =>
       val name = path.getFileName.toString
@@ -64,7 +65,8 @@ class UploadApi extends CatsEffectSuite {
   import fileMock._
   test("Uploads a file") {
 
-    val (fileUpload, numFiles) = generateFilePartsOfDir("./src/test/resources/")
+    val (fileUpload, numFiles) =
+      generateFilePartsOfDir("./src/test/resources/")
 
     println("sending request")
     for {
@@ -75,9 +77,9 @@ class UploadApi extends CatsEffectSuite {
         .header("Content-Type", "multipart/form-data")
         .multipartBody(fileUpload)
       // Create a request
+      _ <- IO.println(req.toCurl)
       response <- req
         .send(be)
-      _ <- IO.println(req.toCurl)
       _ <- IO.println(response)
 
       // Assert that the response status is OK
