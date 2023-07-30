@@ -127,7 +127,7 @@ object PostgresClient {
               document_organization,
               document_roles
             ) values (
-              ?, ?, ?, ?, ?, ?, ?::$EmbeddingModelEnum, ?, ?, ?
+              ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
             )"""
         ).updateMany(chunkRows)
       yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
