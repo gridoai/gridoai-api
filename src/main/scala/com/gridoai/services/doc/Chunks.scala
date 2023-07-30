@@ -9,19 +9,30 @@ import com.gridoai.utils.*
 import com.gridoai.adapters.embeddingApi.*
 import com.gridoai.models.DocDB
 
+def calculateChunkStarts(
+    wordQuantity: Int,
+    chunkSize: Int,
+    overlapSize: Int
+): List[Int] =
+  println(s"wordQuantity: $wordQuantity")
+  println(s"chunkSize: $chunkSize")
+  println(s"overlapSize: $overlapSize")
+  List
+    .range(
+      0,
+      (wordQuantity - overlapSize).max(0) + 1,
+      chunkSize - overlapSize
+    )
+    .traceFn: output =>
+      s"output: $output"
+
 def chunkContent(
     content: String,
     chunkSize: Int,
     overlapSize: Int
 ): List[String] =
   val words = content.split(" ")
-
-  List
-    .range(
-      0,
-      words.length + 1 - overlapSize,
-      chunkSize - overlapSize
-    )
+  calculateChunkStarts(words.length, chunkSize, overlapSize)
     .map(i => words.slice(i, i + chunkSize).mkString(" "))
 
 def makeChunks(document: Document): List[Chunk] =
