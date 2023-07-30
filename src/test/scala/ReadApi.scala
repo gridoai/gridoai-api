@@ -29,25 +29,6 @@ class API extends CatsEffectSuite {
   given db: DocDB[IO] = PostgresClient[IO]
   given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
 
-  val searchDocsBE = serverStubOf(withService.searchDocs)
-
-  test("Creates a document") {
-    val authenticatedRequest = basicRequest
-      .post(uri"http://test.com/documents")
-      .headers(authHeader)
-      .body(
-        DocumentCreationPayload(
-          name = "Sky observations",
-          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
-          content = "The sky is blue"
-        ).asJson.toString
-      )
-      .send(serverStubOf(withService.createDocument))
-      .trace("create doc")
-
-    assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
-  }
-
   test("health check should return OK") {
 
     val response = basicRequest
@@ -80,9 +61,26 @@ class API extends CatsEffectSuite {
   test("Can't search documents without auth") {
     val responseWithoutAuth = basicRequest
       .get(uri"http://test.com/search?query=foo&tokenLimit=1000")
-      .send(searchDocsBE)
+      .send(serverStubOf(withService.searchDocs))
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
+  }
+
+  test("Creates a document") {
+    val authenticatedRequest = basicRequest
+      .post(uri"http://test.com/documents")
+      .headers(authHeader)
+      .body(
+        DocumentCreationPayload(
+          name = "Sky observations",
+          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
+          content = "The sky is blue"
+        ).asJson.toString
+      )
+      .send(serverStubOf(withService.createDocument))
+      .trace("create doc")
+
+    assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
   }
 
   test("Searches for a chunk") {
@@ -90,7 +88,7 @@ class API extends CatsEffectSuite {
     val authenticatedRequest = basicRequest
       .get(uri"http://test.com/search?query=foo&tokenLimit=1000")
       .headers(authHeader)
-      .send(searchDocsBE)
+      .send(serverStubOf(withService.searchDocs))
       .trace("Searches chunks")
       .map(_.body flatMap decode[List[Chunk]])
 
