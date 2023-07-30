@@ -22,4 +22,14 @@ class ChunkingTest extends FunSuite {
       expectedContent
     )
   }
+
+  test("chunkContent splits small contents") {
+    val content = "The sky is blue"
+    val chunks = chunkContent(content, 500, 100)
+    val expectedChunks = List("The sky is blue")
+    assertEquals(
+      chunks,
+      expectedChunks
+    )
+  }
 }
