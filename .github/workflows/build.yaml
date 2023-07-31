@@ -10,9 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Get branch name
         id: branch-name
@@ -39,15 +38,6 @@ jobs:
           java-version: "17" # for a specific JDK 17; or '17' for the latest JDK 17
           distribution: "graalvm" # New 'distribution' option
           cache: "sbt"
-
-      - name: Generate .jar
-        run: sbt assembly
-
-      - name: Save jar
-        uses: actions/upload-artifact@v2
-        with:
-          name: jar
-          path: target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar
 
       - name: Set up PostgreSQL CLI
         run: sudo apt-get install -y postgresql-client
@@ -78,9 +68,22 @@ jobs:
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
         run: sbt test
 
-  dependency-graph:
-    name: Update Dependency Graph
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: scalacenter/sbt-dependency-submission@v2
+      - name: Set up JDK 17
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: "17" # for a specific JDK 17; or '17' for the latest JDK 17
+          distribution: "graalvm" # New 'distribution' option
+          cache: "sbt"
+
+      - name: Generate .jar
+        run: sbt assembly
+
+      - name: Save jar
+        uses: actions/upload-artifact@v2
+        with:
+          name: jar
+          path: target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar
