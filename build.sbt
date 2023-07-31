@@ -9,41 +9,6 @@ val circeVersion = "0.14.1"
 val doobieVersion = "1.0.0-RC1"
 val projectName = "API"
 val currentVersion = "0.1.0-SNAPSHOT"
-val jarPath =
-  s"target/scala-${scala3Version}/API-assembly-${currentVersion}.jar"
-val deployRegion = "southamerica-east1"
-
-val gcpProject = "lucid-arch-387422"
-def bashCommand(name: String, command: String) = Command.command(name) {
-  println(s"> $command")
-  state =>
-    val output = command.!(state.log)
-    output match {
-      case 0 => state
-      case _ => state.fail
-    }
-}
-
-val deployGcpFunction = bashCommand(
-  "deployGcpFunction",
-  s"gcloud functions deploy gridoai-api --region=$deployRegion --entry-point=com.gridoai.ScalaHttpFunction --runtime=java17 --trigger-http --allow-unauthenticated --memory=512MB --source=deployment"
-)
-
-val makeJar = bashCommand("makeJar", s"cp $jarPath deployment/app.jar")
-val buildGcpContainer = bashCommand(
-  "buildGcpContainer",
-  s"gcloud builds submit --tag gcr.io/${gcpProject}/gridoai-api --project ${gcpProject}"
-)
-
-val submitGcpContainer = bashCommand(
-  "submitGcpContainer",
-  s"gcloud run deploy gridoai-api --image gcr.io/${gcpProject}/gridoai-api --platform managed --region=$deployRegion --allow-unauthenticated --memory=512Mi --project ${gcpProject}"
-)
-
-val deploy = Command.command("deploy") { (state: State) =>
-  state.:::(List("assembly", "makeJar", "deployGcpFunction"))
-
-}
 
 lazy val root = project
   .in(file("."))
@@ -51,13 +16,6 @@ lazy val root = project
     name := projectName,
     version := currentVersion,
     scalaVersion := scala3Version,
-    commands ++= Seq(
-      deployGcpFunction,
-      makeJar,
-      deploy,
-      submitGcpContainer,
-      buildGcpContainer
-    ),
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "com.google.cloud.functions" % "functions-framework-api" % "1.0.4" % "provided",
     libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "5.8.0",
