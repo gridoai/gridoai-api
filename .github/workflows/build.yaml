@@ -48,17 +48,6 @@ jobs:
         with:
           name: jar
           path: target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar
-      - name: Start server
-        env:
-          POSTGRES_SCHEMA: ${{ steps.stage-name.outputs.stage-name }}
-          EMBAAS_API_KEY: ${{ secrets.EMBAAS_API_KEY }}
-          EMBEDDING_API_ENDPOINT: ${{ secrets.EMBEDDING_API_ENDPOINT }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_URI: ${{ secrets.POSTGRES_URI }}
-        run: |
-          java -jar target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar &
-          sleep 3
 
       - name: Set up PostgreSQL CLI
         run: sudo apt-get install -y postgresql-client
