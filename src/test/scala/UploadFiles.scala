@@ -5,22 +5,17 @@ import cats.effect.IO
 import com.gridoai.models.DocDB
 import com.gridoai.utils.*
 import munit.CatsEffectSuite
-import sttp.client3.UriContext
-import sttp.client3.basicRequest
-import sttp.model.Header
-import sttp.model.StatusCode
 import sttp.model.Part
 import sttp.model.MediaType
-import cats.implicits.*
 import scala.jdk.CollectionConverters.*
 
-import io.circe.parser.*
-import io.circe.*
 import com.gridoai.models.PostgresClient
-
+import com.gridoai.auth.AuthData
+import com.gridoai.endpoints.FileUpload
+import com.gridoai.services.doc.uploadDocuments
 object fileMock:
   import java.nio.file.{Files, Paths}
-  import sttp.client3.{ByteArrayBody, StringBody}
+  import sttp.client3.{StringBody}
 
   def generateFilePartsOfDir(directory: String) =
     val dir = Paths.get(directory)
@@ -35,13 +30,12 @@ object fileMock:
 
     files.map { path =>
       val name = path.getFileName.toString
-      val bytes = Files.readAllBytes(path)
       val contentType = Option(Files.probeContentType(path))
         .flatMap(x => MediaType.parse(x).toOption)
 
       Part(
         name = "files",
-        body = ByteArrayBody(bytes),
+        body = path.toFile(),
         contentType = contentType,
         fileName = Some(name)
       )
@@ -61,7 +55,6 @@ class UploadApi extends CatsEffectSuite {
   given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
   given db: DocDB[IO] = PostgresClient[IO]
 
-  import com.gridoai.adapters.*
   import fileMock._
   test("Uploads a file") {
 
@@ -70,29 +63,14 @@ class UploadApi extends CatsEffectSuite {
 
     println("sending request")
     for {
-      be <- catsBackend
-      req = basicRequest
-        .post(uri"http://localhost:8080/upload")
-        .headers(authHeader)
-        .header("Content-Type", "multipart/form-data")
-        .multipartBody(fileUpload)
-      // Create a request
-      _ <- IO.println(req.toCurl)
-      response <- req
-        .send(be)
-      _ <- IO.println(response)
+      uploadResult <- uploadDocuments(
+        AuthData("org1", "admin", "admin_1")
+      )(FileUpload(fileUpload))
 
+      _ <- IO.println(uploadResult)
       // Assert that the response status is OK
-      _ = assertEquals(response.code, StatusCode.Ok)
-      decoded <- IO.fromEither(
-        response.body
-          .flatMap(decode[List[String]])
-          .left
-          .map(x => new Exception(x.toString()))
-      )
-
-      _ = assertEquals(decoded.length, numFiles)
-
+      _ = assertEquals(uploadResult.isRight, true)
+      _ = assertEquals(uploadResult.map(_.length), Right(numFiles))
     } yield ()
 
   }
