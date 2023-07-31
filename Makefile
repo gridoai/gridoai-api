@@ -1,5 +1,5 @@
 postgres-up:
-	@cd postgres; cat migrations/*/up.sql > schema.sql; sed -i 's/{schema}/public/g' schema.sql; docker compose up
+	@cd postgres; cat migrations/*/up.sql > schema.sql; sed -i '' 's/{schema}/public/g' schema.sql; docker compose up
 
 submit-img:
 	@gcloud builds submit --tag gcr.io/lucid-arch-387422/gridoai-api --project lucid-arch-387422
