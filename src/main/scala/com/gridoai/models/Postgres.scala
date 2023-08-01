@@ -191,7 +191,7 @@ object PostgresClient {
             uid,
             content,
             token_quantity,
-            embedding <-> $vector::vector as distance
+            embedding <=> $vector::vector as distance
           from $chunksTable
           where
             document_organization = $orgId and
