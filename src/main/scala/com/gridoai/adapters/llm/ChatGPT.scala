@@ -16,7 +16,7 @@ val ENC = Encodings
   .getEncodingForModel(ModelType.GPT_3_5_TURBO)
 
 object ChatGPTClient:
-  val maxInputTokens = 2_000
+  val maxInputTokens = 3_000
 
   def messageFromToRole: MessageFrom => ChatCompletion.Message.Role =
     case MessageFrom.Bot  => ChatCompletion.Message.Role.Assistant
