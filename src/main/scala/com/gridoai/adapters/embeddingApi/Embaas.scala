@@ -85,7 +85,9 @@ object EmbaasClient:
         case Right(r) =>
           r.data
             .sortBy(_.index)
-            .map(d => (Embedding(d.embedding, EmbeddingModel.InstructorLarge)))
+            .map(d =>
+              (Embedding(d.embedding, EmbeddingModel.MultilingualE5Base))
+            )
             .traceFn: e =>
               s"input batch size: ${texts.length}, output batch size: ${e.length}"
             .asRight

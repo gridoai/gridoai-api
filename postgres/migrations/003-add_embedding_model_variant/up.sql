@@ -1,0 +1,1 @@
+ALTER TYPE {schema}.embedding_model ADD VALUE 'MultilingualE5Base';

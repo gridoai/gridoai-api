@@ -11,7 +11,8 @@ enum MessageFrom:
 
 enum EmbeddingModel:
   case TextEmbeddingsAda002, TextEmbeddingsBert002,
-    TextEmbeddingsBertMultilingual002, TextGecko, InstructorLarge, Mocked
+    TextEmbeddingsBertMultilingual002, TextGecko, InstructorLarge,
+    MultilingualE5Base, Mocked
 
 def strToEmbedding(model: String): EmbeddingModel =
   Try(EmbeddingModel.valueOf(model)).getOrElse(EmbeddingModel.Mocked)
