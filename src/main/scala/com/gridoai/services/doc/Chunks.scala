@@ -36,7 +36,7 @@ def chunkContent(
     .map(i => words.slice(i, i + chunkSize).mkString(" "))
 
 def makeChunks(document: Document): List[Chunk] =
-  chunkContent(document.content, 500, 100)
+  chunkContent(document.content, 200, 100)
     .map(content =>
       Chunk(
         documentUid = document.uid,
