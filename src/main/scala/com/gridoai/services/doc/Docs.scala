@@ -33,7 +33,7 @@ def searchDoc(
     db: DocDB[IO]
 ): IO[Either[String, List[Chunk]]] =
   getEmbeddingAPI("embaas")
-    .embed(text)
+    .embedChat(text)
     .flatMapRight(
       getChunks(
         getLLM(llmModel |> strToLLM).calculateChunkTokenQuantity,
@@ -185,7 +185,7 @@ def mapDocumentsToDB[F[_]: Monad](
   val chunks = documents.flatMap(makeChunks)
   println("Got chunks, n: " + chunks.length)
   embeddingApi
-    .embedMany(chunks.map(_.content))
+    .embedChunks(chunks)
     .map(_.flatMap(validateSize(chunks)))
     .mapRight: embeddings =>
       println("Got embeddings: " + embeddings.length)
