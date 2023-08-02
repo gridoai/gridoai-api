@@ -35,4 +35,4 @@ def getEmbeddingApiByName(name: String) =
       EmbaasClient(
         HttpClient("https://api.embaas.io"),
         sys.env("EMBAAS_API_KEY")
-      )
+      ).withFallback(GridoAIML)
