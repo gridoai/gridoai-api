@@ -27,6 +27,7 @@ jobs:
             SANITIZED_BRANCH_NAME=${BRANCH_NAME//\//_}
             STAGE_NAME="preview_$SANITIZED_BRANCH_NAME"
           fi
+          STAGE_NAME=${STAGE_NAME//-/_}  # Replace "-" with "_"
           echo "stage-name=${STAGE_NAME}" >> $GITHUB_OUTPUT
           echo "BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}" >> $GITHUB_ENV
           echo "Stage is ${STAGE_NAME}"
