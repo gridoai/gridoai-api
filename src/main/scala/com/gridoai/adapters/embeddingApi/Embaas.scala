@@ -55,21 +55,10 @@ object EmbaasClient:
         instruction: String
     ): IO[Either[String, List[Embedding]]] =
       println(s"trying to get ${texts.length} embeddings...")
-      if texts.length <= 256 then embedLessThan256(texts, instruction)
-      else
-        embedLessThan256(texts.slice(0, 256), instruction).flatMapRight(
-          embeddings =>
-            embedMany(texts.slice(256, texts.length), instruction).mapRight(
-              newEmbeddings =>
-                println(s"last batch size: ${embeddings.length}")
-                println(s"current batch size: ${newEmbeddings.length}")
-                embeddings ++ newEmbeddings
-            )
-        )
+      executeByParts(embedLessThan256(instruction), 256)(texts)
 
-    def embedLessThan256(
-        texts: List[String],
-        instruction: String
+    def embedLessThan256(instruction: String)(
+        texts: List[String]
     ): IO[Either[String, List[Embedding]]] =
       val request = EmbeddingRequest(texts, instruction)
       val response = httpClient
