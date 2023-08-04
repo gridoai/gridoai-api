@@ -41,6 +41,12 @@ object GridoAIML extends EmbeddingAPI[IO]:
       texts: List[String],
       instruction: String
   ): IO[Either[String, List[Embedding]]] =
+    println(s"trying to get ${texts.length} embeddings...")
+    executeByParts(embedLessThan8(instruction), 8)(texts)
+
+  def embedLessThan8(instruction: String)(
+      texts: List[String]
+  ): IO[Either[String, List[Embedding]]] =
     val body = GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     Http
       .post(f"/embed")

@@ -112,3 +112,19 @@ def traceMappable[T, F[_]: Functor](label: String)(
 def partitionEithers[E, T](list: List[Either[E, T]]): Either[List[E], List[T]] =
   val (lefts, rights) = list.partitionMap(identity)
   if (lefts.isEmpty) Right(rights) else Left(lefts)
+
+def executeByParts[T, E, V](
+    f: List[T] => IO[Either[E, List[V]]],
+    partitionSize: Int
+)(elements: List[T]): IO[Either[E, List[V]]] =
+  if elements.length <= partitionSize then f(elements)
+  else
+    f(elements.slice(0, partitionSize)).flatMapRight(outputElements =>
+      executeByParts(f, partitionSize)(
+        elements.slice(partitionSize, elements.length)
+      ).mapRight(newOutputElements =>
+        println(s"last batch size: ${outputElements.length}")
+        println(s"current batch size: ${newOutputElements.length}")
+        outputElements ++ newOutputElements
+      )
+    )
