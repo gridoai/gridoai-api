@@ -54,8 +54,9 @@ object EmbaasClient:
         texts: List[String],
         instruction: String
     ): IO[Either[String, List[Embedding]]] =
-      println(s"trying to get ${texts.length} embeddings...")
+      println(s"Trying to get ${texts.length} embeddings using Embaas")
       executeByParts(embedLessThan256(instruction), 256)(texts)
+        .timeoutTo(20.seconds, IO.pure(Left("Embaas API Timeout")))
 
     def embedLessThan256(instruction: String)(
         texts: List[String]

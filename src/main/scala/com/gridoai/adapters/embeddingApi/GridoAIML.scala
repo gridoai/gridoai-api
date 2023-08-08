@@ -41,7 +41,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
       texts: List[String],
       instruction: String
   ): IO[Either[String, List[Embedding]]] =
-    println(s"trying to get ${texts.length} embeddings...")
+    println(s"trying to get ${texts.length} embeddings using GridoAIML")
     executeByParts(embedLessThan8(instruction), 8)(texts)
 
   def embedLessThan8(instruction: String)(

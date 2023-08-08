@@ -7,6 +7,7 @@ import com.gridoai.adapters.HttpClient
 import com.gridoai.utils.fallbackEitherM
 import cats.implicits.*
 import cats.Monad
+import com.gridoai.utils.|>
 
 trait EmbeddingAPI[F[_]]:
   def embedChat(text: String): F[Either[String, Embedding]]
@@ -23,9 +24,7 @@ extension [F[_]: Monad](e: EmbeddingAPI[F])
         fallbackEitherM(e.embedChunks, fallback.embedChunks)(chunks)
 
 def getEmbeddingAPI(name: String): EmbeddingAPI[IO] =
-  sys.env.get("USE_MOCKED_EMBEDDINGS_API") match
-    case Some("true") => Mocked
-    case _            => getEmbeddingApiByName(name)
+  sys.env.get("EMBEDDING_API").getOrElse(name) |> getEmbeddingApiByName
 
 def getEmbeddingApiByName(name: String) =
   name match
