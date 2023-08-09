@@ -214,17 +214,20 @@ def createDocs(auth: AuthData)(
   ):
     traceMappable("createDocs"):
       println("Creating docs... ")
-      val documents =
-        payload.map(_.toDocument(UUID.randomUUID()))
-      mapDocumentsToDB(documents, getEmbeddingAPI("embaas"))
-        .flatMapRight(persistencePayload =>
-          println("Got persistencePayloads: " + persistencePayload.length)
-          db.addDocuments(
-            persistencePayload,
-            auth.orgId,
-            auth.role
+      if payload.length > 0 then
+        val documents =
+          payload.map(_.toDocument(UUID.randomUUID()))
+        mapDocumentsToDB(documents, getEmbeddingAPI("embaas"))
+          .flatMapRight(persistencePayload =>
+            println("Got persistencePayloads: " + persistencePayload.length)
+            db.addDocuments(
+              persistencePayload,
+              auth.orgId,
+              auth.role
+            )
           )
-        )
+      else
+        Right(List()).pure[IO]
 
 def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]
