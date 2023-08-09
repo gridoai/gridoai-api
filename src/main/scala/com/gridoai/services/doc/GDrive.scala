@@ -14,6 +14,7 @@ import com.gridoai.parsers.FileFormat
 import java.util.UUID
 
 val SCOPES = List("https://www.googleapis.com/auth/drive.readonly")
+val WEBHOOK_URI = "https://gridoai-api-5yq2d4shfq-rj.a.run.app/gdrive/webhook"
 
 def authenticateGDrive(auth: AuthData)(
     code: String,
@@ -117,6 +118,38 @@ def importGDriveDocuments(auth: AuthData)(
     fetchUserTokens(auth)
       !> getGDriveClient(auth.userId)
       !> getAndAddGDriveDocs(auth, fileIds)
+
+def watchGDriveDocuments(auth: AuthData)(
+    paths: List[String]
+)(using db: DocDB[IO]): IO[Either[String, List[String]]] =
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    println("Watching data from gdrive...")
+    ClerkClient
+      .getUserPublicMetadata(auth.userId)
+      .flatMapRight:
+        case PublicMetadata(Some(accessToken), Some(refreshToken)) =>
+          getGDriveClient(auth.userId, accessToken, refreshToken).flatMapRight:
+            gdriveClient =>
+              findAllFilesInPaths(gdriveClient, paths)
+                .mapRight(_.map(_.id) ++ paths)
+                .flatMapRight(
+                  _.traverse(gdriveClient.watchFile(WEBHOOK_URI))
+                    .map(partitionEithers)
+                    .mapLeft(_.mkString(","))
+                )
+
+        case _ => Left("Make Google Drive authentication first").pure[IO]
+
+// TODO: Add authorization someway in sync requests
+// TODO: Store channel expirations and renew them automatically
+def syncGDriveDocuments(
+    channelId: String,
+    state: String,
+    resourceId: String
+)(implicit db: DocDB[IO]): IO[Either[String, Unit]] = ???
 
 def parseGDriveFileForPersistence(
     file: File

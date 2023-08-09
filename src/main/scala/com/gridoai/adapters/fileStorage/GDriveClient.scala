@@ -8,6 +8,8 @@ import com.gridoai.adapters.GoogleClient
 import java.io.ByteArrayOutputStream
 import scala.jdk.CollectionConverters._
 import cats.effect.kernel.Sync
+import com.google.api.services.drive.model.Channel
+import java.util.UUID
 
 object GDriveClient:
 
@@ -89,4 +91,29 @@ object GDriveClient:
               FileMeta(file.getId, file.getName, file.getMimeType)
             )
             .asRight
+        ) |> attempt
+
+      def watchFile(webhookUrl: String)(
+          fileId: String
+      ): IO[Either[String, String]] =
+        (IO:
+          val sevenDaysInMillis: Long = 7L * 24 * 60 * 60 * 1000
+          val expirationTime = System.currentTimeMillis() + sevenDaysInMillis
+          val channel = new Channel()
+            .setId(
+              UUID.randomUUID.toString
+            ) // A unique ID for this channel
+            .setType("web_hook")
+            .setAddress(webhookUrl)
+            .setExpiration(expirationTime)
+
+          driveService.files().watch(fileId, channel).execute()
+          Right(fileId)
+        ) |> attempt
+
+      def isFolder(fileId: String): IO[Either[String, Boolean]] =
+        (IO:
+          val file =
+            driveService.files().get(fileId).setFields("mimeType").execute()
+          Right(file.getMimeType == "application/vnd.google-apps.folder")
         ) |> attempt
