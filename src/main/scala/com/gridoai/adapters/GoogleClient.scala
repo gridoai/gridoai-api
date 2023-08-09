@@ -78,6 +78,7 @@ object GoogleClient:
         println("Google authorization code flow builded.")
         println("Sending request to get token...")
         flowAndCodeToTokens(flow, code, redirectUri).mapRight(t =>
+          println("Tokens got!")
           (t.getAccessToken, t.getRefreshToken)
         )
 

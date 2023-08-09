@@ -26,31 +26,19 @@ object GDriveClient:
     val driveService = GoogleClient.buildDriveService(token)
 
     new FileStorage[IO]:
-      def listFolders(folderId: String): IO[Either[String, List[FileMeta]]] =
-        (IO:
-          val result = driveService
-            .files()
-            .list()
-            .setQ(
-              s"'$folderId' in parents and mimeType='application/vnd.google-apps.folder'"
-            )
-            .execute()
-          val files = result.getFiles.asScala.toList
-          Right(
-            files.map(file =>
-              FileMeta(file.getId, file.getName, file.getMimeType)
-            )
-          )
-        ) |> attempt
 
-      def listFiles(folderId: String): IO[Either[String, List[FileMeta]]] =
+      def listFiles(
+          folderIds: List[String]
+      ): IO[Either[String, List[FileMeta]]] =
         (IO:
+          val query = folderIds
+            .map(folderId => s"'$folderId' in parents")
+            .mkString(" or ")
+          println(s"query: $query")
           val result = driveService
             .files()
             .list()
-            .setQ(
-              s"'$folderId' in parents and mimeType!='application/vnd.google-apps.folder'"
-            )
+            .setQ(query)
             .execute()
           val files = result.getFiles.asScala.toList
           Right(
@@ -66,21 +54,19 @@ object GDriveClient:
         (IO:
           val fileContents = files.map: file =>
             val outputStream = new ByteArrayOutputStream()
-            if List(
-                "application/vnd.google-apps.presentation",
-                "application/vnd.google-apps.document",
-                "application/vnd.google-apps.sheet"
-              ).contains(file.mimeType)
-            then
-              driveService
-                .files()
-                .`export`(file.id, file.mimeType)
-                .executeMediaAndDownloadTo(outputStream)
-            else
-              driveService
-                .files()
-                .get(file.id)
-                .executeMediaAndDownloadTo(outputStream)
+            mapMimeTypes(file.mimeType) match
+              case Some(mimeType) =>
+                println("Exporting file from Google Drive...")
+                driveService
+                  .files()
+                  .`export`(file.id, mimeType)
+                  .executeMediaAndDownloadTo(outputStream)
+              case None =>
+                println("Downloading file from Google Drive...")
+                driveService
+                  .files()
+                  .get(file.id)
+                  .executeMediaAndDownloadTo(outputStream)
             File(meta = file, content = outputStream.toByteArray)
           Right(fileContents)
         ) |> attempt

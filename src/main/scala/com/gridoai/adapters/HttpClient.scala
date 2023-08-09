@@ -59,3 +59,6 @@ case class HttpClient(endpoint: String):
 
   def post(path: String) =
     basicRequest.post(uri"${endpoint + path}")
+
+  def patch(path: String) =
+    basicRequest.patch(uri"${endpoint + path}")

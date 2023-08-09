@@ -2,12 +2,15 @@ package com.gridoai.adapters.fileStorage
 
 import cats.effect.IO
 
-case class FileMeta(id: String, name: String, mimeType: String)
+case class FileMeta(
+    id: String,
+    name: String,
+    mimeType: String
+)
 case class File(meta: FileMeta, content: Array[Byte])
 
 trait FileStorage[F[_]]:
-  def listFiles(folderId: String): IO[Either[String, List[FileMeta]]]
-  def listFolders(folderId: String): IO[Either[String, List[FileMeta]]]
+  def listFiles(folderIds: List[String]): IO[Either[String, List[FileMeta]]]
   def downloadFiles(
       files: List[FileMeta]
   ): IO[Either[String, List[File]]]

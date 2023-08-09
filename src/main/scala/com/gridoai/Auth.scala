@@ -26,10 +26,10 @@ val mockedJwt =
   JWTPayload(
     "www.grioai.com",
     "accounts.mock.com",
-    Some("org1"),
+    Some("user_2ROSclUThB9eKK0tiDjX8aywetX"),
     Some("admin"),
     "session_blablablabl",
-    "user_blablablabla"
+    "user_2ROSclUThB9eKK0tiDjX8aywetX"
   )
 
 def makeMockedToken =
