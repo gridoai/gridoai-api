@@ -18,44 +18,44 @@ def authenticateGDrive(auth: AuthData)(
     code: String,
     redirectUri: String
 ): IO[Either[String, (String, String)]] =
-  // limitRole(
-  //   auth.role,
-  //   Left(authErrorMsg(Some(auth.role))).pure[IO]
-  // ):
-  println("Authenticating gdrive...")
-  GoogleClient
-    .exchangeCodeForTokens(
-      code,
-      redirectUri,
-      SCOPES
-    )
-    .flatMapRight(ClerkClient.setUserPublicMetadata(auth.userId))
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    println("Authenticating gdrive...")
+    GoogleClient
+      .exchangeCodeForTokens(
+        code,
+        redirectUri,
+        SCOPES
+      )
+      .flatMapRight(ClerkClient.setUserPublicMetadata(auth.userId))
 
 def importGDriveDocuments(auth: AuthData)(
     paths: List[String]
 )(using db: DocDB[IO]): IO[Either[String, List[String]]] =
-  // limitRole(
-  //   auth.role,
-  //   Left(authErrorMsg(Some(auth.role))).pure[IO]
-  // ):
-  println("importing data from gdrive...")
-  ClerkClient
-    .getUserPublicMetadata(auth.userId)
-    .flatMapRight:
-      case PublicMetadata(Some(accessToken), Some(refreshToken)) =>
-        getGDriveClient(auth.userId, accessToken, refreshToken).flatMapRight:
-          gdriveClient =>
-            findAllFilesInPaths(gdriveClient, paths)
-              .flatMapRight(gdriveClient.downloadFiles)
-              .flatMapRight(
-                _.traverse(parseGDriveFileForPersistence)
-                  .map(partitionEithers)
-                  .mapLeft(_.mkString(","))
-                  .flatMapRight(createDocs(auth))
-                  .mapRight(_.map(_.name))
-              )
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    println("importing data from gdrive...")
+    ClerkClient
+      .getUserPublicMetadata(auth.userId)
+      .flatMapRight:
+        case PublicMetadata(Some(accessToken), Some(refreshToken)) =>
+          getGDriveClient(auth.userId, accessToken, refreshToken).flatMapRight:
+            gdriveClient =>
+              findAllFilesInPaths(gdriveClient, paths)
+                .flatMapRight(gdriveClient.downloadFiles)
+                .flatMapRight(
+                  _.traverse(parseGDriveFileForPersistence)
+                    .map(partitionEithers)
+                    .mapLeft(_.mkString(","))
+                    .flatMapRight(createDocs(auth))
+                    .mapRight(_.map(_.name))
+                )
 
-      case _ => Left("Make Google Drive authentication first").pure[IO]
+        case _ => Left("Make Google Drive authentication first").pure[IO]
 
 def parseGDriveFileForPersistence(
     file: File
@@ -84,29 +84,18 @@ def findAllFilesInPaths(
     gdriveClient: FileStorage[IO],
     paths: List[String]
 ): IO[Either[String, List[FileMeta]]] =
-  paths
-    .traverse(findAllFilesInPath(gdriveClient))
-    .map(partitionEithers)
-    .mapLeft(_.mkString(","))
-    .mapRight(_.flatten.distinct)
-
-def findAllFilesInPath(gdriveClient: FileStorage[IO])(
-    path: String
-): IO[Either[String, List[FileMeta]]] =
   gdriveClient
-    .listFiles(path)
-    .flatMapRight: currentFiles =>
-      println(s"files in $path: ${currentFiles.map(_.id)}")
-      gdriveClient
-        .listFolders(path)
-        .flatMapRight: folders =>
-          println(s"folders in $path: ${folders.map(_.id)}")
-          folders
-            .map(_.id)
-            .traverse(findAllFilesInPath(gdriveClient))
-            .map(partitionEithers)
-            .mapLeft(_.mkString(","))
-            .mapRight(newFiles => currentFiles ++ newFiles.flatten)
+    .listFiles(paths)
+    .flatMapRight: elements =>
+      val (files, folders) =
+        elements.partition(_.mimeType != "application/vnd.google-apps.folder")
+      println(s"find ${files.length} files!")
+      println(s"find ${folders.length} folders!")
+      if folders.length > 0 then
+        findAllFilesInPaths(gdriveClient, folders.map(_.id)).mapRight(
+          newFiles => files ++ newFiles
+        )
+      else Right(files).pure[IO]
 
 def getGDriveClient(
     userId: String,
@@ -115,7 +104,7 @@ def getGDriveClient(
 ): IO[Either[String, FileStorage[IO]]] =
   val initialGDriveClient = getFileStorage("gdrive")(accessToken)
   initialGDriveClient
-    .listFiles("root")
+    .listFiles(List("root"))
     .flatMap:
       case Right(_) => Right(initialGDriveClient).pure[IO]
       case Left(_) =>
