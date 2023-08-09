@@ -25,6 +25,9 @@ object withService:
   def listDocs(implicit db: DocDB[IO]) =
     listEndpoint.serverLogic(listDocuments _)
 
+  def authGDrive =
+    authGDriveEndpoint.serverLogic(authenticateGDrive _)
+
   def importGDriveDocs(implicit db: DocDB[IO]) =
     importGDriveEndpoint.serverLogic(importGDriveDocuments _)
 
@@ -37,6 +40,7 @@ object withService:
       healthCheck,
       createDocument,
       uploadDocs,
+      authGDrive,
       importGDriveDocs,
       askLLM,
       deleteDoc,

@@ -2,58 +2,85 @@ package com.gridoai.adapters.fileStorage
 
 import cats.effect.IO
 import com.gridoai.utils.*
-import com.google.api.client.http.javanet.NetHttpTransport
-import com.google.api.client.json.gson.GsonFactory
-import com.google.auth.http.HttpCredentialsAdapter
-import com.google.auth.oauth2.GoogleCredentials
-import com.google.auth.oauth2.AccessToken
-import com.google.api.services.drive.Drive
-import java.util.Date
+import com.gridoai.adapters.GoogleClient
+
 import java.io.ByteArrayOutputStream
 import scala.jdk.CollectionConverters._
 
 object GDriveClient:
 
-  private def buildDriveService(token: String): Drive =
-    val expiryTime =
-      new Date(System.currentTimeMillis() + 3600 * 1000) // 1 hour later
-    val accessToken = new AccessToken(token, expiryTime)
-    val credentials = GoogleCredentials.create(accessToken)
-    val jsonFactory = GsonFactory.getDefaultInstance()
-    val httpTransport = new NetHttpTransport()
+  def mapMimeTypes: String => Option[String] =
+    case "application/vnd.google-apps.presentation" =>
+      Some(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      )
+    case "application/vnd.google-apps.document" =>
+      Some(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      )
+    case "application/vnd.google-apps.sheet" =>
+      Some("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    case _ => None
 
-    new Drive.Builder(
-      httpTransport,
-      jsonFactory,
-      new HttpCredentialsAdapter(credentials)
-    )
-      .setApplicationName("GridoAI")
-      .build()
+  def apply(token: String): FileStorage[IO] =
+    val driveService = GoogleClient.buildDriveService(token)
 
-  def apply(token: String) = new FileStorage[IO]:
-    private val driveService: Drive = buildDriveService(token)
-
-    def listContent(path: String): IO[Either[String, List[String]]] =
-      (IO:
-        val result = driveService
-          .files()
-          .list()
-          .setQ(s"'$path' in parents")
-          .execute()
-        val files = result.getFiles.asScala.toList
-        Right(files.map(_.getName))
-      ) |> attempt
-
-    def downloadFiles(
-        files: List[String]
-    ): IO[Either[String, List[Array[Byte]]]] =
-      (IO:
-        val fileContents = files.map: fileId =>
-          val outputStream = new ByteArrayOutputStream()
-          driveService
+    new FileStorage[IO]:
+      def listFolders(folderId: String): IO[Either[String, List[FileMeta]]] =
+        (IO:
+          val result = driveService
             .files()
-            .get(fileId)
-            .executeMediaAndDownloadTo(outputStream)
-          outputStream.toByteArray
-        Right(fileContents)
-      ) |> attempt
+            .list()
+            .setQ(
+              s"'$folderId' in parents and mimeType='application/vnd.google-apps.folder'"
+            )
+            .execute()
+          val files = result.getFiles.asScala.toList
+          Right(
+            files.map(file =>
+              FileMeta(file.getId, file.getName, file.getMimeType)
+            )
+          )
+        ) |> attempt
+
+      def listFiles(folderId: String): IO[Either[String, List[FileMeta]]] =
+        (IO:
+          val result = driveService
+            .files()
+            .list()
+            .setQ(
+              s"'$folderId' in parents and mimeType!='application/vnd.google-apps.folder'"
+            )
+            .execute()
+          val files = result.getFiles.asScala.toList
+          Right(
+            files.map(file =>
+              FileMeta(file.getId, file.getName, file.getMimeType)
+            )
+          )
+        ) |> attempt
+
+      def downloadFiles(
+          files: List[FileMeta]
+      ): IO[Either[String, List[File]]] =
+        (IO:
+          val fileContents = files.map: file =>
+            val outputStream = new ByteArrayOutputStream()
+            if List(
+                "application/vnd.google-apps.presentation",
+                "application/vnd.google-apps.document",
+                "application/vnd.google-apps.sheet"
+              ).contains(file.mimeType)
+            then
+              driveService
+                .files()
+                .`export`(file.id, file.mimeType)
+                .executeMediaAndDownloadTo(outputStream)
+            else
+              driveService
+                .files()
+                .get(file.id)
+                .executeMediaAndDownloadTo(outputStream)
+            File(meta = file, content = outputStream.toByteArray)
+          Right(fileContents)
+        ) |> attempt

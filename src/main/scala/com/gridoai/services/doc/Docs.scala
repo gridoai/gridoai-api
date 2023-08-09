@@ -54,11 +54,17 @@ def mapExtractToUploadError(e: ExtractTextError) =
 
 def extractText(
     name: String,
-    body: Array[Byte]
+    body: Array[Byte],
+    format: Option[FileFormat] = None
 ): IO[Either[ExtractTextError, String]] = traceMappable("extractText"):
   println("file name: " + name)
 
-  FileFormat.ofFilename(name) match
+  val currentFormat = (format, FileFormat.ofFilename(name)) match
+    case (Some(f), _)    => Some(f)
+    case (None, Some(f)) => Some(f)
+    case _               => None
+
+  currentFormat match
     case Some(FileFormat.PDF) =>
       extractTextFromPdf(body)
     case Some(
@@ -89,9 +95,10 @@ def extractText(
 
 def extractAndCleanText(
     name: String,
-    body: Array[Byte]
+    body: Array[Byte],
+    format: Option[FileFormat] = None
 ): IO[Either[ExtractTextError, String]] =
-  extractText(name, body).mapRight(filterNonUtf8)
+  extractText(name, body, format).mapRight(filterNonUtf8)
 
 type FileUpErr = List[Either[FileUploadError, String]]
 type FileUpOutput = List[String]
@@ -117,11 +124,10 @@ def saveUploadedDocs(auth: AuthData)(
     payloads: List[DocumentCreationPayload]
 )(using
     db: DocDB[IO]
-): IO[Either[FileUpErr, FileUpOutput]] = {
+): IO[Either[FileUpErr, FileUpOutput]] =
   createDocs(auth)(payloads)
     .mapRight(_.map(_.uid.toString()))
     .mapLeft(e => List(FileUploadError.DocumentCreationError(e).asLeft))
-}
 
 def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     db: DocDB[IO]
