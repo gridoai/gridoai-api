@@ -23,11 +23,29 @@ extension (x: Document)
     DocRow(
       uid = x.uid,
       name = x.name,
-      source = x.source,
+      source = x.source.toString,
       content = x.content,
       organization = orgId,
       roles = Array(role)
     )
+
+extension (x: DocRow)
+  def toDocument: Either[String, Document] =
+    val source = x.source match
+      case "Upload"       => Right(Source.Upload)
+      case "CreateButton" => Right(Source.CreateButton)
+      case s if s.startsWith("GDrive(") =>
+        Right(Source.GDrive(s.substring(7, s.length - 1)))
+      case _ => Left("Source out of pattern.")
+
+    source.map: s =>
+      Document(
+        uid = x.uid,
+        name = x.name,
+        source = s,
+        content = x.content
+      )
+
 case class ChunkRow(
     uid: UID,
     document_uid: UID,
@@ -47,7 +65,7 @@ extension (x: ChunkWithEmbedding)
       uid = x.chunk.uid,
       document_uid = x.chunk.documentUid,
       document_name = x.chunk.documentName,
-      document_source = x.chunk.documentSource,
+      document_source = x.chunk.documentSource.toString,
       content = x.chunk.content,
       embedding = x.embedding.vector,
       embedding_model = x.embedding.model,
@@ -140,19 +158,22 @@ object PostgresClient {
     ): F[Either[String, PaginatedResponse[List[Document]]]] =
       traceMappable("listDocuments"):
         sql"""
-       select uid, name, source, content, count(*) over() as total_count 
+       select uid, name, source, content, organization, roles, count(*) over() as total_count 
        from $documentsTable 
        where organization = ${orgId} 
        order by uid asc 
        limit ${(end - start).abs} 
        offset ${start}
      """
-          .query[(Document, Int)]
+          .query[(DocRow, Int)]
           .to[List]
           .transact[F](xa)
           .map(results =>
             val totalCount = results.headOption.map(_._2).getOrElse(0)
-            Right(PaginatedResponse(results.map(_._1), totalCount))
+            results
+              .traverse(_._1.toDocument)
+              .map: documents =>
+                PaginatedResponse(documents, totalCount)
           ) |> attempt
 
     def deleteDocument(
