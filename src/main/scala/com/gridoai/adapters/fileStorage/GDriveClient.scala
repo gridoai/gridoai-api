@@ -6,6 +6,7 @@ import com.gridoai.adapters.GoogleClient
 
 import java.io.ByteArrayOutputStream
 import scala.jdk.CollectionConverters._
+import cats.effect.kernel.Sync
 
 object GDriveClient:
 
@@ -30,7 +31,7 @@ object GDriveClient:
       def listFiles(
           folderIds: List[String]
       ): IO[Either[String, List[FileMeta]]] =
-        (IO:
+        (Sync[IO].blocking:
           val query = folderIds
             .map(folderId => s"'$folderId' in parents")
             .mkString(" or ")
@@ -51,7 +52,7 @@ object GDriveClient:
       def downloadFiles(
           files: List[FileMeta]
       ): IO[Either[String, List[File]]] =
-        (IO:
+        (Sync[IO].blocking:
           val fileContents = files.map: file =>
             val outputStream = new ByteArrayOutputStream()
             mapMimeTypes(file.mimeType) match
@@ -72,14 +73,14 @@ object GDriveClient:
         ) |> attempt
 
       def isFolder(fileId: String): IO[Either[String, Boolean]] =
-        (IO:
+        (Sync[IO].blocking:
           val file =
             driveService.files().get(fileId).setFields("mimeType").execute()
           Right(file.getMimeType == "application/vnd.google-apps.folder")
         ) |> attempt
 
       def fileInfo(fileIds: List[String]): IO[Either[String, List[FileMeta]]] =
-        (IO:
+        (Sync[IO].blocking:
           val fileMetas = fileIds.map: fileId =>
             val file = driveService.files().get(fileId).execute()
             FileMeta(file.getId, file.getName, file.getMimeType)
