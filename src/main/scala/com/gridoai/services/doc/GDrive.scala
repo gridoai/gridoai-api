@@ -11,6 +11,7 @@ import com.gridoai.adapters.PublicMetadata
 import cats.effect.IO
 import cats.implicits.*
 import com.gridoai.parsers.FileFormat
+import java.util.UUID
 
 val SCOPES = List("https://www.googleapis.com/auth/drive.readonly")
 
@@ -80,7 +81,7 @@ def importGDriveDocuments(auth: AuthData)(
 
 def parseGDriveFileForPersistence(
     file: File
-): IO[Either[String, DocumentCreationPayload]] =
+): IO[Either[String, Document]] =
   extractAndCleanText(
     file.meta.name,
     file.content,
@@ -88,9 +89,10 @@ def parseGDriveFileForPersistence(
   )
     .mapLeft(_.toString)
     .mapRight(content =>
-      DocumentCreationPayload(
+      Document(
+        uid = UUID.randomUUID(),
         name = file.meta.name,
-        source = "gdrive",
+        source = Source.GDrive(file.meta.id),
         content = content
       )
     )

@@ -115,7 +115,6 @@ def parseFileForPersistence(
     .mapRight(content =>
       DocumentCreationPayload(
         name = name,
-        source = name,
         content = content
       )
     )
@@ -125,7 +124,7 @@ def saveUploadedDocs(auth: AuthData)(
 )(using
     db: DocDB[IO]
 ): IO[Either[FileUpErr, FileUpOutput]] =
-  createDocs(auth)(payloads)
+  createDocs(auth)(payloads.map(_.toDocument(UUID.randomUUID(), Source.Upload)))
     .mapRight(_.map(_.uid.toString()))
     .mapLeft(e => List(FileUploadError.DocumentCreationError(e).asLeft))
 
@@ -172,7 +171,9 @@ def createDoc(auth: AuthData)(
     auth.role,
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
-    createDocs(auth)(List(payload))
+    createDocs(auth)(
+      List(payload.toDocument(UUID.randomUUID(), Source.CreateButton))
+    )
       .mapRight(_.head.uid.toString())
 
 def validateSize[A, B](a: List[A])(b: List[B]) =
@@ -206,7 +207,7 @@ def mapDocumentsToDB[F[_]: Monad](
         )
 
 def createDocs(auth: AuthData)(
-    payload: List[DocumentCreationPayload]
+    documents: List[Document]
 )(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
   limitRole(
     auth.role,
@@ -214,9 +215,7 @@ def createDocs(auth: AuthData)(
   ):
     traceMappable("createDocs"):
       println("Creating docs... ")
-      if payload.length > 0 then
-        val documents =
-          payload.map(_.toDocument(UUID.randomUUID()))
+      if documents.length > 0 then
         mapDocumentsToDB(documents, getEmbeddingAPI("embaas"))
           .flatMapRight(persistencePayload =>
             println("Got persistencePayloads: " + persistencePayload.length)
@@ -226,8 +225,7 @@ def createDocs(auth: AuthData)(
               auth.role
             )
           )
-      else
-        Right(List()).pure[IO]
+      else Right(List()).pure[IO]
 
 def ask(auth: AuthData)(messages: List[Message])(implicit
     db: DocDB[IO]

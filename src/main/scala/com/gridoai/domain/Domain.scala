@@ -29,17 +29,21 @@ def strToLLM(model: String): LLMModel =
 def llmToStr(model: LLMModel): String =
   model.toString()
 
+enum Source:
+  case Upload, CreateButton
+  case GDrive(fileId: String)
+
 case class Document(
     uid: UID,
     name: String,
-    source: String,
+    source: Source,
     content: String
 )
 
 case class Chunk(
     documentUid: UID,
     documentName: String,
-    documentSource: String,
+    documentSource: Source,
     uid: UID,
     content: String,
     tokenQuantity: Int
@@ -59,10 +63,9 @@ case class SimilarChunk(
 
 case class DocumentCreationPayload(
     name: String,
-    source: String,
     content: String
 ):
-  def toDocument(uid: UID) =
+  def toDocument(uid: UID, source: Source) =
     Document(
       uid,
       name,

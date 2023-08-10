@@ -5,6 +5,7 @@ import com.gridoai.domain.Embedding
 import com.gridoai.domain.EmbeddingModel
 import com.gridoai.domain.Document
 import com.gridoai.domain.Chunk
+import com.gridoai.domain.Source
 
 import java.util.UUID
 
@@ -13,7 +14,7 @@ val mockedChunk = ChunkWithEmbedding(
     uid = UUID.fromString("694b8567-8c93-45c6-8051-34be4337e740"),
     documentUid = UUID.fromString("694b8567-8c93-45c6-8051-34be4337e740"),
     documentName = "Sky observations",
-    documentSource = "https://www.nasa.gov/planetarydefense/faq/asteroid",
+    documentSource = Source.Upload,
     content = "The sky is blue",
     tokenQuantity = 4
   ),
@@ -23,6 +24,6 @@ val mockedChunk = ChunkWithEmbedding(
 val mockedDocument = Document(
   uid = UUID.fromString("694b8567-8c93-45c6-8051-34be4337e740"),
   name = "Sky observations",
-  source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
+  source = Source.Upload,
   content = "The sky is blue"
 )
