@@ -14,6 +14,8 @@ trait FileStorage[F[_]]:
   def downloadFiles(
       files: List[FileMeta]
   ): IO[Either[String, List[File]]]
+  def isFolder(fileId: String): IO[Either[String, Boolean]]
+  def fileInfo(fileIds: List[String]): IO[Either[String, List[FileMeta]]]
 
 def getFileStorageByName(
     name: String

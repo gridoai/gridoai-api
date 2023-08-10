@@ -32,7 +32,7 @@ def authenticateGDrive(auth: AuthData)(
       .flatMapRight(ClerkClient.setUserPublicMetadata(auth.userId))
 
 def importGDriveDocuments(auth: AuthData)(
-    paths: List[String]
+    fileIds: List[String]
 )(using db: DocDB[IO]): IO[Either[String, List[String]]] =
   limitRole(
     auth.role,
@@ -45,15 +45,36 @@ def importGDriveDocuments(auth: AuthData)(
         case PublicMetadata(Some(accessToken), Some(refreshToken)) =>
           getGDriveClient(auth.userId, accessToken, refreshToken).flatMapRight:
             gdriveClient =>
-              findAllFilesInPaths(gdriveClient, paths)
-                .flatMapRight(gdriveClient.downloadFiles)
-                .flatMapRight(
-                  _.traverse(parseGDriveFileForPersistence)
-                    .map(partitionEithers)
-                    .mapLeft(_.mkString(","))
-                    .flatMapRight(createDocs(auth))
-                    .mapRight(_.map(_.name))
+              fileIds
+                .traverse(fileId =>
+                  gdriveClient
+                    .isFolder(fileId)
+                    .mapRight(isFolder => (fileId, isFolder))
                 )
+                .map(partitionEithers)
+                .mapLeft(_.mkString(","))
+                .flatMapRight: elements =>
+                  val folders = elements.filter(_._2).map(_._1)
+                  val files = elements.filter(!_._2).map(_._1)
+                  println(s"Received ${folders.length} folders.")
+                  println(s"Received ${files.length} files.")
+
+                  findAllFilesInFolders(gdriveClient, folders)
+                    .flatMapRight(newFiles =>
+                      if files.length > 0 then
+                        gdriveClient
+                          .fileInfo(files)
+                          .mapRight(filesMeta => filesMeta ++ newFiles)
+                      else Right(newFiles).pure[IO]
+                    )
+                    .flatMapRight(gdriveClient.downloadFiles)
+                    .flatMapRight(
+                      _.traverse(parseGDriveFileForPersistence)
+                        .map(partitionEithers)
+                        .mapLeft(_.mkString(","))
+                        .flatMapRight(createDocs(auth))
+                        .mapRight(_.map(_.name))
+                    )
 
         case _ => Left("Make Google Drive authentication first").pure[IO]
 
@@ -80,22 +101,24 @@ def parseGoogleMimeTypes(mimeType: String): Option[FileFormat] =
     case "application/vnd.google-apps.document"     => Some(FileFormat.DOCX)
     case _                                          => None
 
-def findAllFilesInPaths(
+def findAllFilesInFolders(
     gdriveClient: FileStorage[IO],
-    paths: List[String]
+    folders: List[String]
 ): IO[Either[String, List[FileMeta]]] =
-  gdriveClient
-    .listFiles(paths)
-    .flatMapRight: elements =>
-      val (files, folders) =
-        elements.partition(_.mimeType != "application/vnd.google-apps.folder")
-      println(s"find ${files.length} files!")
-      println(s"find ${folders.length} folders!")
-      if folders.length > 0 then
-        findAllFilesInPaths(gdriveClient, folders.map(_.id)).mapRight(
-          newFiles => files ++ newFiles
-        )
-      else Right(files).pure[IO]
+  if folders.length > 0 then
+    gdriveClient
+      .listFiles(folders)
+      .flatMapRight: elements =>
+        val (files, newFolders) =
+          elements.partition(_.mimeType != "application/vnd.google-apps.folder")
+        println(s"find ${files.length} files!")
+        println(s"find ${newFolders.length} folders!")
+        if newFolders.length > 0 then
+          findAllFilesInFolders(gdriveClient, newFolders.map(_.id)).mapRight(
+            newFiles => files ++ newFiles
+          )
+        else Right(files).pure[IO]
+  else Right(List()).pure[IO]
 
 def getGDriveClient(
     userId: String,

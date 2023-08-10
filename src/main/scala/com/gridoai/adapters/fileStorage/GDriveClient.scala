@@ -70,3 +70,18 @@ object GDriveClient:
             File(meta = file, content = outputStream.toByteArray)
           Right(fileContents)
         ) |> attempt
+
+      def isFolder(fileId: String): IO[Either[String, Boolean]] =
+        (IO:
+          val file =
+            driveService.files().get(fileId).setFields("mimeType").execute()
+          Right(file.getMimeType == "application/vnd.google-apps.folder")
+        ) |> attempt
+
+      def fileInfo(fileIds: List[String]): IO[Either[String, List[FileMeta]]] =
+        (IO:
+          val fileMetas = fileIds.map: fileId =>
+            val file = driveService.files().get(fileId).execute()
+            FileMeta(file.getId, file.getName, file.getMimeType)
+          Right(fileMetas)
+        ) |> attempt
