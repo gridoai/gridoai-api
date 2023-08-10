@@ -35,4 +35,15 @@ object LocalFileStorage extends FileStorage[IO] {
         Left(s"One or more files could not be read.")
       else
         Right(contents.flatten)
+
+  def isFolder(fileId: String): IO[Either[String, Boolean]] =
+    IO:
+      val path = Paths.get(fileId)
+      if (Files.exists(path))
+        Right(Files.isDirectory(path))
+      else
+        Left(s"The path $fileId does not exist.")
+
+  def fileInfo(fileIds: List[String]): IO[Either[String, List[FileMeta]]] =
+    Right(fileIds.map(fileId => FileMeta(fileId, fileId, fileId))).pure[IO]
 }
