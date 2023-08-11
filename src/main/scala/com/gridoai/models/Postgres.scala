@@ -124,32 +124,40 @@ object PostgresClient {
         orgId: String,
         role: String
     ): F[Either[String, List[Document]]] =
-      val documentRows = docs.map(_.doc.toDocRow(orgId, role))
+      docs.toNel match
+        case Some(documents) =>
+          val documentRows = documents.map(_.doc.toDocRow(orgId, role))
+          val chunkRows =
+            documents.toList.flatMap(_.chunks.map(_.toChunkRow(role, orgId)))
+          val uids = documentRows.map(_.uid)
 
-      val chunkRows = docs.flatMap(_.chunks.map(_.toChunkRow(role, orgId)))
-
-      (for
-        _ <- Update[DocRow](
-          s"""insert into $POSTGRES_SCHEMA.documents (uid, name, source, content, organization, roles) 
-               values (?, ?, ?, ?, ?, ?)"""
-        ).updateMany(documentRows)
-        _ <- Update[ChunkRow](
-          s"""insert into $POSTGRES_SCHEMA.chunks (
-              uid,
-              document_uid,
-              document_name,
-              document_source,
-              content,
-              embedding,
-              embedding_model,
-              token_quantity,
-              document_organization,
-              document_roles
-            ) values (
-              ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
-            )"""
-        ).updateMany(chunkRows)
-      yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
+          (for
+            _ <-
+              sql"delete from $chunksTable where ${Fragments.in(fr"document_uid", uids)} and document_organization = ${orgId} ".update.run
+            _ <-
+              sql"delete from $documentsTable where ${Fragments.in(fr"uid", uids)} and organization = ${orgId}".update.run
+            _ <- Update[DocRow](
+              s"""insert into $POSTGRES_SCHEMA.documents (uid, name, source, content, organization, roles) 
+                  values (?, ?, ?, ?, ?, ?)"""
+            ).updateMany(documentRows)
+            _ <- Update[ChunkRow](
+              s"""insert into $POSTGRES_SCHEMA.chunks (
+                  uid,
+                  document_uid,
+                  document_name,
+                  document_source,
+                  content,
+                  embedding,
+                  embedding_model,
+                  token_quantity,
+                  document_organization,
+                  document_roles
+                ) values (
+                  ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
+                )"""
+            ).updateMany(chunkRows)
+          yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
+        case None => Right(List()).pure[F]
 
     def listDocuments(
         orgId: String,
@@ -195,22 +203,26 @@ object PostgresClient {
           else Right(())
         ) |> attempt
 
-    def deleteDocumentsBySource(
+    def listDocumentsBySource(
         sources: List[Source],
         orgId: String,
         role: String
-    ): F[Either[String, Unit]] =
+    ): F[Either[String, List[Document]]] =
       sources.map(_.toString).toNel match
         case Some(sourceStrings) =>
-          (for
-            deletedChunks <-
-              sql"delete from $chunksTable where ${Fragments.in(fr"document_source", sourceStrings)} and document_organization = ${orgId} ".update.run
-            deletedDocuments <-
-              sql"delete from $documentsTable where ${Fragments.in(fr"source", sourceStrings)} and organization = ${orgId}".update.run
-          yield (deletedChunks, deletedDocuments))
+          sql"""
+            select uid, name, source, content, organization, roles
+            from $documentsTable 
+            where organization = ${orgId} and ${Fragments.in(
+              fr"source",
+              sourceStrings
+            )}
+          """
+            .query[DocRow]
+            .to[List]
             .transact[F](xa)
-            .map(_ => Right(())) |> attempt
-        case None => Right(()).pure[F]
+            .map(_.traverse(_.toDocument)) |> attempt
+        case None => Right(List()).pure[F]
 
     def getNearChunks(
         embedding: Embedding,

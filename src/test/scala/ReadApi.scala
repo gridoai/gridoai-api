@@ -73,7 +73,6 @@ class API extends CatsEffectSuite {
       .body(
         DocumentCreationPayload(
           name = "Sky observations",
-          source = "https://www.nasa.gov/planetarydefense/faq/asteroid",
           content = "The sky is blue"
         ).asJson.toString
       )
