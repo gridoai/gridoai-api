@@ -4,6 +4,7 @@ import doobie.*
 import doobie.implicits.*
 import cats.*
 import cats.effect.*
+import cats.syntax.list.*
 import doobie.postgres.*
 import doobie.postgres.implicits.*
 import com.pgvector.PGvector
@@ -199,15 +200,17 @@ object PostgresClient {
         orgId: String,
         role: String
     ): F[Either[String, Unit]] =
-      val formattedSources = sources.mkString(", ")
-      (for
-        deletedChunks <-
-          sql"delete from $chunksTable where document_source in [$formattedSources] and document_organization = ${orgId} ".update.run
-        deletedDocuments <-
-          sql"delete from $documentsTable where source in [$formattedSources] and organization = ${orgId}".update.run
-      yield (deletedChunks, deletedDocuments))
-        .transact[F](xa)
-        .map(_ => Right(())) |> attempt
+      sources.map(_.toString).toNel match
+        case Some(sourceStrings) =>
+          (for
+            deletedChunks <-
+              sql"delete from $chunksTable where ${Fragments.in(fr"document_source", sourceStrings)} and document_organization = ${orgId} ".update.run
+            deletedDocuments <-
+              sql"delete from $documentsTable where ${Fragments.in(fr"source", sourceStrings)} and organization = ${orgId}".update.run
+          yield (deletedChunks, deletedDocuments))
+            .transact[F](xa)
+            .map(_ => Right(())) |> attempt
+        case None => Right(()).pure[F]
 
     def getNearChunks(
         embedding: Embedding,
