@@ -91,29 +91,22 @@ object MockDocDB extends DocDB[IO]:
       }
     }
 
-  def deleteDocumentsBySource(
+  def listDocumentsBySource(
       sources: List[Source],
       orgId: String,
       role: String
-  ): IO[Either[String, Unit]] =
-    IO.pure {
-      val documentsToDelete = allDocuments
-        .filter(row =>
-          sources.contains(
-            row.doc.source
-          ) && row.orgId == orgId && row.role == role
-        )
-      val chunksToDelete = allChunks
-        .filter(row =>
-          sources.contains(
-            row.chunk.chunk.documentSource
-          ) && row.orgId == orgId && row.role == role
-        )
-      allDocuments --= documentsToDelete
-      allChunks --= chunksToDelete
-      Right(())
-    }
-
+  ): IO[Either[String, List[Document]]] =
+    IO.pure(
+      Right(
+        allDocuments.toList
+          .filter(row =>
+            row.orgId == orgId && row.role == role && sources.contains(
+              row.doc.source
+            )
+          )
+          .map(_.doc)
+      )
+    )
   def getNearChunks(
       embedding: Embedding,
       offset: Int,

@@ -39,11 +39,11 @@ trait DocDB[F[_]]:
       role: String
   ): F[Either[String, Unit]]
 
-  def deleteDocumentsBySource(
+  def listDocumentsBySource(
       sources: List[Source],
       orgId: String,
       role: String
-  ): F[Either[String, Unit]]
+  ): F[Either[String, List[Document]]]
 
   def getNearChunks(
       embedding: Embedding,
