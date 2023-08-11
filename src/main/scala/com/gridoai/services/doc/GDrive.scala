@@ -73,6 +73,13 @@ def importGDriveDocuments(auth: AuthData)(
                       _.traverse(parseGDriveFileForPersistence)
                         .map(partitionEithers)
                         .mapLeft(_.mkString(","))
+                        .flatMapRight(filesToDelete =>
+                          db.deleteDocumentsBySource(
+                            filesToDelete.map(_.source),
+                            auth.orgId,
+                            auth.role
+                          ).mapRight(_ => filesToDelete)
+                        )
                         .flatMapRight(createDocs(auth))
                         .mapRight(_.map(_.name))
                     )
