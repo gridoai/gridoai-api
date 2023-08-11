@@ -75,11 +75,10 @@ def downloadAndParseFiles(auth: AuthData, gdriveClient: FileStorage[IO])(
         .map(partitionEithers)
         .mapLeft(_.mkString(","))
     )
-    .flatMapRight(filesToUpload => createOrUpdateFiles(auth, filesToUpload))
+    .flatMapRight(createOrUpdateFiles(auth))
     .mapRight(_.map(_.name))
 
-def createOrUpdateFiles(
-    auth: AuthData,
+def createOrUpdateFiles(auth: AuthData)(
     filesToUpload: List[Document]
 )(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
   db.listDocumentsBySource(filesToUpload.map(_.source), auth.orgId, auth.role)
