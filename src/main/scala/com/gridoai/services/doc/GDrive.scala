@@ -32,6 +32,80 @@ def authenticateGDrive(auth: AuthData)(
       )
       .flatMapRight(ClerkClient.setUserPublicMetadata(auth.userId))
 
+def fetchUserTokens(auth: AuthData): IO[Either[String, (String, String)]] =
+  ClerkClient
+    .getUserPublicMetadata(auth.userId)
+    .flatMapRight:
+      case PublicMetadata(Some(x), Some(y)) => Right((x, y)).pure[IO]
+      case _ => Left("Make Google Drive authentication first").pure[IO]
+
+def partitionFilesFolders(
+    gdriveClient: FileStorage[IO],
+    fileIds: List[String]
+): IO[Either[String, (List[String], List[String])]] =
+  fileIds
+    .traverse(fileId =>
+      gdriveClient.isFolder(fileId).mapRight(isFolder => (fileId, isFolder))
+    )
+    .map(partitionEithers)
+    .mapLeft(_.mkString(","))
+    .mapRight(elements =>
+      (elements.filter(_._2).map(_._1), elements.filter(!_._2).map(_._1))
+    )
+
+def appendFiles(
+    gdriveClient: FileStorage[IO],
+    newFiles: List[String]
+)(
+    files: List[FileMeta]
+): IO[Either[String, List[FileMeta]]] =
+  if newFiles.nonEmpty then
+    gdriveClient
+      .fileInfo(newFiles)
+      .mapRight(filesMeta => filesMeta ++ files)
+  else Right(files).pure[IO]
+
+def downloadAndParseFiles(auth: AuthData, gdriveClient: FileStorage[IO])(
+    files: List[FileMeta]
+)(using db: DocDB[IO]): IO[Either[String, List[String]]] =
+  gdriveClient
+    .downloadFiles(files)
+    .flatMapRight(
+      _.traverse(parseGDriveFileForPersistence)
+        .map(partitionEithers)
+        .mapLeft(_.mkString(","))
+    )
+    .flatMapRight(filesToUpload => createOrUpdateFiles(auth, filesToUpload))
+    .mapRight(_.map(_.name))
+
+def createOrUpdateFiles(
+    auth: AuthData,
+    filesToUpload: List[Document]
+)(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
+  db.listDocumentsBySource(filesToUpload.map(_.source), auth.orgId, auth.role)
+    .mapRight(filesToUpdate =>
+      filesToUpload.map(fileToUpload =>
+        filesToUpdate.filter(_.source == fileToUpload.source).headOption match
+          case Some(fileToUpdate) =>
+            Document(
+              uid = fileToUpdate.uid,
+              name = fileToUpload.name,
+              source = fileToUpload.source,
+              content = fileToUpload.content
+            )
+          case None => fileToUpload
+      )
+    )
+    .flatMapRight(createDocs(auth))
+
+def getAndAddGDriveDocs(auth: AuthData, fileIds: List[String])(
+    gdriveClient: FileStorage[IO]
+)(using db: DocDB[IO]) =
+  partitionFilesFolders(gdriveClient, fileIds).flatMapRight: (folders, files) =>
+    findAllFilesInFolders(gdriveClient, folders)
+      !> appendFiles(gdriveClient, files)
+      !> downloadAndParseFiles(auth, gdriveClient)
+
 def importGDriveDocuments(auth: AuthData)(
     fileIds: List[String]
 )(using db: DocDB[IO]): IO[Either[String, List[String]]] =
@@ -40,65 +114,10 @@ def importGDriveDocuments(auth: AuthData)(
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
     println("importing data from gdrive...")
-    ClerkClient
-      .getUserPublicMetadata(auth.userId)
-      .flatMapRight:
-        case PublicMetadata(Some(accessToken), Some(refreshToken)) =>
-          getGDriveClient(auth.userId, accessToken, refreshToken).flatMapRight:
-            gdriveClient =>
-              fileIds
-                .traverse(fileId =>
-                  gdriveClient
-                    .isFolder(fileId)
-                    .mapRight(isFolder => (fileId, isFolder))
-                )
-                .map(partitionEithers)
-                .mapLeft(_.mkString(","))
-                .flatMapRight: elements =>
-                  val folders = elements.filter(_._2).map(_._1)
-                  val files = elements.filter(!_._2).map(_._1)
-                  println(s"Received ${folders.length} folders.")
-                  println(s"Received ${files.length} files.")
 
-                  findAllFilesInFolders(gdriveClient, folders)
-                    .flatMapRight(newFiles =>
-                      if files.length > 0 then
-                        gdriveClient
-                          .fileInfo(files)
-                          .mapRight(filesMeta => filesMeta ++ newFiles)
-                      else Right(newFiles).pure[IO]
-                    )
-                    .flatMapRight(gdriveClient.downloadFiles)
-                    .flatMapRight(
-                      _.traverse(parseGDriveFileForPersistence)
-                        .map(partitionEithers)
-                        .mapLeft(_.mkString(","))
-                        .flatMapRight(filesToUpload =>
-                          db.listDocumentsBySource(
-                            filesToUpload.map(_.source),
-                            auth.orgId,
-                            auth.role
-                          ).mapRight(filesToUpdate =>
-                            filesToUpload.map(fileToUpload =>
-                              filesToUpdate
-                                .filter(_.source == fileToUpload.source)
-                                .headOption match
-                                case Some(fileToUpdate) =>
-                                  Document(
-                                    uid = fileToUpdate.uid,
-                                    name = fileToUpload.name,
-                                    source = fileToUpload.source,
-                                    content = fileToUpload.content
-                                  )
-                                case None => fileToUpload
-                            )
-                          )
-                        )
-                        .flatMapRight(createDocs(auth))
-                        .mapRight(_.map(_.name))
-                    )
-
-        case _ => Left("Make Google Drive authentication first").pure[IO]
+    fetchUserTokens(auth)
+      !> getGDriveClient(auth.userId)
+      !> getAndAddGDriveDocs(auth, fileIds)
 
 def parseGDriveFileForPersistence(
     file: File
@@ -143,8 +162,7 @@ def findAllFilesInFolders(
         else Right(files).pure[IO]
   else Right(List()).pure[IO]
 
-def getGDriveClient(
-    userId: String,
+def getGDriveClient(userId: String)(
     accessToken: String,
     refreshToken: String
 ): IO[Either[String, FileStorage[IO]]] =
