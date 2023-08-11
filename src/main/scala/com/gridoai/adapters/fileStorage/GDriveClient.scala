@@ -1,6 +1,7 @@
 package com.gridoai.adapters.fileStorage
 
 import cats.effect.IO
+import cats.implicits.*
 import com.gridoai.utils.*
 import com.gridoai.adapters.GoogleClient
 
@@ -31,45 +32,46 @@ object GDriveClient:
       def listFiles(
           folderIds: List[String]
       ): IO[Either[String, List[FileMeta]]] =
-        (Sync[IO].blocking:
-          val query = folderIds
-            .map(folderId => s"'$folderId' in parents")
-            .mkString(" or ")
-          println(s"query: $query")
-          val result = driveService
+        val query = folderIds
+          .map(folderId => s"'$folderId' in parents")
+          .mkString(" or ")
+        println(s"query: $query")
+        Sync[IO].blocking(
+          driveService
             .files()
             .list()
             .setQ(query)
             .execute()
-          val files = result.getFiles.asScala.toList
-          Right(
-            files.map(file =>
-              FileMeta(file.getId, file.getName, file.getMimeType)
-            )
-          )
+            .getFiles
+            .asScala
+            .toList
+            .map(file => FileMeta(file.getId, file.getName, file.getMimeType))
+            .asRight
         ) |> attempt
 
       def downloadFiles(
           files: List[FileMeta]
       ): IO[Either[String, List[File]]] =
-        (Sync[IO].blocking:
-          val fileContents = files.map: file =>
-            val outputStream = new ByteArrayOutputStream()
-            mapMimeTypes(file.mimeType) match
-              case Some(mimeType) =>
-                println("Exporting file from Google Drive...")
-                driveService
-                  .files()
-                  .`export`(file.id, mimeType)
-                  .executeMediaAndDownloadTo(outputStream)
-              case None =>
-                println("Downloading file from Google Drive...")
-                driveService
-                  .files()
-                  .get(file.id)
-                  .executeMediaAndDownloadTo(outputStream)
-            File(meta = file, content = outputStream.toByteArray)
-          Right(fileContents)
+        Sync[IO].blocking(
+          files
+            .map(file =>
+              val outputStream = ByteArrayOutputStream()
+              mapMimeTypes(file.mimeType) match
+                case Some(mimeType) =>
+                  println("Exporting file from Google Drive...")
+                  driveService
+                    .files()
+                    .`export`(file.id, mimeType)
+                    .executeMediaAndDownloadTo(outputStream)
+                case None =>
+                  println("Downloading file from Google Drive...")
+                  driveService
+                    .files()
+                    .get(file.id)
+                    .executeMediaAndDownloadTo(outputStream)
+              File(meta = file, content = outputStream.toByteArray)
+            )
+            .asRight
         ) |> attempt
 
       def isFolder(fileId: String): IO[Either[String, Boolean]] =
@@ -80,9 +82,11 @@ object GDriveClient:
         ) |> attempt
 
       def fileInfo(fileIds: List[String]): IO[Either[String, List[FileMeta]]] =
-        (Sync[IO].blocking:
-          val fileMetas = fileIds.map: fileId =>
-            val file = driveService.files().get(fileId).execute()
-            FileMeta(file.getId, file.getName, file.getMimeType)
-          Right(fileMetas)
+        Sync[IO].blocking(
+          fileIds
+            .map(fileId =>
+              val file = driveService.files().get(fileId).execute()
+              FileMeta(file.getId, file.getName, file.getMimeType)
+            )
+            .asRight
         ) |> attempt

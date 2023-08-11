@@ -12,13 +12,12 @@ import com.google.api.client.googleapis.auth.oauth2.{
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse
-import cats.effect.IO
+import cats.effect.{IO, Sync}
 import cats.implicits.*
 import java.util.Date
 import scala.util.Try
 import scala.jdk.CollectionConverters.SeqHasAsJava
 import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest
-import java.util.Arrays
 
 val CLIENT_ID =
   sys.env.getOrElse("GOOGLE_CLIENT_ID", "")
@@ -32,12 +31,12 @@ object GoogleClient:
       code: String,
       redirectUri: String
   ): IO[Either[String, GoogleTokenResponse]] =
-    (IO:
-      Right:
-        flow
-          .newTokenRequest(code)
-          .setRedirectUri(redirectUri)
-          .execute()
+    Sync[IO].blocking(
+      flow
+        .newTokenRequest(code)
+        .setRedirectUri(redirectUri)
+        .execute()
+        .asRight
     ) |> attempt
 
   private def buildGoogleAuthorizationCodeFlow(
@@ -85,16 +84,15 @@ object GoogleClient:
   def refreshToken(
       refreshToken: String
   ): IO[Either[String, (String, String)]] =
-    (IO:
+    Sync[IO].blocking(
       Right:
-        val token = GoogleRefreshTokenRequest(
+        GoogleRefreshTokenRequest(
           NetHttpTransport(),
-          GsonFactory.getDefaultInstance(),
+          GsonFactory.getDefaultInstance,
           refreshToken,
           CLIENT_ID,
           CLIENT_SECRET
-        ).execute()
-        (token.getAccessToken, refreshToken)
+        ).execute.getAccessToken -> refreshToken
     ) |> attempt
 
   def buildDriveService(token: String): Drive =
