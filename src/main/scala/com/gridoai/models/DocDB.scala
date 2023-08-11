@@ -6,6 +6,7 @@ import com.gridoai.domain.Embedding
 import com.gridoai.domain.SimilarChunk
 import com.gridoai.domain.Document
 import com.gridoai.domain.PaginatedResponse
+import com.gridoai.domain.Source
 
 case class DocumentPersistencePayload(
     doc: Document,
@@ -34,6 +35,12 @@ trait DocDB[F[_]]:
 
   def deleteDocument(
       uid: UID,
+      orgId: String,
+      role: String
+  ): F[Either[String, Unit]]
+
+  def deleteDocumentsBySource(
+      sources: List[Source],
       orgId: String,
       role: String
   ): F[Either[String, Unit]]

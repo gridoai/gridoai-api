@@ -194,6 +194,21 @@ object PostgresClient {
           else Right(())
         ) |> attempt
 
+    def deleteDocumentsBySource(
+        sources: List[Source],
+        orgId: String,
+        role: String
+    ): F[Either[String, Unit]] =
+      val formattedSources = sources.mkString(", ")
+      (for
+        deletedChunks <-
+          sql"delete from $chunksTable where document_source in [$formattedSources] and document_organization = ${orgId} ".update.run
+        deletedDocuments <-
+          sql"delete from $documentsTable where source in [$formattedSources] and organization = ${orgId}".update.run
+      yield (deletedChunks, deletedDocuments))
+        .transact[F](xa)
+        .map(_ => Right(())) |> attempt
+
     def getNearChunks(
         embedding: Embedding,
         offset: Int,

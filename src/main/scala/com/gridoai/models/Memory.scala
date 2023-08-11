@@ -40,6 +40,9 @@ object MockDocDB extends DocDB[IO]:
   ) =
     IO.pure {
       allDocuments ++= docs.map(doc => MockedDocument(doc.doc, orgId, role))
+      allChunks ++= docs.flatMap(
+        _.chunks.map(chunk => MockedChunk(chunk, orgId, role))
+      )
       println(s"Mock: Adding documents $docs")
       Right(docs.map(_.doc))
     }
@@ -73,22 +76,42 @@ object MockDocDB extends DocDB[IO]:
           row.doc.uid == uid && row.orgId == orgId && row.role == role
         )
         .headOption
-      documentToDelete match {
-        case Some(doc) =>
+      val chunkToDelete = allChunks
+        .filter(row =>
+          row.chunk.chunk.documentUid == uid && row.orgId == orgId && row.role == role
+        )
+        .headOption
+      (documentToDelete, chunkToDelete) match {
+        case (Some(doc), Some(chunk)) =>
           allDocuments -= doc
+          allChunks -= chunk
           Right(())
-        case None =>
-          Left("No document was deleted")
+        case _ =>
+          Left("No document or no chunk was deleted")
       }
     }
 
-  def addChunks(orgId: String, role: String)(
-      chunks: List[ChunkWithEmbedding]
-  ): IO[Either[String, List[ChunkWithEmbedding]]] =
+  def deleteDocumentsBySource(
+      sources: List[Source],
+      orgId: String,
+      role: String
+  ): IO[Either[String, Unit]] =
     IO.pure {
-      allChunks ++= chunks.map(chunk => MockedChunk(chunk, orgId, role))
-      println(s"Mock: Adding chunks $chunks")
-      Right(chunks)
+      val documentsToDelete = allDocuments
+        .filter(row =>
+          sources.contains(
+            row.doc.source
+          ) && row.orgId == orgId && row.role == role
+        )
+      val chunksToDelete = allChunks
+        .filter(row =>
+          sources.contains(
+            row.chunk.chunk.documentSource
+          ) && row.orgId == orgId && row.role == role
+        )
+      allDocuments --= documentsToDelete
+      allChunks --= chunksToDelete
+      Right(())
     }
 
   def getNearChunks(
@@ -112,23 +135,3 @@ object MockDocDB extends DocDB[IO]:
           )
       )
     )
-
-  def deleteChunksByDocument(
-      documentUid: UID,
-      orgId: String,
-      role: String
-  ): IO[Either[String, Unit]] =
-    IO.pure {
-      val chunkToDelete = allChunks
-        .filter(row =>
-          row.chunk.chunk.documentUid == documentUid && row.orgId == orgId && row.role == role
-        )
-        .headOption
-      chunkToDelete match {
-        case Some(chunk) =>
-          allChunks -= chunk
-          Right(())
-        case None =>
-          Left("No document was deleted")
-      }
-    }
