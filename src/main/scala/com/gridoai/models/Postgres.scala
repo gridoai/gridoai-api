@@ -32,20 +32,14 @@ extension (x: Document)
 
 extension (x: DocRow)
   def toDocument: Either[String, Document] =
-    val source = x.source match
-      case "Upload"       => Right(Source.Upload)
-      case "CreateButton" => Right(Source.CreateButton)
-      case s if s.startsWith("GDrive(") =>
-        Right(Source.GDrive(s.substring(7, s.length - 1)))
-      case _ => Left("Source out of pattern.")
-
-    source.map: s =>
-      Document(
-        uid = x.uid,
-        name = x.name,
-        source = s,
-        content = x.content
-      )
+    strToSource(x.source)
+      .map: s =>
+        Document(
+          uid = x.uid,
+          name = x.name,
+          source = s,
+          content = x.content
+        )
 
 case class ChunkRow(
     uid: UID,
@@ -74,6 +68,19 @@ extension (x: ChunkWithEmbedding)
       document_organization = orgId,
       document_roles = List(role)
     )
+
+extension (x: ChunkRow)
+  def toChunk: Either[String, Chunk] =
+    strToSource(x.document_source)
+      .map: s =>
+        Chunk(
+          documentUid = x.document_uid,
+          documentName = x.document_name,
+          documentSource = s,
+          uid = x.uid,
+          content = x.content,
+          tokenQuantity = x.token_quantity
+        )
 
 implicit val getPGvector: Get[PGvector] =
   Get[Array[Float]].map(new PGvector(_))
@@ -236,12 +243,16 @@ object PostgresClient {
         val vector = PGvector(embedding.vector.toArray)
         val query =
           sql"""select
+            uid,
             document_uid,
             document_name,
             document_source,
-            uid,
             content,
+            embedding,
+            embedding_model,
             token_quantity,
+            document_organization,
+            document_roles,
             embedding <=> $vector::vector as distance
           from $chunksTable
           where
@@ -250,19 +261,26 @@ object PostgresClient {
           order by distance asc
           offset $offset
           limit $limit"""
+        println(query)
+        println(vector)
+        println(chunksTable)
+        println(orgId)
+        println(embedding.model)
+        println(offset)
+        println(limit)
         query
-          .query[(Chunk, Float)]
+          .query[(ChunkRow, Float)]
           .to[List]
           .transact[F](xa)
           .map(
-            _.map(x =>
-              SimilarChunk(
-                chunk = x(0),
-                distance = x(1)
-              )
-            )
+            _.traverse: (chunkRow, distance) =>
+              chunkRow.toChunk.map: chunk =>
+                SimilarChunk(
+                  chunk = chunk,
+                  distance = distance
+                )
           )
-          .map((Right(_))) |> attempt
+          |> attempt
 
   }
 }

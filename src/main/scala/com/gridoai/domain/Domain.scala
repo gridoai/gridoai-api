@@ -33,6 +33,14 @@ enum Source:
   case Upload, CreateButton
   case GDrive(fileId: String)
 
+def strToSource(source: String): Either[String, Source] =
+  source match
+    case "Upload"       => Right(Source.Upload)
+    case "CreateButton" => Right(Source.CreateButton)
+    case s if s.startsWith("GDrive(") =>
+      Right(Source.GDrive(s.substring(7, s.length - 1)))
+    case _ => Left("Source out of pattern.")
+
 case class Document(
     uid: UID,
     name: String,
