@@ -95,7 +95,7 @@ def createOrUpdateFiles(auth: AuthData)(
           case None => fileToUpload
       )
     )
-    .flatMapRight(createDocs(auth))
+    .flatMapRight(upsertDocs(auth))
 
 def getAndAddGDriveDocs(auth: AuthData, fileIds: List[String])(
     gdriveClient: FileStorage[IO]
