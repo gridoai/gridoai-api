@@ -96,7 +96,7 @@ object GDriveClient:
       def watchFile(webhookUrl: String)(
           fileId: String
       ): IO[Either[String, String]] =
-        (IO:
+        (Sync[IO].blocking:
           val sevenDaysInMillis: Long = 7L * 24 * 60 * 60 * 1000
           val expirationTime = System.currentTimeMillis() + sevenDaysInMillis
           val channel = new Channel()
@@ -109,11 +109,4 @@ object GDriveClient:
 
           driveService.files().watch(fileId, channel).execute()
           Right(fileId)
-        ) |> attempt
-
-      def isFolder(fileId: String): IO[Either[String, Boolean]] =
-        (IO:
-          val file =
-            driveService.files().get(fileId).setFields("mimeType").execute()
-          Right(file.getMimeType == "application/vnd.google-apps.folder")
         ) |> attempt

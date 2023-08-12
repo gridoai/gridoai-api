@@ -120,7 +120,7 @@ val watchGDriveEndpoint
     .out(jsonBody[List[String]])
 
 val syncGDriveEndpoint
-    : PublicEndpoint[(String, String, String), Unit, String, Any] =
+    : PublicEndpoint[(String, String, String), String, Unit, Any] =
   endpoint
     .name("Sync data from Google Drive")
     .description("Sync google drive documents with the knowledge base")
@@ -130,7 +130,8 @@ val syncGDriveEndpoint
     .in(header[String]("X-Goog-Channel-ID"))
     .in(header[String]("X-Goog-Resource-State"))
     .in(header[String]("X-Goog-Resource-ID"))
-    .out(stringBody)
+    .errorOut(stringBody)
+    .out(emptyOutput)
 
 val askEndpoint: SecuredEndpoint[List[Message], String, String, Any] =
   auth.securedWithBearer

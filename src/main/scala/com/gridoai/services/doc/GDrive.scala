@@ -54,6 +54,14 @@ def partitionFilesFolders(
       (elements.filter(_._2).map(_._1), elements.filter(!_._2).map(_._1))
     )
 
+def findAllFilesAndFolders(
+    gdriveClient: FileStorage[IO],
+    fileIds: List[String]
+): IO[Either[String, List[FileMeta]]] =
+  partitionFilesFolders(gdriveClient, fileIds).flatMapRight: (folders, files) =>
+    findAllFilesInFolders(gdriveClient, folders)
+      !> appendFiles(gdriveClient, files)
+
 def appendFiles(
     gdriveClient: FileStorage[IO],
     newFiles: List[String]
@@ -101,10 +109,18 @@ def createOrUpdateFiles(auth: AuthData)(
 def getAndAddGDriveDocs(auth: AuthData, fileIds: List[String])(
     gdriveClient: FileStorage[IO]
 )(using db: DocDB[IO]) =
-  partitionFilesFolders(gdriveClient, fileIds).flatMapRight: (folders, files) =>
-    findAllFilesInFolders(gdriveClient, folders)
-      !> appendFiles(gdriveClient, files)
-      !> downloadAndParseFiles(auth, gdriveClient)
+  findAllFilesAndFolders(gdriveClient, fileIds)
+    !> downloadAndParseFiles(auth, gdriveClient)
+
+def getAndWatchDriveDocs(
+    fileIds: List[String]
+)(gdriveClient: FileStorage[IO]): IO[Either[String, List[String]]] =
+  findAllFilesAndFolders(gdriveClient, fileIds).flatMapRight(
+    _.map(_.id)
+      .traverse(gdriveClient.watchFile(WEBHOOK_URI))
+      .map(partitionEithers)
+      .mapLeft(_.mkString(","))
+  )
 
 def importGDriveDocuments(auth: AuthData)(
     fileIds: List[String]
@@ -120,28 +136,16 @@ def importGDriveDocuments(auth: AuthData)(
       !> getAndAddGDriveDocs(auth, fileIds)
 
 def watchGDriveDocuments(auth: AuthData)(
-    paths: List[String]
+    fileIds: List[String]
 )(using db: DocDB[IO]): IO[Either[String, List[String]]] =
   limitRole(
     auth.role,
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
     println("Watching data from gdrive...")
-    ClerkClient
-      .getUserPublicMetadata(auth.userId)
-      .flatMapRight:
-        case PublicMetadata(Some(accessToken), Some(refreshToken)) =>
-          getGDriveClient(auth.userId, accessToken, refreshToken).flatMapRight:
-            gdriveClient =>
-              findAllFilesInPaths(gdriveClient, paths)
-                .mapRight(_.map(_.id) ++ paths)
-                .flatMapRight(
-                  _.traverse(gdriveClient.watchFile(WEBHOOK_URI))
-                    .map(partitionEithers)
-                    .mapLeft(_.mkString(","))
-                )
-
-        case _ => Left("Make Google Drive authentication first").pure[IO]
+    fetchUserTokens(auth)
+      !> getGDriveClient(auth.userId)
+      !> getAndWatchDriveDocs(fileIds)
 
 // TODO: Add authorization someway in sync requests
 // TODO: Store channel expirations and renew them automatically
