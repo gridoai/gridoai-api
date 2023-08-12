@@ -124,7 +124,7 @@ def saveUploadedDocs(auth: AuthData)(
 )(using
     db: DocDB[IO]
 ): IO[Either[FileUpErr, FileUpOutput]] =
-  createDocs(auth)(payloads.map(_.toDocument(UUID.randomUUID(), Source.Upload)))
+  createDocs(auth)(payloads, Source.Upload)
     .mapRight(_.map(_.uid.toString()))
     .mapLeft(e => List(FileUploadError.DocumentCreationError(e).asLeft))
 
@@ -172,7 +172,8 @@ def createDoc(auth: AuthData)(
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
     createDocs(auth)(
-      List(payload.toDocument(UUID.randomUUID(), Source.CreateButton))
+      List(payload),
+      Source.CreateButton
     )
       .mapRight(_.head.uid.toString())
 
@@ -206,15 +207,22 @@ def mapDocumentsToDB[F[_]: Monad](
           chunksMap.get(document.uid).get
         )
 
-def createDocs(auth: AuthData)(
+def createDocs(
+    auth: AuthData
+)(payload: List[DocumentCreationPayload], source: Source)(using
+    db: DocDB[IO]
+): IO[Either[String, List[Document]]] =
+  upsertDocs(auth)(payload.map(_.toDocument(UUID.randomUUID(), source)))
+
+def upsertDocs(auth: AuthData)(
     documents: List[Document]
 )(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
   limitRole(
     auth.role,
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
-    traceMappable("createDocs"):
-      println("Creating docs... ")
+    traceMappable("upsertDocs"):
+      println("Upserting docs... ")
       if documents.length > 0 then
         mapDocumentsToDB(documents, getEmbeddingAPI("embaas"))
           .flatMapRight(persistencePayload =>
