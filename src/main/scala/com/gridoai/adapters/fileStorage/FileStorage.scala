@@ -14,7 +14,7 @@ trait FileStorage[F[_]]:
   def listFiles(folderIds: List[String]): F[Either[String, List[FileMeta]]]
   def downloadFiles(
       files: List[FileMeta]
-  ): IO[Either[String, List[File]]]
+  ): F[Either[String, List[File]]]
   def isFolder(fileId: String): F[Either[String, Boolean]]
   def fileInfo(fileIds: List[String]): F[Either[String, List[FileMeta]]]
   def watchFile(webhookUrl: String)(
