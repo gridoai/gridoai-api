@@ -69,17 +69,30 @@ extension (x: ChunkWithEmbedding)
       document_roles = List(role)
     )
 
-extension (x: ChunkRow)
-  def toChunk: Either[String, Chunk] =
+case class NearChunkOutput(
+    uid: UID,
+    document_uid: UID,
+    document_name: String,
+    document_source: String,
+    content: String,
+    token_quantity: Int,
+    distance: Float
+)
+
+extension (x: NearChunkOutput)
+  def toChunk: Either[String, SimilarChunk] =
     strToSource(x.document_source)
       .map: s =>
-        Chunk(
-          documentUid = x.document_uid,
-          documentName = x.document_name,
-          documentSource = s,
-          uid = x.uid,
-          content = x.content,
-          tokenQuantity = x.token_quantity
+        SimilarChunk(
+          chunk = Chunk(
+            documentUid = x.document_uid,
+            documentName = x.document_name,
+            documentSource = s,
+            uid = x.uid,
+            content = x.content,
+            tokenQuantity = x.token_quantity
+          ),
+          distance = x.distance
         )
 
 implicit val getPGvector: Get[PGvector] =
@@ -248,11 +261,7 @@ object PostgresClient {
             document_name,
             document_source,
             content,
-            embedding,
-            embedding_model,
             token_quantity,
-            document_organization,
-            document_roles,
             embedding <=> $vector::vector as distance
           from $chunksTable
           where
@@ -261,25 +270,11 @@ object PostgresClient {
           order by distance asc
           offset $offset
           limit $limit"""
-        println(query)
-        println(vector)
-        println(chunksTable)
-        println(orgId)
-        println(embedding.model)
-        println(offset)
-        println(limit)
         query
-          .query[(ChunkRow, Float)]
+          .query[NearChunkOutput]
           .to[List]
           .transact[F](xa)
-          .map(
-            _.traverse: (chunkRow, distance) =>
-              chunkRow.toChunk.map: chunk =>
-                SimilarChunk(
-                  chunk = chunk,
-                  distance = distance
-                )
-          )
+          .map(_.traverse(_.toChunk))
           |> attempt
 
   }
