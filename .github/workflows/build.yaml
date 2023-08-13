@@ -61,8 +61,7 @@ jobs:
           EMBAAS_API_KEY: ${{ secrets.EMBAAS_API_KEY }}
           EMBEDDING_API_ENDPOINT: ${{ secrets.EMBEDDING_API_ENDPOINT }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          USE_MOCKED_LLM: "true"
-          USE_MOCKED_EMBEDDINGS_API: "true"
+          EMBEDDING_API: mocked
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
