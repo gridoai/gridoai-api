@@ -18,6 +18,7 @@ import java.util.Date
 import scala.util.Try
 import scala.jdk.CollectionConverters.SeqHasAsJava
 import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest
+import concurrent.duration.DurationInt
 
 val CLIENT_ID =
   sys.env.getOrElse("GOOGLE_CLIENT_ID", "")
@@ -97,16 +98,14 @@ object GoogleClient:
 
   def buildDriveService(token: String): Drive =
     val expiryTime =
-      Date(System.currentTimeMillis() + 3600 * 1000) // 1 hour later
+      Date(System.currentTimeMillis + 1.hour.toMillis)
     val accessToken = AccessToken(token, expiryTime)
     val credentials = GoogleCredentials.create(accessToken)
-    val jsonFactory = GsonFactory.getDefaultInstance()
-    val httpTransport = NetHttpTransport()
 
     Drive
       .Builder(
-        httpTransport,
-        jsonFactory,
+        NetHttpTransport(),
+        GsonFactory.getDefaultInstance,
         HttpCredentialsAdapter(credentials)
       )
       .setApplicationName("GridoAI")
