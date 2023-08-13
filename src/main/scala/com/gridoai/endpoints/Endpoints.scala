@@ -108,6 +108,42 @@ val importGDriveEndpoint
     .in(jsonBody[List[String]])
     .out(jsonBody[List[String]])
 
+val watchGDriveEndpoint
+    : SecuredEndpoint[List[String], String, List[String], Any] =
+  auth.securedWithBearer
+    .name("Watch data from Google Drive")
+    .description("Watch google drive documents")
+    .post
+    .in("gdrive")
+    .in("watch")
+    .in(jsonBody[List[String]])
+    .out(jsonBody[List[String]])
+
+val unwatchGDriveEndpoint
+    : SecuredEndpoint[List[String], String, List[SyncData], Any] =
+  auth.securedWithBearer
+    .name("Unwatch data from Google Drive")
+    .description("Unwatch google drive documents")
+    .post
+    .in("gdrive")
+    .in("unwatch")
+    .in(jsonBody[List[String]])
+    .out(jsonBody[List[SyncData]])
+
+val syncGDriveEndpoint
+    : PublicEndpoint[(String, String, String), String, Unit, Any] =
+  endpoint
+    .name("Sync data from Google Drive")
+    .description("Sync google drive documents with the knowledge base")
+    .post
+    .in("gdrive")
+    .in("sync")
+    .in(header[String]("X-Goog-Channel-ID"))
+    .in(header[String]("X-Goog-Resource-State"))
+    .in(header[String]("X-Goog-Resource-ID"))
+    .errorOut(stringBody)
+    .out(emptyOutput)
+
 val askEndpoint: SecuredEndpoint[List[Message], String, String, Any] =
   auth.securedWithBearer
     .name("Ask to LLM")
@@ -127,6 +163,9 @@ val allEndpoints: List[AnyEndpoint] =
     createDocumentEndpoint.endpoint,
     authGDriveEndpoint.endpoint,
     importGDriveEndpoint.endpoint,
+    watchGDriveEndpoint.endpoint,
+    unwatchGDriveEndpoint.endpoint,
+    syncGDriveEndpoint,
     askEndpoint.endpoint
   )
 

@@ -31,6 +31,15 @@ object withService:
   def importGDriveDocs(implicit db: DocDB[IO]) =
     importGDriveEndpoint.serverLogic(importGDriveDocuments _)
 
+  def watchGDriveDocs(implicit db: DocDB[IO]) =
+    watchGDriveEndpoint.serverLogic(watchGDriveDocuments _)
+
+  def unwatchGDriveDocs(implicit db: DocDB[IO]) =
+    unwatchGDriveEndpoint.serverLogic(unwatchGDriveDocuments _)
+
+  def syncGDriveDocs(implicit db: DocDB[IO]) =
+    syncGDriveEndpoint.serverLogic(syncGDriveDocuments _)
+
   def askLLM(implicit db: DocDB[IO]) =
     askEndpoint.serverLogic(ask _)
 
@@ -42,6 +51,8 @@ object withService:
       uploadDocs,
       authGDrive,
       importGDriveDocs,
+      watchGDriveDocs,
+      syncGDriveDocs,
       askLLM,
       deleteDoc,
       listDocs

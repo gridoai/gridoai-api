@@ -14,6 +14,9 @@ import com.gridoai.parsers.FileFormat
 import java.util.UUID
 
 val SCOPES = List("https://www.googleapis.com/auth/drive.readonly")
+val HOST = "https://457a-2804-14c-5bc0-95c5-1af2-6a7a-a51f-2aed.ngrok.io"
+// val HOST = "https://gridoai-api-5yq2d4shfq-rj.a.run.app"
+val WEBHOOK_URI = s"$HOST/gdrive/sync"
 
 def authenticateGDrive(auth: AuthData)(
     code: String,
@@ -52,6 +55,17 @@ def partitionFilesFolders(
     .mapRight(elements =>
       (elements.filter(_._2).map(_._1), elements.filter(!_._2).map(_._1))
     )
+
+def findAllFilesAndFolders(
+    gdriveClient: FileStorage[IO],
+    fileIds: List[String],
+    appendFolders: Boolean = false
+): IO[Either[String, List[FileMeta]]] =
+  partitionFilesFolders(gdriveClient, fileIds).flatMapRight: (folders, files) =>
+    val metas = findAllFilesInFolders(gdriveClient, folders)
+      !> appendFiles(gdriveClient, files)
+    if !appendFolders then metas
+    else metas !> appendFiles(gdriveClient, folders)
 
 def appendFiles(
     gdriveClient: FileStorage[IO],
@@ -100,10 +114,30 @@ def createOrUpdateFiles(auth: AuthData)(
 def getAndAddGDriveDocs(auth: AuthData, fileIds: List[String])(
     gdriveClient: FileStorage[IO]
 )(using db: DocDB[IO]) =
-  partitionFilesFolders(gdriveClient, fileIds).flatMapRight: (folders, files) =>
-    findAllFilesInFolders(gdriveClient, folders)
-      !> appendFiles(gdriveClient, files)
-      !> downloadAndParseFiles(auth, gdriveClient)
+  findAllFilesAndFolders(gdriveClient, fileIds)
+    !> downloadAndParseFiles(auth, gdriveClient)
+
+def getAndWatchDriveDocs(
+    fileIds: List[String]
+)(gdriveClient: FileStorage[IO]): IO[Either[String, List[SyncData]]] =
+  findAllFilesAndFolders(gdriveClient, fileIds, appendFolders = true)
+    .flatMapRight(
+      _.map(_.id)
+        .traverse(gdriveClient.watchFile(WEBHOOK_URI))
+        .map(partitionEithers)
+        .mapLeft(_.mkString(","))
+    )
+
+def getAndUnwatchDriveDocs(
+    fileIds: List[String]
+)(gdriveClient: FileStorage[IO]): IO[Either[String, List[String]]] =
+  findAllFilesAndFolders(gdriveClient, fileIds, appendFolders = true)
+    .flatMapRight(
+      _.map(_.id)
+        .traverse(gdriveClient.unwatchFile)
+        .map(partitionEithers)
+        .mapLeft(_.mkString(","))
+    )
 
 def importGDriveDocuments(auth: AuthData)(
     fileIds: List[String]
@@ -117,6 +151,43 @@ def importGDriveDocuments(auth: AuthData)(
     fetchUserTokens(auth)
       !> getGDriveClient(auth.userId)
       !> getAndAddGDriveDocs(auth, fileIds)
+
+def watchGDriveDocuments(auth: AuthData)(
+    fileIds: List[String]
+)(using db: DocDB[IO]): IO[Either[String, List[String]]] =
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    println("Watching data from gdrive...")
+    fetchUserTokens(auth)
+      !> getGDriveClient(auth.userId)
+      !> getAndUnwatchDriveDocs(fileIds)
+
+def unwatchGDriveDocuments(auth: AuthData)(
+    fileIds: List[String]
+)(using db: DocDB[IO]): IO[Either[String, List[String]]] =
+  limitRole(
+    auth.role,
+    Left(authErrorMsg(Some(auth.role))).pure[IO]
+  ):
+    println("Unwatching data from gdrive...")
+    fetchUserTokens(auth)
+      !> getGDriveClient(auth.userId)
+      !> getAndWatchDriveDocs(fileIds)
+
+// TODO: Add authorization someway in sync requests
+// TODO: Store channel expirations and renew them automatically
+def syncGDriveDocuments(
+    channelId: String,
+    state: String,
+    resourceId: String
+)(implicit db: DocDB[IO]): IO[Either[String, Unit]] =
+  println("Syncing a file...")
+  println(channelId)
+  println(state)
+  println(resourceId)
+  ().asRight.pure[IO]
 
 def parseGDriveFileForPersistence(
     file: File

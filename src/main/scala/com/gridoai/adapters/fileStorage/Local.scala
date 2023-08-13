@@ -46,4 +46,8 @@ object LocalFileStorage extends FileStorage[IO] {
 
   def fileInfo(fileIds: List[String]): IO[Either[String, List[FileMeta]]] =
     Right(fileIds.map(fileId => FileMeta(fileId, fileId, fileId))).pure[IO]
+  def watchFile(webhookUrl: String)(
+      fileId: String
+  ): IO[Either[String, String]] = ???
+
 }
