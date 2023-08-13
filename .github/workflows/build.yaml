@@ -66,6 +66,7 @@ jobs:
           POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          OPENAI_API_KEY: mocked
         run: sbt test
 
   build:
