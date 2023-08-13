@@ -67,6 +67,7 @@ jobs:
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
           OPENAI_API_KEY: mocked
+          USE_MOCKED_LLM: true
         run: sbt test
 
   build:
