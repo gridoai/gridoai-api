@@ -10,12 +10,12 @@ case class FileMeta(
 case class File(meta: FileMeta, content: Array[Byte])
 
 trait FileStorage[F[_]]:
-  def listFiles(folderIds: List[String]): IO[Either[String, List[FileMeta]]]
+  def listFiles(folderIds: List[String]): F[Either[String, List[FileMeta]]]
   def downloadFiles(
       files: List[FileMeta]
-  ): IO[Either[String, List[File]]]
-  def isFolder(fileId: String): IO[Either[String, Boolean]]
-  def fileInfo(fileIds: List[String]): IO[Either[String, List[FileMeta]]]
+  ): F[Either[String, List[File]]]
+  def isFolder(fileId: String): F[Either[String, Boolean]]
+  def fileInfo(fileIds: List[String]): F[Either[String, List[FileMeta]]]
 
 def getFileStorageByName(
     name: String
