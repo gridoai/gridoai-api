@@ -1,6 +1,7 @@
 package com.gridoai.adapters.fileStorage
 
 import cats.effect.IO
+import com.gridoai.domain.SyncData
 
 case class FileMeta(
     id: String,
@@ -18,6 +19,9 @@ trait FileStorage[F[_]]:
   def fileInfo(fileIds: List[String]): F[Either[String, List[FileMeta]]]
   def watchFile(webhookUrl: String)(
       fileId: String
+  ): F[Either[String, SyncData]]
+  def unwatchFile(
+      sync: SyncData
   ): F[Either[String, String]]
 
 def getFileStorageByName(

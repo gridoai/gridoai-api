@@ -95,8 +95,9 @@ object GDriveClient:
 
       def watchFile(webhookUrl: String)(
           fileId: String
-      ): IO[Either[String, String]] =
+      ): IO[Either[String, SyncData]] =
         (Sync[IO].blocking:
+          println(s"Making channel to watch $fileId...")
           val sevenDaysInMillis: Long = 7L * 24 * 60 * 60 * 1000
           val expirationTime = System.currentTimeMillis() + sevenDaysInMillis
           val channel = new Channel()
@@ -107,6 +108,22 @@ object GDriveClient:
             .setAddress(webhookUrl)
             .setExpiration(expirationTime)
 
-          driveService.files().watch(fileId, channel).execute()
-          Right(fileId)
+          val builtChannel =
+            driveService.files().watch(fileId, channel).execute()
+          SyncData(builtChannel.getId, builtChannel.getResourceId).asRight
+        ) |> attempt
+
+      def unwatchFile(
+          sync: SyncData
+      ): IO[Either[String, Unit]] =
+        (Sync[IO].blocking:
+          println(
+            s"Stopping channel $sync..."
+          )
+          val channel = new Channel()
+            .setId(sync.id) // The unique ID of the channel you want to stop
+            .setResourceId(sync.resourceId) // The ID of the watched resource
+
+          driveService.channels().stop(channel).execute()
+          ().asRight
         ) |> attempt

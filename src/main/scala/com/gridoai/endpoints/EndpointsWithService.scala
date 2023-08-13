@@ -34,6 +34,9 @@ object withService:
   def watchGDriveDocs(implicit db: DocDB[IO]) =
     watchGDriveEndpoint.serverLogic(watchGDriveDocuments _)
 
+  def unwatchGDriveDocs(implicit db: DocDB[IO]) =
+    unwatchGDriveEndpoint.serverLogic(unwatchGDriveDocuments _)
+
   def syncGDriveDocs(implicit db: DocDB[IO]) =
     syncGDriveEndpoint.serverLogic(syncGDriveDocuments _)
 

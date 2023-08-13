@@ -119,6 +119,17 @@ val watchGDriveEndpoint
     .in(jsonBody[List[String]])
     .out(jsonBody[List[String]])
 
+val unwatchGDriveEndpoint
+    : SecuredEndpoint[List[String], String, List[SyncData], Any] =
+  auth.securedWithBearer
+    .name("Unwatch data from Google Drive")
+    .description("Unwatch google drive documents")
+    .post
+    .in("gdrive")
+    .in("unwatch")
+    .in(jsonBody[List[String]])
+    .out(jsonBody[List[SyncData]])
+
 val syncGDriveEndpoint
     : PublicEndpoint[(String, String, String), String, Unit, Any] =
   endpoint
@@ -153,6 +164,7 @@ val allEndpoints: List[AnyEndpoint] =
     authGDriveEndpoint.endpoint,
     importGDriveEndpoint.endpoint,
     watchGDriveEndpoint.endpoint,
+    unwatchGDriveEndpoint.endpoint,
     syncGDriveEndpoint,
     askEndpoint.endpoint
   )
