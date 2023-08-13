@@ -257,6 +257,6 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
           )
         .flatMapRight: chunks =>
           val answer = llm.ask(chunks)(messages)
-          val sources = chunks.map(_.documentSource).distinct.mkString(", ")
+          val sources = chunks.map(_.documentName).distinct.mkString(", ")
           if chunks.length < 1 then answer
           else answer.mapRight(x => s"$x\n\n\n\nsources: $sources")
