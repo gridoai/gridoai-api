@@ -109,7 +109,10 @@ class API extends CatsEffectSuite {
       .post(uri"http://test.com/ask")
       .headers(authHeader)
       .body(
-        List(Message(from = MessageFrom.User, message = "Hi")).asJson.toString
+        AskPayload(
+          messages = List(Message(from = MessageFrom.User, message = "Hi")),
+          basedOnDocsOnly = true
+        ).asJson.toString
       )
       .send(backendStub)
       .map(_.code)

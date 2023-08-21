@@ -1,4 +1,4 @@
-package com.gridoai.adapters.llm
+package com.gridoai.adapters.llm.chatGPT
 
 import munit.FunSuite
 
