@@ -247,16 +247,17 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       println("Used llm: " + llm.toString())
 
       llm
-        .mergeMessages(payload.messages)
-        .trace("prompt built by llm")
-        .flatMapRight: prompt =>
+        .buildQueryToSearchDocuments(payload.messages)
+        .trace("Query built by llm")
+        .flatMapRight: query =>
           searchDoc(auth)(
-            prompt,
+            query,
             llm.askMaxTokens(payload.messages, payload.basedOnDocsOnly),
             llmModel |> llmToStr
           )
         .flatMapRight: chunks =>
-          val answer = llm.ask(chunks, payload.basedOnDocsOnly)(payload.messages)
+          val answer =
+            llm.ask(chunks, payload.basedOnDocsOnly)(payload.messages)
           val sources = chunks.map(_.documentName).distinct.mkString(", ")
           if chunks.length < 1 then answer
           else answer.mapRight(x => s"$x\n\n\n\nsources: $sources")
