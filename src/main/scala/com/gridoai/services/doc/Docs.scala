@@ -235,10 +235,10 @@ def upsertDocs(auth: AuthData)(
           )
       else Right(List()).pure[IO]
 
-def ask(auth: AuthData)(messages: List[Message])(implicit
+def ask(auth: AuthData)(payload: AskPayload)(implicit
     db: DocDB[IO]
 ): IO[Either[String, String]] = traceMappable("ask"):
-  messages.last.from match
+  payload.messages.last.from match
     case MessageFrom.Bot =>
       IO.pure(Left("Last message should be from the user"))
     case MessageFrom.User =>
@@ -247,16 +247,16 @@ def ask(auth: AuthData)(messages: List[Message])(implicit
       println("Used llm: " + llm.toString())
 
       llm
-        .mergeMessages(messages)
+        .mergeMessages(payload.messages)
         .trace("prompt built by llm")
         .flatMapRight: prompt =>
           searchDoc(auth)(
             prompt,
-            llm.askMaxTokens(messages),
+            llm.askMaxTokens(payload.messages, payload.basedOnDocsOnly),
             llmModel |> llmToStr
           )
         .flatMapRight: chunks =>
-          val answer = llm.ask(chunks)(messages)
+          val answer = llm.ask(chunks, payload.basedOnDocsOnly)(payload.messages)
           val sources = chunks.map(_.documentName).distinct.mkString(", ")
           if chunks.length < 1 then answer
           else answer.mapRight(x => s"$x\n\n\n\nsources: $sources")

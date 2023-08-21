@@ -1,7 +1,11 @@
-package com.gridoai.adapters.llm
+package com.gridoai.adapters.llm.chatGPT
 
-val baseContextPrompt =
-  "You are GridoAI, an intelligent chatbot for knowledge retrieval. Provide a single response to the following conversation in a natural and intelligent way."
+def baseContextPrompt(basedOnDocsOnly: Boolean = true) =
+  basedOnDocsOnly match
+    case true =>
+      "You're GridoAI, a smart and reliable chatbot that responds contextually. After searching the user's documents for their query, provide a single, intelligent response. Only answer based on the document's information and refuse to answer questions requiring external data."
+    case false =>
+      "You're GridoAI, a smart and reliable chatbot that responds contextually. After searching the user's documents for their query, provide a single, intelligent response. You can use information that is not in the documents, but make it clear that you are doing so."
 
 val defaultTemperature: Double = 0.2
 val defaultMaxOutputTokens: Int = 512

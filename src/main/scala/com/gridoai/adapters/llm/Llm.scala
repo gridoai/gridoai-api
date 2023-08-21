@@ -5,11 +5,17 @@ import com.gridoai.domain.Message
 import com.gridoai.domain.Chunk
 import com.gridoai.domain.LLMModel
 import com.gridoai.adapters.catsBackendSync
+import com.gridoai.adapters.llm.chatGPT.ChatGPTClient
+import com.gridoai.adapters.llm.palm2.Paml2Client
+import com.gridoai.adapters.llm.mocked.MockLLM
 
 trait LLM[F[_]]:
   def calculateChunkTokenQuantity(chunk: Chunk): Int
-  def askMaxTokens(messages: List[Message]): Int
-  def ask(chunks: List[Chunk])(
+  def askMaxTokens(
+      messages: List[Message],
+      basedOnDocsOnly: Boolean = true
+  ): Int
+  def ask(chunks: List[Chunk], basedOnDocsOnly: Boolean = true)(
       messages: List[Message]
   ): F[Either[String, String]]
 

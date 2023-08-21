@@ -1,7 +1,8 @@
-package com.gridoai.adapters.llm
+package com.gridoai.adapters.llm.palm2
 import cats.effect.IO
 import com.google.auth.oauth2.GoogleCredentials
 import com.gridoai.adapters.*
+import com.gridoai.adapters.llm.*
 import com.gridoai.domain.*
 import com.gridoai.utils._
 import io.circe.*
@@ -107,14 +108,17 @@ object Paml2Client extends LLM[IO]:
   def calculateMessagesTokenQuantity(messages: List[Message]): Int =
     messages.map(m => 10 + calculateTokenQuantity(m.message)).sum
 
-  def askMaxTokens(messages: List[Message]): Int =
+  def askMaxTokens(
+      messages: List[Message],
+      basedOnDocsOnly: Boolean = true
+  ): Int =
     val contextTokens = calculateTokenQuantity(baseContextPrompt)
     val messageTokens = calculateMessagesTokenQuantity(messages)
     val res = maxInputTokens - messageTokens - contextTokens
     println(s"askMaxTokens: $res")
     res
 
-  def ask(chunks: List[Chunk])(
+  def ask(chunks: List[Chunk], basedOnDocsOnly: Boolean = true)(
       messages: List[Message]
   ): IO[Either[String, String]] =
 
