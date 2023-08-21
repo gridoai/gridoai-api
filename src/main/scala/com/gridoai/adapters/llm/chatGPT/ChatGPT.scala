@@ -103,23 +103,10 @@ object ChatGPTClient:
         |> client.createChatCompletion
         |> getAnswer
 
-    def mergeMessages(messages: List[Message]): F[Either[String, String]] =
-
-      val mergedMessages =
-        messages
-          .map(m => s"${m.from.toString()}: ${m.message}")
-          .mkString("\n")
-
-      if messages.length <= 5 then Right(mergedMessages).pure[F]
-      else
-        val singleMessage = List(
-          Message(
-            from = MessageFrom.User,
-            message =
-              s"$chatMergePrompt\n\nProvide a laconic summary for the following conversation: $mergedMessages"
-          )
-        )
-        singleMessage
-          |> makePayloadWithContext()
-          |> client.createChatCompletion
-          |> getAnswer
+    def buildQueryToSearchDocuments(
+        messages: List[Message]
+    ): F[Either[String, String]] =
+      messages
+        |> makePayloadWithContext(Some(buildQueryToSearchDocumentsPrompt))
+        |> client.createChatCompletion
+        |> getAnswer

@@ -19,7 +19,9 @@ trait LLM[F[_]]:
       messages: List[Message]
   ): F[Either[String, String]]
 
-  def mergeMessages(messages: List[Message]): F[Either[String, String]]
+  def buildQueryToSearchDocuments(
+      messages: List[Message]
+  ): F[Either[String, String]]
 
 def getLLMByName(llm: LLMModel): LLM[IO] =
   llm match
