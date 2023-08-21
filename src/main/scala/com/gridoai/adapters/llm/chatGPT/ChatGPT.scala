@@ -1,6 +1,7 @@
-package com.gridoai.adapters.llm
+package com.gridoai.adapters.llm.chatGPT
 
 import com.gridoai.adapters.*
+import com.gridoai.adapters.llm.*
 import com.gridoai.domain.*
 import com.gridoai.utils.*
 import dev.maxmelnyk.openaiscala.models.text.completions.chat._
@@ -69,14 +70,19 @@ object ChatGPTClient:
         s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
       )
 
-    def askMaxTokens(messages: List[Message]): Int =
-      val contextTokens = calculateTokenQuantity(baseContextPrompt)
+    def askMaxTokens(
+        messages: List[Message],
+        basedOnDocsOnly: Boolean = true
+    ): Int =
+      val contextTokens = calculateTokenQuantity(
+        baseContextPrompt(basedOnDocsOnly)
+      )
       val messageTokens = calculateMessagesTokenQuantity(messages)
       val res = maxInputTokens - messageTokens - contextTokens
       println(s"askMaxTokens: $res")
       res
 
-    def ask(chunks: List[Chunk])(
+    def ask(chunks: List[Chunk], basedOnDocsOnly: Boolean = true)(
         messages: List[Message]
     ): F[Either[String, String]] =
 
@@ -85,7 +91,7 @@ object ChatGPTClient:
           s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
         )
         .mkString("\n")
-      val context = s"$baseContextPrompt\n$mergedChunks"
+      val context = s"${baseContextPrompt(basedOnDocsOnly)}\n$mergedChunks"
       println(
         s"Total tokens in chunks: ${calculateTokenQuantity(mergedChunks)}"
       )
