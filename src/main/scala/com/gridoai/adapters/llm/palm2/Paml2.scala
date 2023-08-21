@@ -136,7 +136,9 @@ object Paml2Client extends LLM[IO]:
     )
     messages |> makePayloadWithContext(context) |> call |> getAnswer
 
-  def mergeMessages(messages: List[Message]): IO[Either[String, String]] =
+  def buildQueryToSearchDocuments(
+      messages: List[Message]
+  ): IO[Either[String, String]] =
 
     val mergedMessages =
       messages

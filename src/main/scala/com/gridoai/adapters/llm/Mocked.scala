@@ -16,5 +16,7 @@ class MockLLM[F[_]: Applicative] extends LLM[F]:
   ): F[Either[String, String]] =
     Applicative[F].pure(Right("The response message."))
 
-  def mergeMessages(messages: List[Message]): F[Either[String, String]] =
+  def buildQueryToSearchDocuments(
+      messages: List[Message]
+  ): F[Either[String, String]] =
     Applicative[F].pure(Right("The response message."))
