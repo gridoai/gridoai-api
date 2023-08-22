@@ -4,13 +4,15 @@ import com.gridoai.adapters.*
 import com.gridoai.adapters.llm.*
 import com.gridoai.domain.*
 import com.gridoai.utils.*
-import dev.maxmelnyk.openaiscala.models.text.completions.chat._
+import dev.maxmelnyk.openaiscala.models.text.completions.chat.*
+import dev.maxmelnyk.openaiscala.models.text.completions.*
 import dev.maxmelnyk.openaiscala.client.OpenAIClient
 import sttp.client3.*
 import cats.MonadError
 import cats.implicits.*
 import com.knuddels.jtokkit.Encodings
 import com.knuddels.jtokkit.api.ModelType
+import dev.maxmelnyk.openaiscala.models.models.Models
 
 val ENC = Encodings
   .newDefaultEncodingRegistry()
@@ -60,10 +62,15 @@ object ChatGPTClient:
   ) = new LLM[F]:
     val client = OpenAIClient(sttpBackend)
 
-    def getAnswer(
+    def getAnswerFromChat(
         llmOutput: F[ChatCompletion]
     ): F[Either[String, String]] =
       llmOutput.map(_.choices.head.message.content).map(Right(_)) |> attempt
+
+    def getAnswerFromCompletion(
+        llmOutput: F[Completion]
+    ): F[Either[String, String]] =
+      llmOutput.map(_.choices.head.text).map(Right(_)) |> attempt
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
       calculateTokenQuantity(
@@ -101,12 +108,19 @@ object ChatGPTClient:
       messages
         |> makePayloadWithContext(Some(context))
         |> client.createChatCompletion
-        |> getAnswer
+        |> getAnswerFromChat
 
     def buildQueryToSearchDocuments(
         messages: List[Message]
     ): F[Either[String, String]] =
-      messages
-        |> makePayloadWithContext(Some(buildQueryToSearchDocumentsPrompt))
-        |> client.createChatCompletion
-        |> getAnswer
+      val mergedMessages =
+        messages.map(m => s"${m.from}: ${m.message}").mkString("\n")
+      val prompts = Seq(
+        s"$buildQueryToSearchDocumentsPrompt\n$mergedMessages\nQuery:"
+      )
+      client.createCompletion(prompts)
+        |> getAnswerFromCompletion
+        |> (_.mapRight(cleanQueryToSearchDocuments))
+
+    def cleanQueryToSearchDocuments(query: String): String =
+      query.trim()
