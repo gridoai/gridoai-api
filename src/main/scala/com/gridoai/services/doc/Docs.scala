@@ -237,7 +237,7 @@ def upsertDocs(auth: AuthData)(
 
 def ask(auth: AuthData)(payload: AskPayload)(implicit
     db: DocDB[IO]
-): IO[Either[String, String]] = traceMappable("ask"):
+): IO[Either[String, AskResponse]] = traceMappable("ask"):
   payload.messages.last.from match
     case MessageFrom.Bot =>
       IO.pure(Left("Last message should be from the user"))
@@ -256,8 +256,5 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
             llmModel |> llmToStr
           )
         .flatMapRight: chunks =>
-          val answer =
-            llm.ask(chunks, payload.basedOnDocsOnly)(payload.messages)
-          val sources = chunks.map(_.documentName).distinct.mkString(", ")
-          if chunks.length < 1 then answer
-          else answer.mapRight(x => s"$x\n\n\n\nsources: $sources")
+          llm.ask(chunks, payload.basedOnDocsOnly)(payload.messages).mapRight: answer =>
+            AskResponse(message=answer, sources=chunks.map(_.documentName).distinct)

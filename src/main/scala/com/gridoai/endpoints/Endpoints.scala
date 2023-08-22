@@ -108,14 +108,14 @@ val importGDriveEndpoint
     .in(jsonBody[List[String]])
     .out(jsonBody[List[String]])
 
-val askEndpoint: SecuredEndpoint[AskPayload, String, String, Any] =
+val askEndpoint: SecuredEndpoint[AskPayload, String, AskResponse, Any] =
   auth.securedWithBearer
     .name("Ask to LLM")
     .description("Ask something based on knowledge base")
     .post
     .in("ask")
     .in(jsonBody[AskPayload])
-    .out(stringBody)
+    .out(jsonBody[AskResponse])
 
 val allEndpoints: List[AnyEndpoint] =
   List(
