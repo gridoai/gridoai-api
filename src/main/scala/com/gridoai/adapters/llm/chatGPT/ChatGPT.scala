@@ -118,7 +118,10 @@ object ChatGPTClient:
       val prompts = Seq(
         s"$buildQueryToSearchDocumentsPrompt\n$mergedMessages\nQuery:"
       )
-      client.createCompletion(prompts)
+      client.createCompletion(
+        prompts,
+        CompletionSettings(maxTokens = Some(1_000), n = Some(1))
+      )
         |> getAnswerFromCompletion
         |> (_.mapRight(cleanQueryToSearchDocuments))
 

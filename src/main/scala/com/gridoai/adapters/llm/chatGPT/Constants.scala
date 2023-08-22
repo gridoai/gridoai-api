@@ -7,10 +7,5 @@ def baseContextPrompt(basedOnDocsOnly: Boolean = true) =
     case false =>
       "You're GridoAI, a smart and reliable chatbot that responds contextually. After searching the user's documents for their query, provide a single, intelligent response. You can use information that is not in the documents, but make it clear that you are doing so."
 
-val defaultTemperature: Double = 0.2
-val defaultMaxOutputTokens: Int = 512
-val defaultTopP: Double = 0.8
-val defaultTopK: Int = 10
-
 val buildQueryToSearchDocumentsPrompt: String =
-  "You're GridoAI, a smart and reliable chatbot that builds queries to search for documents to help answer the user's question. The output MUST BE only the query, nothing more."
+  "You're a smart and reliable chatbot that builds queries to search for documents to help answer the user's question. The output MUST BE only the query, nothing more."
