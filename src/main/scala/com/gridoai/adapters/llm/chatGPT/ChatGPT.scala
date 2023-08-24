@@ -77,28 +77,49 @@ object ChatGPTClient:
         s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
       )
 
-    def askMaxTokens(
+    def maxTokensForChunks(
         messages: List[Message],
-        basedOnDocsOnly: Boolean = true
+        basedOnDocsOnly: Boolean
     ): Int =
-      val contextTokens = calculateTokenQuantity(
-        baseContextPrompt(basedOnDocsOnly)
-      )
+      val contextTokens = List(
+        baseContextPrompt(basedOnDocsOnly, true, true),
+        baseContextPrompt(basedOnDocsOnly, false, true)
+      ).map(calculateTokenQuantity).max
       val messageTokens = calculateMessagesTokenQuantity(messages)
       val res = maxInputTokens - messageTokens - contextTokens
       println(s"askMaxTokens: $res")
       res
 
-    def ask(chunks: List[Chunk], basedOnDocsOnly: Boolean = true)(
-        messages: List[Message]
+    def answer(
+        chunks: List[Chunk],
+        basedOnDocsOnly: Boolean,
+        messages: List[Message],
+        searchedBefore: Boolean
     ): F[Either[String, String]] =
+      askOrAnswer(chunks, basedOnDocsOnly, messages, searchedBefore, false)
 
+    def ask(
+        chunks: List[Chunk],
+        basedOnDocsOnly: Boolean,
+        messages: List[Message],
+        searchedBefore: Boolean
+    ): F[Either[String, String]] =
+      askOrAnswer(chunks, basedOnDocsOnly, messages, searchedBefore, true)
+
+    def askOrAnswer(
+        chunks: List[Chunk],
+        basedOnDocsOnly: Boolean,
+        messages: List[Message],
+        searchedBefore: Boolean,
+        askUser: Boolean
+    ): F[Either[String, String]] =
       val mergedChunks = chunks
         .map(chunk =>
           s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
         )
         .mkString("\n")
-      val context = s"${baseContextPrompt(basedOnDocsOnly)}\n$mergedChunks"
+      val context =
+        s"${baseContextPrompt(basedOnDocsOnly, askUser, searchedBefore)}\n$mergedChunks"
       println(
         s"Total tokens in chunks: ${calculateTokenQuantity(mergedChunks)}"
       )
@@ -110,20 +131,35 @@ object ChatGPTClient:
         |> client.createChatCompletion
         |> getAnswerFromChat
 
-    def buildQueryToSearchDocuments(
-        messages: List[Message]
-    ): F[Either[String, String]] =
-      val mergedMessages =
-        messages.map(m => s"${m.from}: ${m.message}").mkString("\n")
-      val prompts = Seq(
-        s"$buildQueryToSearchDocumentsPrompt\n$mergedMessages\nQuery:"
-      )
+    def chooseAction(
+        messages: List[Message],
+        query: Option[String],
+        chunks: List[Chunk]
+    ): F[Either[String, Action]] =
       client.createCompletion(
-        prompts,
+        Seq(chooseActionPrompt(chunks, messages)),
+        CompletionSettings(maxTokens = Some(1), n = Some(1))
+      )
+        |> getAnswerFromCompletion
+        |> (_.map(_.flatMap(strToAction)))
+
+    def buildQueryToSearchDocuments(
+        messages: List[Message],
+        lastQuery: Option[String],
+        lastChunks: List[Chunk]
+    ): F[Either[String, String]] =
+      client.createCompletion(
+        Seq(buildQueryToSearchDocumentsPrompt(messages, lastQuery, lastChunks)),
         CompletionSettings(maxTokens = Some(1_000), n = Some(1))
       )
         |> getAnswerFromCompletion
-        |> (_.mapRight(cleanQueryToSearchDocuments))
+        |> (_.mapRight(_.trim()))
 
-    def cleanQueryToSearchDocuments(query: String): String =
-      query.trim()
+    def strToAction(llmOutput: String): Either[String, Action] =
+      llmOutput.trim() match
+        case "1" => Action.Ask.asRight
+        case "2" => Action.Answer.asRight
+        case "3" => Action.Search.asRight
+        case e =>
+          println(s"bad action: $e")
+          Left("Invalid LLM output")
