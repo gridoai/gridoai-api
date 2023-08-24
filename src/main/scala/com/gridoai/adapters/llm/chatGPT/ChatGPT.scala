@@ -139,11 +139,16 @@ object ChatGPTClient:
         query: Option[String],
         chunks: List[Chunk]
     ): F[Either[String, Action]] =
-      client.createCompletion(
-        Seq(chooseActionPrompt(chunks, messages)),
-        CompletionSettings(maxTokens = Some(1), n = Some(1))
+      client.createChatCompletion(
+        Seq(
+          ChatCompletion.Message(
+            role = ChatCompletion.Message.Role.System,
+            content = chooseActionPrompt(chunks, messages)
+          )
+        ),
+        ChatCompletionSettings(maxTokens = Some(1), n = Some(1))
       )
-        |> getAnswerFromCompletion
+        |> getAnswerFromChat
         |> (_.map(_.flatMap(strToAction)))
 
     def buildQueryToSearchDocuments(
@@ -153,14 +158,16 @@ object ChatGPTClient:
     ): F[Either[String, String]] =
       val prompt =
         buildQueryToSearchDocumentsPrompt(messages, lastQuery, lastChunks)
-      client.createCompletion(
-        Seq(prompt),
-        CompletionSettings(
-          maxTokens = Some(4097 - ENC_DAVINCI.countTokens(prompt)),
-          n = Some(1)
-        )
+      client.createChatCompletion(
+        Seq(
+          ChatCompletion.Message(
+            role = ChatCompletion.Message.Role.System,
+            content = prompt
+          )
+        ),
+        ChatCompletionSettings()
       )
-        |> getAnswerFromCompletion
+        |> getAnswerFromChat
         |> (_.mapRight(_.trim()))
 
     def strToAction(llmOutput: String): Either[String, Action] =
