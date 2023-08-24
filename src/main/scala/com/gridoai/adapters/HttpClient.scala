@@ -6,13 +6,37 @@ import java.net.InetAddress
 import scala.concurrent.duration.Duration
 import concurrent.duration.DurationInt
 import cats.effect.unsafe.implicits.global
+import com.gridoai.utils.changeUri
 
 val catsBackend =
   HttpClientCatsBackend
     .resource[IO]()
     .use(IO.pure)
 
-val catsBackendSync = catsBackend.unsafeRunSync()
+import java.net.URI
+def makeAzureURIOfOpenAI(originalURI: URI): URI = {
+  // https://gridoai.openai.azure.com/openai/deployments/API/completions?api-version=2023-03-15-preview
+  val newPath =
+    s"/openai/deployments/API/${originalURI.getPath.replaceAll("/v1", "").stripPrefix("/")}"
+  val newURI = new URI(
+    originalURI.getScheme,
+    null,
+    "gridoai.openai.azure.com",
+    originalURI.getPort,
+    newPath,
+    "api-version=2023-03-15-preview",
+    null
+  )
+  newURI
+}
+
+val openAiClientBackend = HttpClientCatsBackend
+  .resource[IO](customizeRequest = sys.env.get("OPENAI_ENDPOINT") match
+    case None        => identity
+    case Some(value) => changeUri(makeAzureURIOfOpenAI)
+  )
+  .use(IO.pure)
+  .unsafeRunSync()
 
 def sendRequest[T] = (r: Request[T, Any]) => catsBackend.flatMap(r.send)
 
