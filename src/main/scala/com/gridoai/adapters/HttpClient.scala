@@ -15,7 +15,6 @@ val catsBackend =
 
 import java.net.URI
 def makeAzureURIOfOpenAI(originalURI: URI): URI = {
-  // https://gridoai.openai.azure.com/openai/deployments/API/completions?api-version=2023-03-15-preview
   val newPath =
     s"/openai/deployments/API/${originalURI.getPath.replaceAll("/v1", "").stripPrefix("/")}"
   val newURI = new URI(
