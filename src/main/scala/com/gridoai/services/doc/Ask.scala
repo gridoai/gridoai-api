@@ -1,13 +1,11 @@
 package com.gridoai.services.doc
 
-import cats.Monad
 import cats.effect.IO
 import cats.implicits.*
 import com.gridoai.adapters.llm.*
 import com.gridoai.domain.*
 import com.gridoai.models.DocDB
 import com.gridoai.utils.*
-import com.gridoai.endpoints.*
 
 import com.gridoai.adapters.*
 import com.gridoai.auth.AuthData
@@ -21,12 +19,14 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
     case MessageFrom.User =>
       askRecursively(auth)(
         payload.messages,
-        payload.basedOnDocsOnly
+        payload.basedOnDocsOnly,
+        true // Switch actions mode
       )
 
 def askRecursively(auth: AuthData)(
     messages: List[Message],
     basedOnDocsOnly: Boolean,
+    useActionsFeature: Boolean,
     lastQuery: Option[String] = None,
     lastChunks: List[Chunk] = List.empty,
     searchesBeforeResponse: Int = 2
@@ -38,8 +38,14 @@ def askRecursively(auth: AuthData)(
   println("Used llm: " + llm.toString())
 
   if searchesBeforeResponse > 0 then
-    llm
-      .chooseAction(messages, lastQuery, lastChunks)
+    chooseAction(
+      llm,
+      messages,
+      lastQuery,
+      lastChunks,
+      searchesBeforeResponse,
+      useActionsFeature
+    )
       .flatMapRight:
         case Action.Ask =>
           println("AI decided to ask...")
@@ -74,15 +80,35 @@ def askRecursively(auth: AuthData)(
                   askRecursively(auth)(
                     messages,
                     basedOnDocsOnly,
+                    useActionsFeature,
                     Some(newQuery),
                     newChunks,
                     searchesBeforeResponse - 1
                   )
   else
     llm
-      .ask(lastChunks, basedOnDocsOnly, messages, lastQuery.isDefined)
+      .answer(lastChunks, basedOnDocsOnly, messages, lastQuery.isDefined)
       .mapRight: answer =>
         AskResponse(
           message = answer,
           sources = lastChunks.map(_.documentName).distinct
         )
+
+def chooseAction(
+    llm: LLM[IO],
+    messages: List[Message],
+    lastQuery: Option[String],
+    lastChunks: List[Chunk],
+    searchesBeforeResponse: Int,
+    useActionsFeature: Boolean
+): IO[Either[String, Action]] =
+  if useActionsFeature then llm.chooseAction(messages, lastQuery, lastChunks)
+  else
+    IO(searchesBeforeResponse match
+      case 2 => Action.Search.asRight
+      case 1 => Action.Answer.asRight
+      case _ =>
+        Left(
+          s"Invalid state. searchesBeforeResponse = $searchesBeforeResponse and useActionsFeature = $useActionsFeature"
+        )
+    )
