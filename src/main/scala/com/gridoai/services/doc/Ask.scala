@@ -12,103 +12,119 @@ import com.gridoai.auth.AuthData
 
 def ask(auth: AuthData)(payload: AskPayload)(implicit
     db: DocDB[IO]
-): IO[Either[String, AskResponse]] = traceMappable("ask"):
-  payload.messages.last.from match
-    case MessageFrom.Bot =>
-      IO.pure(Left("Last message should be from the user"))
-    case MessageFrom.User =>
-      askRecursively(auth)(
-        payload.messages,
-        payload.basedOnDocsOnly,
-        true // Switch actions mode
-      )
-
-def askRecursively(auth: AuthData)(
-    messages: List[Message],
-    basedOnDocsOnly: Boolean,
-    useActionsFeature: Boolean,
-    lastQuery: Option[String] = None,
-    lastChunks: List[Chunk] = List.empty,
-    searchesBeforeResponse: Int = 2
-)(implicit
-    db: DocDB[IO]
 ): IO[Either[String, AskResponse]] =
   val llmModel = LLMModel.Gpt35Turbo
   val llm = getLLM(llmModel)
-  println("Used llm: " + llm.toString())
+  val useActionsFeature = true
 
-  if searchesBeforeResponse > 0 then
+  def askRecursively(
+      lastQuery: Option[String],
+      searchesBeforeResponse: Int
+  )(
+      lastChunks: List[Chunk]
+  ): IO[Either[String, AskResponse]] =
+    println("Used llm: " + llm.toString())
+
     chooseAction(
-      llm,
-      messages,
       lastQuery,
       lastChunks,
-      searchesBeforeResponse,
-      useActionsFeature
+      searchesBeforeResponse
     )
-      .flatMapRight:
-        case Action.Ask =>
-          println("AI decided to ask...")
-          llm
-            .ask(lastChunks, basedOnDocsOnly, messages, lastQuery.isDefined)
-            .mapRight: question =>
-              AskResponse(
-                message = question,
-                sources = lastChunks.map(_.documentName).distinct
-              )
-        case Action.Answer =>
-          println("AI decided to answer...")
-          llm
-            .answer(lastChunks, basedOnDocsOnly, messages, lastQuery.isDefined)
-            .mapRight: answer =>
-              AskResponse(
-                message = answer,
-                sources = lastChunks.map(_.documentName).distinct
-              )
-        case Action.Search =>
-          println("AI decided to search...")
-          llm
-            .buildQueryToSearchDocuments(messages, lastQuery, lastChunks)
-            .flatMapRight: newQuery =>
-              println(s"AI's query: $newQuery")
-              searchDoc(auth)(
-                newQuery,
-                llm.maxTokensForChunks(messages, basedOnDocsOnly),
-                llmModel |> llmToStr
-              )
-                .flatMapRight: newChunks =>
-                  askRecursively(auth)(
-                    messages,
-                    basedOnDocsOnly,
-                    useActionsFeature,
-                    Some(newQuery),
-                    newChunks,
-                    searchesBeforeResponse - 1
-                  )
-  else
+      !> makeAction(lastQuery, lastChunks, searchesBeforeResponse)
+
+  def chooseAction(
+      lastQuery: Option[String],
+      lastChunks: List[Chunk],
+      searchesBeforeResponse: Int
+  ): IO[Either[String, Action]] =
+    if useActionsFeature then
+      if searchesBeforeResponse > 0 then
+        llm.chooseAction(payload.messages, lastQuery, lastChunks)
+      else Action.Answer.asRight.pure[IO]
+    else
+      IO(searchesBeforeResponse match
+        case 2 => Action.Search.asRight
+        case 1 => Action.Answer.asRight
+        case _ =>
+          Left(
+            s"Invalid state. searchesBeforeResponse = $searchesBeforeResponse and useActionsFeature = $useActionsFeature"
+          )
+      )
+
+  def makeAction(
+      lastQuery: Option[String],
+      lastChunks: List[Chunk],
+      searchesBeforeResponse: Int
+  )(action: Action): IO[Either[String, AskResponse]] =
+    (action match
+      case Action.Ask    => doAskAction
+      case Action.Answer => doAnswerAction
+      case Action.Search => doSearchAction
+    )(lastQuery, lastChunks, searchesBeforeResponse)
+
+  def doAskAction(
+      lastQuery: Option[String],
+      lastChunks: List[Chunk],
+      searchesBeforeResponse: Int
+  ): IO[Either[String, AskResponse]] =
+    println("AI decided to ask...")
     llm
-      .answer(lastChunks, basedOnDocsOnly, messages, lastQuery.isDefined)
+      .ask(
+        lastChunks,
+        payload.basedOnDocsOnly,
+        payload.messages,
+        lastQuery.isDefined
+      )
+      .mapRight: question =>
+        AskResponse(
+          message = question,
+          sources = lastChunks.map(_.documentName).distinct
+        )
+
+  def doAnswerAction(
+      lastQuery: Option[String],
+      lastChunks: List[Chunk],
+      searchesBeforeResponse: Int
+  ): IO[Either[String, AskResponse]] =
+    println("AI decided to answer...")
+    llm
+      .answer(
+        lastChunks,
+        payload.basedOnDocsOnly,
+        payload.messages,
+        lastQuery.isDefined
+      )
       .mapRight: answer =>
         AskResponse(
           message = answer,
           sources = lastChunks.map(_.documentName).distinct
         )
 
-def chooseAction(
-    llm: LLM[IO],
-    messages: List[Message],
-    lastQuery: Option[String],
-    lastChunks: List[Chunk],
-    searchesBeforeResponse: Int,
-    useActionsFeature: Boolean
-): IO[Either[String, Action]] =
-  if useActionsFeature then llm.chooseAction(messages, lastQuery, lastChunks)
-  else
-    IO(searchesBeforeResponse match
-      case 2 => Action.Search.asRight
-      case 1 => Action.Answer.asRight
-      case _ =>
-        Left(
-          s"Invalid state. searchesBeforeResponse = $searchesBeforeResponse and useActionsFeature = $useActionsFeature"
+  def doSearchAction(
+      lastQuery: Option[String],
+      lastChunks: List[Chunk],
+      searchesBeforeResponse: Int
+  ): IO[Either[String, AskResponse]] =
+    println("AI decided to search...")
+    llm
+      .buildQueryToSearchDocuments(payload.messages, lastQuery, lastChunks)
+      .flatMapRight: newQuery =>
+        println(s"AI's query: $newQuery")
+        searchDoc(auth)(
+          newQuery,
+          llm.maxTokensForChunks(payload.messages, payload.basedOnDocsOnly),
+          llmModel |> llmToStr
         )
-    )
+          .flatMapRight(
+            askRecursively(
+              Some(newQuery),
+              searchesBeforeResponse - 1
+            )
+          )
+
+  traceMappable("ask"):
+    payload.messages.last.from match
+      case MessageFrom.Bot =>
+        IO.pure(Left("Last message should be from the user"))
+      case MessageFrom.User =>
+        askRecursively(None, 2)(List.empty)
