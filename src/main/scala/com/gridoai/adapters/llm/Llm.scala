@@ -5,7 +5,7 @@ import com.gridoai.domain.Message
 import com.gridoai.domain.Chunk
 import com.gridoai.domain.LLMModel
 import com.gridoai.domain.Action
-import com.gridoai.adapters.catsBackendSync
+import com.gridoai.adapters.openAiClientBackend
 import com.gridoai.adapters.llm.chatGPT.ChatGPTClient
 import com.gridoai.adapters.llm.palm2.Paml2Client
 import com.gridoai.adapters.llm.mocked.MockLLM
@@ -41,7 +41,7 @@ trait LLM[F[_]]:
 
 def getLLMByName(llm: LLMModel): LLM[IO] =
   llm match
-    case LLMModel.Gpt35Turbo => ChatGPTClient(catsBackendSync)
+    case LLMModel.Gpt35Turbo => ChatGPTClient(openAiClientBackend)
     case LLMModel.Palm2      => Paml2Client
     case LLMModel.Mocked     => MockLLM[IO]
 
