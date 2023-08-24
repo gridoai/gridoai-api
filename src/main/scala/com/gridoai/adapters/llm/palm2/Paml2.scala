@@ -1,5 +1,6 @@
 package com.gridoai.adapters.llm.palm2
 import cats.effect.IO
+import cats.implicits.*
 import com.google.auth.oauth2.GoogleCredentials
 import com.gridoai.adapters.*
 import com.gridoai.adapters.llm.*
@@ -108,18 +109,21 @@ object Paml2Client extends LLM[IO]:
   def calculateMessagesTokenQuantity(messages: List[Message]): Int =
     messages.map(m => 10 + calculateTokenQuantity(m.message)).sum
 
-  def askMaxTokens(
+  def maxTokensForChunks(
       messages: List[Message],
-      basedOnDocsOnly: Boolean = true
+      basedOnDocsOnly: Boolean
   ): Int =
     val contextTokens = calculateTokenQuantity(baseContextPrompt)
     val messageTokens = calculateMessagesTokenQuantity(messages)
     val res = maxInputTokens - messageTokens - contextTokens
-    println(s"askMaxTokens: $res")
+    println(s"maxTokensForChunks: $res")
     res
 
-  def ask(chunks: List[Chunk], basedOnDocsOnly: Boolean = true)(
-      messages: List[Message]
+  def ask(
+      chunks: List[Chunk],
+      basedOnDocsOnly: Boolean,
+      messages: List[Message],
+      searchedBefore: Boolean
   ): IO[Either[String, String]] =
 
     val mergedChunks = chunks
@@ -136,8 +140,38 @@ object Paml2Client extends LLM[IO]:
     )
     messages |> makePayloadWithContext(context) |> call |> getAnswer
 
+  def answer(
+      chunks: List[Chunk],
+      basedOnDocsOnly: Boolean,
+      messages: List[Message],
+      searchedBefore: Boolean
+  ): IO[Either[String, String]] =
+
+    val mergedChunks = chunks
+      .map(chunk =>
+        s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
+      )
+      .mkString("\n")
+    val context = s"$baseContextPrompt\n$mergedChunks"
+    println(
+      s"Total tokens in chunks: ${calculateTokenQuantity(mergedChunks)}"
+    )
+    println(
+      s"Total tokens in messages: ${calculateMessagesTokenQuantity(messages)}"
+    )
+    messages |> makePayloadWithContext(context) |> call |> getAnswer
+
+  def chooseAction(
+      messages: List[Message],
+      query: Option[String],
+      chunks: List[Chunk]
+  ): IO[Either[String, Action]] =
+    Action.Search.asRight.pure[IO]
+
   def buildQueryToSearchDocuments(
-      messages: List[Message]
+      messages: List[Message],
+      lastQuery: Option[String],
+      lastChunks: List[Chunk]
   ): IO[Either[String, String]] =
 
     val mergedMessages =

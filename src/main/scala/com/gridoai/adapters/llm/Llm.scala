@@ -4,6 +4,7 @@ import cats.effect.IO
 import com.gridoai.domain.Message
 import com.gridoai.domain.Chunk
 import com.gridoai.domain.LLMModel
+import com.gridoai.domain.Action
 import com.gridoai.adapters.catsBackendSync
 import com.gridoai.adapters.llm.chatGPT.ChatGPTClient
 import com.gridoai.adapters.llm.palm2.Paml2Client
@@ -11,16 +12,31 @@ import com.gridoai.adapters.llm.mocked.MockLLM
 
 trait LLM[F[_]]:
   def calculateChunkTokenQuantity(chunk: Chunk): Int
-  def askMaxTokens(
+  def maxTokensForChunks(
       messages: List[Message],
-      basedOnDocsOnly: Boolean = true
+      basedOnDocsOnly: Boolean
   ): Int
-  def ask(chunks: List[Chunk], basedOnDocsOnly: Boolean = true)(
-      messages: List[Message]
+  def chooseAction(
+      messages: List[Message],
+      query: Option[String],
+      chunks: List[Chunk]
+  ): F[Either[String, Action]]
+  def ask(
+      chunks: List[Chunk],
+      basedOnDocsOnly: Boolean,
+      messages: List[Message],
+      searchedBefore: Boolean
   ): F[Either[String, String]]
-
+  def answer(
+      chunks: List[Chunk],
+      basedOnDocsOnly: Boolean,
+      messages: List[Message],
+      searchedBefore: Boolean
+  ): F[Either[String, String]]
   def buildQueryToSearchDocuments(
-      messages: List[Message]
+      messages: List[Message],
+      lastQuery: Option[String],
+      lastChunks: List[Chunk]
   ): F[Either[String, String]]
 
 def getLLMByName(llm: LLMModel): LLM[IO] =

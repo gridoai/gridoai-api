@@ -234,27 +234,3 @@ def upsertDocs(auth: AuthData)(
             )
           )
       else Right(List()).pure[IO]
-
-def ask(auth: AuthData)(payload: AskPayload)(implicit
-    db: DocDB[IO]
-): IO[Either[String, AskResponse]] = traceMappable("ask"):
-  payload.messages.last.from match
-    case MessageFrom.Bot =>
-      IO.pure(Left("Last message should be from the user"))
-    case MessageFrom.User =>
-      val llmModel = LLMModel.Gpt35Turbo
-      val llm = getLLM(llmModel)
-      println("Used llm: " + llm.toString())
-
-      llm
-        .buildQueryToSearchDocuments(payload.messages)
-        .trace("Query built by llm")
-        .flatMapRight: query =>
-          searchDoc(auth)(
-            query,
-            llm.askMaxTokens(payload.messages, payload.basedOnDocsOnly),
-            llmModel |> llmToStr
-          )
-        .flatMapRight: chunks =>
-          llm.ask(chunks, payload.basedOnDocsOnly)(payload.messages).mapRight: answer =>
-            AskResponse(message=answer, sources=chunks.map(_.documentName).distinct)
