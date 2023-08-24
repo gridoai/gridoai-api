@@ -120,10 +120,16 @@ object ChatGPTClient:
       )
       client.createCompletion(
         prompts,
-        CompletionSettings(maxTokens = Some(1_000), n = Some(1))
+        CompletionSettings(
+          maxTokens = Some(1_000),
+          n = Some(1),
+          model = "gpt-35-turbo-16k"
+        )
       )
         |> getAnswerFromCompletion
         |> (_.mapRight(cleanQueryToSearchDocuments))
 
     def cleanQueryToSearchDocuments(query: String): String =
       query.trim()
+// https://gridoai.openai.azure.com/openai/deployments/API/chat/completions?api-version=2022-12-01
+// https://gridoai.openai.azure.com/openai/deployments/API/chat/completions?api-version=2023-03-15-preview
