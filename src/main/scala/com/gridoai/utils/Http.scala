@@ -7,14 +7,11 @@ import collection.convert.ImplicitConversions.`list asScalaBuffer`
 
 def changeUri(
     makeNewURI: ((oldUri: URI) => URI)
-)(request: HttpRequest): HttpRequest = {
-  println("CHANGING THE DAMN REQUEST ----------")
-  println(request)
+)(request: HttpRequest): HttpRequest =
   try {
 
     val oldUri = request.uri()
     val newUri = makeNewURI(oldUri)
-    println("NEW URI: " + newUri)
 
     val newReq = HttpRequest
       .newBuilder(newUri)
@@ -26,13 +23,9 @@ def changeUri(
       .timeout(request.timeout().orElse(null))
       .build()
 
-    print("CHANGED REQUEST: ")
-    println((newReq.uri(), newReq.headers(), newReq.method()))
     newReq
   } catch {
     case e: Exception =>
       println("Error: " + e)
       request
   }
-
-}

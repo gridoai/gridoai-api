@@ -14,13 +14,13 @@ def baseContextPrompt(
     case (false, false, true) =>
       "You're GridoAI, a smart and reliable chatbot that responds contextually. After searching the user's documents for their query, provide a single, intelligent response. You can use information that is not in the documents, but make it clear that you are doing so."
     case (true, true, true) | (false, true, true) =>
-      "You're GridoAI, a smart and reliable chatbot that asks contextually. After searching the user's documents for their query, provide a single, intelligent question to improve your understanding about the user's question. Don't ask for information you should know as a knowledge retrieval chatbot."
+      "You're GridoAI, a smart and reliable chatbot that asks contextually. After searching the user's documents for their query, provide a single, intelligent question to improve your understanding about the user's question. Don't ask for information you should know as a chatbot with access to user documents."
     case (true, false, false) =>
       "You're GridoAI, a smart and reliable chatbot that responds contextually. You have access to the user's documents but you decided to not search in it. Provide a single, intelligent response. Only answer based on the document's information and refuse to answer questions requiring external data."
     case (false, false, false) =>
       "You're GridoAI, a smart and reliable chatbot that responds contextually. You have access to the user's documents but you decided to not search in it. Provide a single, intelligent response. You can use information that is not in the documents, but make it clear that you are doing so."
     case (true, true, false) | (false, true, false) =>
-      "You're GridoAI, a smart and reliable chatbot that asks contextually. You have access to the user's documents but you decided to not search in it. Provide a single, intelligent question to improve your understanding about the user's question. Don't ask for information you should know as a knowledge retrieval chatbot."
+      "You're GridoAI, a smart and reliable chatbot that asks contextually. You have access to the user's documents but you decided to not search in it. Provide a single, intelligent question to improve your understanding about the user's question. Don't ask for information you should know as a chatbot with access to user documents."
 
 def mergeMessages(messages: List[Message]): String =
   messages.map(m => s"${m.from}: ${m.message}").mkString("\n")
@@ -43,9 +43,9 @@ def buildQueryToSearchDocumentsPrompt(
 
   val instruction = lastQuery match
     case None =>
-      "You're a smart and reliable chatbot that builds natural language queries to search information to help answer the user's question. The query will be used for a semantic search in the user's documents. The output MUST BE only the query, nothing more."
+      "You're a smart and reliable chatbot that builds natural language queries to search information to help answer the user's question. The query will be used for a semantic search in the user's documents chunks using embeddings by multilingual-e5-base. The output MUST BE only the query, nothing more."
     case Some(query) =>
-      s"You're a smart and reliable chatbot that builds natural language queries to search information to help answer the user's question. Your last query was \n$query\n and the output documents weren't that helpful. The new query will be used for a semantic search in the user's documents. The output MUST BE only the new query, nothing more."
+      s"You're a smart and reliable chatbot that builds natural language queries to search information to help answer the user's question. Your last query was \n$query\n and the output documents weren't that helpful. The new query will be used for a semantic search in the user's documents chunks using embeddings by multilingual-e5-base. The output MUST BE only the new query, nothing more."
   s"$instruction\n${mergeChunks(lastChunks)}\n${mergeMessages(messages)}\nQuery: "
 
 def chooseActionPrompt(chunks: List[Chunk], messages: List[Message]): String =
