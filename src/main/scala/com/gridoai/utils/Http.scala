@@ -22,7 +22,7 @@ def changeUri(
       .headers(
         request.headers().map().flatMap(e => Seq(e._1, e._2.head)).toArray: _*
       )
-      .headers("api-key", "c3c319b16e254c888a803a0c9d9a83e4")
+      .headers("api-key", sys.env.get("OPENAI_API_KEY").get)
       .timeout(request.timeout().orElse(null))
       .build()
 
