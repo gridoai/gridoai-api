@@ -16,11 +16,11 @@ def baseContextPrompt(
     case (true, true, true) | (false, true, true) =>
       "You're GridoAI, a smart and reliable chatbot that asks contextually. After searching the user's documents for their query, provide a single, intelligent question to improve your understanding about the user's question."
     case (true, false, false) =>
-      "You're GridoAI, a smart and reliable chatbot that responds contextually. Provide a single, intelligent response. Only answer based on the document's information and refuse to answer questions requiring external data."
+      "You're GridoAI, a smart and reliable chatbot that responds contextually. You have access to the user's documents but you decided to not search in it. Provide a single, intelligent response. Only answer based on the document's information and refuse to answer questions requiring external data."
     case (false, false, false) =>
-      "You're GridoAI, a smart and reliable chatbot that responds contextually. Provide a single, intelligent response. You can use information that is not in the documents, but make it clear that you are doing so."
+      "You're GridoAI, a smart and reliable chatbot that responds contextually. You have access to the user's documents but you decided to not search in it. Provide a single, intelligent response. You can use information that is not in the documents, but make it clear that you are doing so."
     case (true, true, false) | (false, true, false) =>
-      "You're GridoAI, a smart and reliable chatbot that asks contextually. Provide a single, intelligent question to improve your understanding about the user's question."
+      "You're GridoAI, a smart and reliable chatbot that asks contextually. You have access to the user's documents but you decided to not search in it. Provide a single, intelligent question to improve your understanding about the user's question."
 
 def mergeMessages(messages: List[Message]): String =
   messages.map(m => s"${m.from}: ${m.message}").mkString("\n")
@@ -43,13 +43,12 @@ def buildQueryToSearchDocumentsPrompt(
 
   val instruction = lastQuery match
     case None =>
-      "You're a smart and reliable chatbot that builds queries to search information to help answer the user's question. The query will be used for a semantic search in the user's documents. The output MUST BE only the query, nothing more."
+      "You're a smart and reliable chatbot that builds natural language queries to search information to help answer the user's question. The query will be used for a semantic search in the user's documents. The output MUST BE only the query, nothing more."
     case Some(query) =>
-      s"You're a smart and reliable chatbot that builds queries to search information to help answer the user's question. The query will be used for a semantic search in the user's documents. Your last query was $query and it didn't work. The output MUST BE only the query, nothing more."
+      s"You're a smart and reliable chatbot that builds natural language queries to search information to help answer the user's question. Your last query was \n$query\n and the output documents weren't that helpful. The new query will be used for a semantic search in the user's documents. The output MUST BE only the new query, nothing more."
   s"$instruction\n${mergeChunks(lastChunks)}\n${mergeMessages(messages)}\nQuery: "
 
 def chooseActionPrompt(chunks: List[Chunk], messages: List[Message]): String =
-  val searchedBefore = chunks.length > 0
 
   val chunksSection = mergeChunks(chunks)
 
@@ -57,13 +56,14 @@ def chooseActionPrompt(chunks: List[Chunk], messages: List[Message]): String =
     "You're a smart and reliable chatbot that chooses an action to help answer the user's question."
 
   val actions = List(
-    "1) Ask (Choose this action if you believe the user can give you the necessary information to answer the question or if the question is unclear)",
-    "2) Answer (Choose this action if you already have enough information to answer the user)",
-    searchedBefore match
+    chunks.length > 0 match
       case false =>
-        "3) Search (choose this action if you believe the user's documents can give you the necessary information to answer the question or if you need more context)"
+        "1) Search (Choose this action if you believe the user's documents give you the necessary information to answer the question or if you need more context)"
       case true =>
-        "3) Search (Choose this action if the current searched documents chunks don't give you the necessary information to answer the question or if you need a different context)"
+        "1) Search again (Choose this action if the documents already searched don't provide the necessary information you need to answer the question, or if you need a different context)"
+    ,
+    "2) Ask (Choose this action if you believe the user can give you the necessary information to answer the question or if the question is unclear)",
+    "3) Answer (Choose this action if you already have enough information to answer the user)"
   ).mkString("\n")
 
   val actionsSection = s"Available actions:\n$actions"
