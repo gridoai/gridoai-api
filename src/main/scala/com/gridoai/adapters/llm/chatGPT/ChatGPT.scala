@@ -5,7 +5,6 @@ import com.gridoai.adapters.llm.*
 import com.gridoai.domain.*
 import com.gridoai.utils.*
 import dev.maxmelnyk.openaiscala.models.text.completions.chat.*
-import dev.maxmelnyk.openaiscala.models.text.completions.*
 import dev.maxmelnyk.openaiscala.client.OpenAIClient
 import sttp.client3.*
 import cats.MonadError
@@ -15,14 +14,10 @@ import com.knuddels.jtokkit.api.ModelType
 
 val ENC_GPT35TURBO = Encodings
   .newDefaultEncodingRegistry()
-  .getEncodingForModel(ModelType.GPT_3_5_TURBO)
-
-val ENC_DAVINCI = Encodings
-  .newDefaultEncodingRegistry()
-  .getEncodingForModel(ModelType.TEXT_DAVINCI_003)
+  .getEncodingForModel(ModelType.GPT_3_5_TURBO_16K)
 
 object ChatGPTClient:
-  val maxInputTokens = 3_000
+  val maxInputTokens = 10_000
 
   def messageFromToRole: MessageFrom => ChatCompletion.Message.Role =
     case MessageFrom.Bot  => ChatCompletion.Message.Role.Assistant
@@ -69,11 +64,6 @@ object ChatGPTClient:
         llmOutput: F[ChatCompletion]
     ): F[Either[String, String]] =
       llmOutput.map(_.choices.head.message.content).map(Right(_)) |> attempt
-
-    def getAnswerFromCompletion(
-        llmOutput: F[Completion]
-    ): F[Either[String, String]] =
-      llmOutput.map(_.choices.head.text).map(Right(_)) |> attempt
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
       calculateTokenQuantity(
@@ -139,7 +129,7 @@ object ChatGPTClient:
         query: Option[String],
         chunks: List[Chunk]
     ): F[Either[String, Action]] =
-      client.createChatCompletion(
+      (
         Seq(
           ChatCompletion.Message(
             role = ChatCompletion.Message.Role.System,
@@ -148,6 +138,7 @@ object ChatGPTClient:
         ),
         ChatCompletionSettings(maxTokens = Some(1), n = Some(1))
       )
+        |> client.createChatCompletion
         |> getAnswerFromChat
         |> (_.map(_.flatMap(strToAction)))
 
@@ -158,15 +149,16 @@ object ChatGPTClient:
     ): F[Either[String, String]] =
       val prompt =
         buildQueryToSearchDocumentsPrompt(messages, lastQuery, lastChunks)
-      client.createChatCompletion(
+      (
         Seq(
           ChatCompletion.Message(
             role = ChatCompletion.Message.Role.System,
             content = prompt
           )
         ),
-        ChatCompletionSettings()
+        ChatCompletionSettings(maxTokens = Some(1_000), n = Some(1))
       )
+        |> client.createChatCompletion
         |> getAnswerFromChat
         |> (_.mapRight(_.trim()))
 
