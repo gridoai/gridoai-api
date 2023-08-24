@@ -30,7 +30,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       lastChunks,
       searchesBeforeResponse
     )
-      !> makeAction(lastQuery, lastChunks, searchesBeforeResponse)
+      !> runAction(lastQuery, lastChunks, searchesBeforeResponse)
 
   def chooseAction(
       lastQuery: Option[String],
@@ -51,7 +51,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
           )
       )
 
-  def makeAction(
+  def runAction(
       lastQuery: Option[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
