@@ -166,8 +166,8 @@ object ChatGPTClient:
     def strToAction(llmOutput: String): Either[String, Action] =
       llmOutput.trim() match
         case "1" => Action.Search.asRight
-        case "2" => Action.Ask.asRight
-        case "3" => Action.Answer.asRight
+        case "2" => Action.Answer.asRight
+        case "3" => Action.Ask.asRight
         case e =>
           println(s"bad action: $e")
           Left("Invalid LLM output")
