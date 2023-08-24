@@ -42,6 +42,7 @@ def askRecursively(auth: AuthData)(
       .chooseAction(messages, lastQuery, lastChunks)
       .flatMapRight:
         case Action.Ask =>
+          println("AI decided to ask...")
           llm
             .ask(lastChunks, basedOnDocsOnly, messages, lastQuery.isDefined)
             .mapRight: question =>
@@ -50,6 +51,7 @@ def askRecursively(auth: AuthData)(
                 sources = lastChunks.map(_.documentName).distinct
               )
         case Action.Answer =>
+          println("AI decided to answer...")
           llm
             .answer(lastChunks, basedOnDocsOnly, messages, lastQuery.isDefined)
             .mapRight: answer =>
@@ -58,9 +60,11 @@ def askRecursively(auth: AuthData)(
                 sources = lastChunks.map(_.documentName).distinct
               )
         case Action.Search =>
+          println("AI decided to search...")
           llm
             .buildQueryToSearchDocuments(messages, lastQuery, lastChunks)
             .flatMapRight: newQuery =>
+              println(s"AI's query: $newQuery")
               searchDoc(auth)(
                 newQuery,
                 llm.maxTokensForChunks(messages, basedOnDocsOnly),

@@ -12,11 +12,14 @@ import cats.MonadError
 import cats.implicits.*
 import com.knuddels.jtokkit.Encodings
 import com.knuddels.jtokkit.api.ModelType
-import dev.maxmelnyk.openaiscala.models.models.Models
 
-val ENC = Encodings
+val ENC_GPT35TURBO = Encodings
   .newDefaultEncodingRegistry()
   .getEncodingForModel(ModelType.GPT_3_5_TURBO)
+
+val ENC_DAVINCI = Encodings
+  .newDefaultEncodingRegistry()
+  .getEncodingForModel(ModelType.TEXT_DAVINCI_003)
 
 object ChatGPTClient:
   val maxInputTokens = 3_000
@@ -47,7 +50,7 @@ object ChatGPTClient:
     val fullSeq = (contextMessage ++ chat).toSeq
     (fullSeq, ChatCompletionSettings())
 
-  def calculateTokenQuantity = ENC.countTokens
+  def calculateTokenQuantity = ENC_GPT35TURBO.countTokens
 
   def calculateMessageTokenQuantity(message: Message): Int =
     calculateTokenQuantity(s"${message.from.toString()}: ${message.message}")
@@ -148,18 +151,23 @@ object ChatGPTClient:
         lastQuery: Option[String],
         lastChunks: List[Chunk]
     ): F[Either[String, String]] =
+      val prompt =
+        buildQueryToSearchDocumentsPrompt(messages, lastQuery, lastChunks)
       client.createCompletion(
-        Seq(buildQueryToSearchDocumentsPrompt(messages, lastQuery, lastChunks)),
-        CompletionSettings(maxTokens = Some(1_000), n = Some(1))
+        Seq(prompt),
+        CompletionSettings(
+          maxTokens = Some(4097 - ENC_DAVINCI.countTokens(prompt)),
+          n = Some(1)
+        )
       )
         |> getAnswerFromCompletion
         |> (_.mapRight(_.trim()))
 
     def strToAction(llmOutput: String): Either[String, Action] =
       llmOutput.trim() match
-        case "1" => Action.Ask.asRight
-        case "2" => Action.Answer.asRight
-        case "3" => Action.Search.asRight
+        case "1" => Action.Search.asRight
+        case "2" => Action.Ask.asRight
+        case "3" => Action.Answer.asRight
         case e =>
           println(s"bad action: $e")
           Left("Invalid LLM output")
