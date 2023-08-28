@@ -30,7 +30,7 @@ def authenticateGDrive(auth: AuthData)(
         redirectUri,
         SCOPES
       )
-      .flatMapRight(ClerkClient.setUserPublicMetadata(auth.userId))
+      .flatMapRight(ClerkClient.setGDriveMetadata(auth.userId))
 
 def fetchUserTokens(auth: AuthData): IO[Either[String, (String, String)]] =
   ClerkClient
@@ -174,7 +174,7 @@ def getGDriveClient(userId: String)(
         println("Trying to refresh token...")
         GoogleClient
           .refreshToken(refreshToken)
-          .flatMapRight(ClerkClient.setUserPublicMetadata(userId))
+          .flatMapRight(ClerkClient.setGDriveMetadata(userId))
           .mapRight((newAccessToken, _) =>
             getFileStorage("gdrive")(newAccessToken)
           )
