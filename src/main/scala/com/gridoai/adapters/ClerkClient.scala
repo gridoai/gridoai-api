@@ -29,6 +29,73 @@ case class UpdateUser(
     public_metadata: PublicMetadata
 )
 
+import io.circe.Codec
+import io.circe.derivation.Configuration
+
+given Configuration = Configuration.default
+  .withDiscriminator("type")
+  .withTransformConstructorNames(_.toLowerCase())
+
+enum Plan:
+  case Free, Starter, Pro, Enterprise
+object Plan:
+  given Codec[Plan] = Codec.AsObject.derivedConfigured
+
+case class OrganizationMetadata(
+    plan: Plan
+)
+case class Organization(
+    `object`: String,
+    id: String,
+    name: String,
+    slug: String,
+    members_count: Int,
+    max_allowed_memberships: Int,
+    admin_delete_enabled: Boolean,
+    public_metadata: OrganizationMetadata,
+    // private_metadata: Any,
+    created_by: String,
+    created_at: Int,
+    updated_at: Int
+)
+case class UserCreatedData(
+    // birthday: String,
+    // created_at: Int,
+    email_addresses: List[EmailAddress],
+    // external_id: String,
+    first_name: String,
+    // gender: String,
+    id: String,
+    // image_url: String,
+    last_name: String
+    // last_sign_in_at: Int,
+    // password_enabled: Boolean,
+    // primary_email_address_id: String,
+    // primary_phone_number_id: String,
+    // primary_web3_wallet_id: String,
+    // profile_image_url: String,
+    // two_factor_enabled: Boolean,
+    // updated_at: Int,
+    // username: String
+)
+
+case class EmailAddress(
+    email_address: String
+    // id: String,
+    // verification: Verification
+)
+
+case class UserCreated(
+    data: UserCreatedData
+)
+
+case class Verification(
+    status: String,
+    strategy: String
+)
+case class UpdateOrganization(
+    public_metadata: OrganizationMetadata
+)
 object ClerkClient:
 
   val Http = HttpClient(CLERK_ENDPOINT)
@@ -50,7 +117,58 @@ object ClerkClient:
         _.public_metadata
       ) |> attempt
 
-  def setUserPublicMetadata(userId: String)(
+  // Update an organization
+  //   PATH PARAMETERS
+  // organization_id
+  // required
+  // string
+  // The ID of the organization to update
+
+  // REQUEST BODY SCHEMA: application/json
+  // required
+  // public_metadata
+  // object
+  // Metadata saved on the organization, that is visible to both your frontend and backend.
+
+  // private_metadata
+  // object
+  // Metadata saved on the organization that is only visible to your backend.
+
+  // name
+  // string or null
+  // The new name of the organization
+
+  // slug
+  // string or null
+  // The new slug of the organization, which needs to be unique in the instance
+
+  // max_allowed_memberships
+  // integer or null
+  // The maximum number of memberships allowed for this organization
+
+  // admin_delete_enabled
+  // boolean or null
+  // If true, an admin can delete this organization with the Frontend API.
+
+  // def updateOrganizationPlan(
+  //     organizationId: String,
+  //     plan: Plan
+  // ): IO[Either[String, Unit]] =
+  //   val body = ??? // UpdateOrganization().asJson.noSpaces
+  //   Http
+  //     .patch(s"/organizations/$organizationId")
+  //     .body(body)
+  //     .header(authHeader)
+  //     .contentType(MediaType.ApplicationJson)
+  //     .sendReq()
+  //     .map(
+  //       _.body.flatMap(
+  //         decode[Organization](_).left.map(_.getMessage())
+  //       )
+  //     )
+  //     .mapRight(_ => ()) |> attempt
+
+  def setGDriveMetadata(userId: String)(
       googleDriveAccessToken: String,
       googleDriveRefreshToken: String
   ): IO[Either[String, (String, String)]] =
