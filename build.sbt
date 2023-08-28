@@ -24,27 +24,26 @@ lazy val root = project
     libraryDependencies += "org.typelevel" %% "cats-core" % "2.9.0",
     libraryDependencies += "org.typelevel" %% "cats-effect" % "3.5.0",
     libraryDependencies += "com.softwaremill.sttp.client3" %% "cats" % "3.8.15",
-    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % "1.5.0",
-    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-core" % "1.5.0",
-    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.5.0",
-    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.5.5",
-    libraryDependencies += "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % "0.4.0",
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % "1.7.3",
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-core" % "1.7.3",
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.7.3",
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.7.3",
+    libraryDependencies += "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % "0.6.0",
     libraryDependencies += "de.killaitis" %% "http4s-cloud-functions" % "0.4.3",
     libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.0.0-M1" % "test",
     libraryDependencies += "org.apache.pdfbox" % "pdfbox" % "2.0.28",
     libraryDependencies += "com.google.auth" % "google-auth-library-oauth2-http" % "1.3.0",
     libraryDependencies += "com.github.jwt-scala" %% "jwt-core" % "9.4.0",
-    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-sttp-stub-server" % "1.5.0" % Test,
+    libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-sttp-stub-server" % "1.7.3" % Test,
     libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.3.0",
     libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-vertx-server-cats" % "1.6.0",
-    libraryDependencies += ("org.scalamock" %% "scalamock" % "5.1.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
+    libraryDependencies += "com.stripe" % "stripe-java" % "23.2.0"
   )
   .enablePlugins(GraalVMNativeImagePlugin)
 
 libraryDependencies ++= Seq(
-  "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.5.0",
-  "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % "0.4.0"
+  "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % "1.7.3",
+  "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml" % "0.6.0"
 )
 libraryDependencies ++= Seq(
   "org.apache.poi" % "poi" % "5.2.0",
