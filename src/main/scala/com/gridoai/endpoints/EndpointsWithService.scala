@@ -10,6 +10,10 @@ object withService:
   def searchDocs(implicit db: DocDB[IO]) =
     searchEndpoint.serverLogic(searchDoc _)
 
+  def webHooksEndpoint =
+    webhooks.serverLogic(
+      com.gridoai.adapters.payments.handleCreateCostumer[IO] _
+    )
   def healthCheck =
     healthCheckEndpoint.serverLogic(_ => IO.pure(Right("OK")))
 
@@ -44,5 +48,6 @@ object withService:
       importGDriveDocs,
       askLLM,
       deleteDoc,
-      listDocs
+      listDocs,
+      webHooksEndpoint
     )

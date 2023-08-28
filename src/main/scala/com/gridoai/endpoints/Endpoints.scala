@@ -15,6 +15,7 @@ import sttp.tapir.server.PartialServerEndpoint
 import java.io.File
 import java.util.UUID
 import com.gridoai.auth.AuthData
+import com.gridoai.adapters.*
 
 type PublicEndpoint[I, E, O, -R] = Endpoint[Unit, I, E, O, R]
 type SecuredEndpoint[I, E, O, -R] =
@@ -36,6 +37,20 @@ val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
     .in(multipartBody[FileUpload])
     .out(jsonBody[List[String]])
     .mapErrorOut(identity)(_.toString())
+
+val webhooks = endpoint
+  .in("webhooks" / "clerk")
+  .in(jsonBody[UserCreated])
+  .in(header[String]("authorization"))
+  .out(stringBody)
+  .errorOut(stringBody)
+
+val webhooksS = endpoint
+  .in("webhooks" / "clerk")
+  .in(jsonBody[UserCreated])
+  .in(header[String]("authorization"))
+  .out(stringBody)
+  .errorOut(stringBody)
 
 val listEndpoint: SecuredEndpoint[(Int, Int), String, PaginatedResponse[
   List[Document]
