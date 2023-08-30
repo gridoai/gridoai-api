@@ -85,3 +85,6 @@ case class HttpClient(endpoint: String):
 
   def patch(path: String) =
     basicRequest.patch(uri"${endpoint + path}")
+
+  def delete(path: String) =
+    basicRequest.delete(uri"${endpoint + path}")

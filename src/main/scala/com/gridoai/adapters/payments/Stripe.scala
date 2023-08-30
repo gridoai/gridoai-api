@@ -11,17 +11,25 @@ import com.stripe.model.Customer
 import com.gridoai.utils.attempt
 import com.stripe.net.ApiResource
 import com.stripe.model.Event
-import com.stripe.model.PaymentIntent
-import com.stripe.model.PaymentMethod
+
 import com.stripe.net.Webhook
 import com.gridoai.adapters.ClerkClient
 import com.stripe.model.Subscription
+import com.stripe.model.StripeObject
+import com.gridoai.domain.Plan
+import cats.effect.IO
+import com.gridoai.utils.flatMapRight
 
-val client = com.stripe.StripeClient(
-  sys.env
-    .get("STRIPE_SECRET_KEY")
-    .getOrElse(throw new Exception("STRIPE_SECRET_KEY not found"))
-)
+val stripeKey = sys.env
+  .get("STRIPE_SECRET_KEY")
+  .getOrElse(throw new Exception("STRIPE_SECRET_KEY not found"))
+val _ = Stripe.apiKey = stripeKey
+val client = com.stripe.StripeClient(stripeKey)
+
+def getPlanById: String => Plan =
+  case "prod_OXYliuLZeUgGCo" => Plan.Starter
+  case "prod_OXYlBswtpMHlF4" => Plan.Pro
+  case _                     => Plan.Free
 
 def createCostumerFromClerkPayload[F[_]](
     payload: UserCreated
@@ -30,10 +38,12 @@ def createCostumerFromClerkPayload[F[_]](
     CustomerCreateParams
       .builder()
       .setEmail(payload.data.email_addresses.head.email_address)
-      .setName(payload.data.first_name + " " + payload.data.last_name)
+      .setName(
+        payload.data.first_name + " " + payload.data.last_name.getOrElse("")
+      )
       .setMetadata(
         new HashMap[String, String]() {
-          put("clerk_id", payload.data.id)
+          put("clerkId", payload.data.id)
         }
       )
       .build()
@@ -49,54 +59,101 @@ def handleCreateCostumer[F[_]](
   sys.env.get("WEBHOOK_KEY") match
     case Some(key) if key == authorization =>
       createCostumerFromClerkPayload(payload)
-        .map(_.toJson())
+        .map(_.toJson)
         .attempt |> attempt
     case _ =>
       "Unauthorized".asLeft.pure[F]
 
-def handleDeletionEvent(orgId: String) =
-  ClerkClient.deleteOrg(orgId)
+def handleCreated(eventObj: StripeObject) =
+  val subscription = eventObj.asInstanceOf[Subscription]
+  println(subscription.getItems.getData.get(0).getPlan.getId)
+  val customer = Customer.retrieve(subscription.getCustomer)
 
-def handleEvent[F[_]](
-    eventRaw: String,
-    sigHeader: String
-)(using F: Sync[F]): F[Either[String, String]] = Sync[F].blocking {
-  println(s"Event from stripe: ${eventRaw}")
-
-  val event = Webhook.constructEvent(
-    eventRaw,
-    sigHeader,
-    sys.env
-      .get("WEBHOOK_KEY")
-      .getOrElse(throw new Exception("WEBHOOK_KEY not found"))
+  val necessaryData = (
+    Option(customer.getEmail),
+    Option(customer.getMetadata.get("clerkId")),
+    Option(customer.getName).getOrElse("User"),
+    Option(subscription.getItems.getData.get(0).getPlan.getId)
   )
 
-  // Deserialize the nested object inside the event
-  val dataObjectDeserializer = event.getDataObjectDeserializer
-  val stripeObject = dataObjectDeserializer.getObject.get
+  necessaryData match
+    case (Some(email), Some(clerkId), (userName), Some(productId)) =>
+      val plan = getPlanById(productId)
 
-  // Move this to separate case if we add other types of events
-  val subscription = stripeObject.asInstanceOf[Subscription]
-  val eventType = event.getType
-  println(s"Event type: ${eventType}")
-  // Handle the event
-  eventType match
+      ClerkClient.createOrg(clerkId, s"${userName} Org", plan)
+    case _ => IO(Left(s"Missing data: ${necessaryData}"))
 
-    case "customer.subscription.created" =>
-      subscription.getItems().getData().get(0)
-      "???"
-    case "customer.subscription.deleted" =>
-      "???"
-    case "customer.subscription.updated" =>
-      "???"
-    // Then define and call a method to handle the successful attachment of a PaymentMethod.
-    // handlePaymentMethodAttached(paymentMethod);
+def handleUpdated(eventObj: StripeObject) =
+  val subscription = eventObj.asInstanceOf[Subscription]
+  val customer = Customer.retrieve(subscription.getCustomer)
 
-    // ... handle other event types
-    case _ =>
-      System.out.println("Unhandled event type: " + event.getType)
-      "???"
+  val necessaryData = (
+    Option(customer.getEmail),
+    Option(customer.getMetadata.get("clerkId")),
+    Option(subscription.getItems().getData().get(0).getId())
+  )
 
-  // val event = ApiResource.GSON.fromJson(eventRaw, classOf[Event])
-  // val dataObjectDeserializer = event.getDataObjectDeserializer()
-}.attempt |> attempt
+  necessaryData match
+    case (Some(email), Some(clerkId), Some(productId)) =>
+      val plan = getPlanById(productId)
+
+      ClerkClient
+        .listMembershipsOfUser(clerkId)
+        .flatMapRight(
+          _.data
+            .find(_.organization.created_by === clerkId)
+            .map(_.organization.id)
+            .map(ClerkClient.updateOrganizationPlan(_, plan))
+            .getOrElse(IO(Left("No org found")))
+        )
+    case _ => IO(Left(s"Missing data: ${necessaryData}"))
+
+def handleDeleted(
+    eventObj: StripeObject
+) = {
+  val subscription = eventObj.asInstanceOf[Subscription]
+  val customer = Customer.retrieve(subscription.getCustomer)
+  Option(customer.getMetadata.get("clerkId")) match
+    case Some(clerkId) =>
+      ClerkClient
+        .listMembershipsOfUser(clerkId)
+        .flatMapRight(
+          _.data
+            .find(_.organization.created_by === clerkId)
+            .map(_.organization.id)
+            .map(ClerkClient.deleteOrg)
+            .getOrElse(IO(Left("No org found")))
+        )
+    case None =>
+      IO(Left(s"Missing clerkId"))
+
+}
+
+def handleEvent(
+    eventRaw: String,
+    sigHeader: String
+) = Sync[IO]
+  .blocking {
+    val event1 = Webhook.constructEvent(
+      eventRaw,
+      sigHeader,
+      sys.env
+        .get("WEBHOOK_KEY")
+        .getOrElse(throw new Exception("WEBHOOK_KEY not found"))
+    )
+    println(event1.toJson())
+    val event = ApiResource.GSON.fromJson(eventRaw, classOf[Event])
+    val dataObjectDeserializer = event.getDataObjectDeserializer
+    val stripeObject = dataObjectDeserializer.getObject.get
+
+    val eventType = event.getType
+    println(s"Event type: ${eventType}")
+    eventType match
+      case "customer.subscription.created" => handleCreated(stripeObject)
+      case "customer.subscription.deleted" => handleDeleted(stripeObject)
+      case "customer.subscription.updated" => handleUpdated(stripeObject)
+      case _ => IO(Left("Unhandled event type: " + event.getType))
+  }
+  .flatten
+  .attemptTap(IO.println)
+  .flatMapRight(_ => IO(Right("OK")))

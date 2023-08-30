@@ -11,9 +11,15 @@ object withService:
     searchEndpoint.serverLogic(searchDoc _)
 
   def webHooksEndpoint =
-    webhooks.serverLogic(
+    webhooksClerk.serverLogic(
       com.gridoai.adapters.payments.handleCreateCostumer[IO] _
     )
+
+  def webHooksStripeEndpoint =
+    webhooksStripe.serverLogic(
+      com.gridoai.adapters.payments.handleEvent _
+    )
+
   def healthCheck =
     healthCheckEndpoint.serverLogic(_ => IO.pure(Right("OK")))
 
@@ -49,5 +55,6 @@ object withService:
       askLLM,
       deleteDoc,
       listDocs,
-      webHooksEndpoint
+      webHooksEndpoint,
+      webHooksStripeEndpoint
     )
