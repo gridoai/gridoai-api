@@ -3,6 +3,18 @@ import io.circe._
 import io.circe.generic.semiauto._
 import scala.util.Try
 import java.util.UUID
+import io.circe.Codec
+import io.circe.derivation.Configuration
+
+given Configuration = Configuration.default
+  .withDiscriminator("type")
+  .withTransformConstructorNames(_.toLowerCase())
+
+enum Plan:
+  case Free, Starter, Pro, Enterprise
+
+object Plan:
+  given Codec[Plan] = Codec.AsObject.derivedConfigured
 
 type UID = UUID
 
