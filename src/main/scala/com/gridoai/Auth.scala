@@ -5,6 +5,7 @@ import io.circe.syntax._
 import java.time.Clock
 import pdi.jwt.{Jwt, JwtAlgorithm}
 import com.gridoai.utils.trace
+import com.gridoai.domain.Plan
 
 implicit val clock: Clock = Clock.systemUTC
 case class JWTPayload(
@@ -13,13 +14,16 @@ case class JWTPayload(
     orgId: Option[String],
     role: Option[String],
     sid: String,
-    sub: String
+    sub: String,
+    orgPlan: Option[Plan],
+    userPlan: Option[Plan]
 )
 
 case class AuthData(
     orgId: String,
     role: String,
-    userId: String
+    userId: String,
+    plan: Plan
 )
 
 val mockedJwt =
@@ -29,7 +33,9 @@ val mockedJwt =
     Some("org1"),
     Some("admin"),
     "session_blablablabl",
-    "user_blablablabla"
+    "user_blablablabla",
+    None,
+    Some(Plan.Enterprise)
   )
 
 def makeMockedToken =
@@ -50,7 +56,12 @@ val getOrgIdAndRolesFromJwt = (jwt: JWTPayload) =>
 
 val getAuthDataFromJwt = (jwt: JWTPayload) =>
   val (orgId, role) = getOrgIdAndRolesFromJwt(jwt)
-  AuthData(orgId, role, jwt.sub)
+  AuthData(
+    orgId,
+    role,
+    jwt.sub,
+    jwt.userPlan.orElse(jwt.orgPlan).getOrElse(Plan.Free)
+  )
 
 def limitRole[A](role: String, error: A)(resource: => A) =
   role match
