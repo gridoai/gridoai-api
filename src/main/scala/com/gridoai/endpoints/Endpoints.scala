@@ -38,17 +38,17 @@ val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
     .out(jsonBody[List[String]])
     .mapErrorOut(identity)(_.toString())
 
-val webhooks = endpoint
+val webhooksClerk = endpoint
   .in("webhooks" / "clerk")
   .in(jsonBody[UserCreated])
   .in(header[String]("authorization"))
   .out(stringBody)
   .errorOut(stringBody)
 
-val webhooksS = endpoint
-  .in("webhooks" / "clerk")
-  .in(jsonBody[UserCreated])
-  .in(header[String]("authorization"))
+val webhooksStripe = endpoint
+  .in("webhooks" / "stripe")
+  .in(stringBody)
+  .in(header[String]("Stripe-Signature"))
   .out(stringBody)
   .errorOut(stringBody)
 
