@@ -14,5 +14,7 @@ def fallbackEitherM[I, O, E, F[_]: Monad](
     f2: I => F[Either[E, O]]
 )(i: I) =
   f1(i).flatMap:
-    case Left(_) => f2(i)
-    case x       => x.pure[F]
+    case Left(e) =>
+      println(s"First function call failed, trying fallback. Error: $e")
+      f2(i)
+    case x => x.pure[F]

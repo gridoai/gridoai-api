@@ -55,10 +55,9 @@ object EmbaasClient:
         instruction: String
     ): IO[Either[String, List[Embedding]]] =
       println(s"Trying to get ${texts.length} embeddings using Embaas")
-      executeByParts(embedLessThan256(instruction), 256)(texts)
-        .timeoutTo(20.seconds, IO.pure(Left("Embaas API Timeout")))
+      executeByParts(embedLessThan200(instruction), 200)(texts)
 
-    def embedLessThan256(instruction: String)(
+    def embedLessThan200(instruction: String)(
         texts: List[String]
     ): IO[Either[String, List[Embedding]]] =
       val request = EmbeddingRequest(texts, instruction)
@@ -70,7 +69,9 @@ object EmbaasClient:
         .sendReq(retries = 4, retryDelay = 1.seconds)
         .map(
           _.body.flatMap(decode[EmbeddingResponse](_))
-        ) |> attempt
+        )
+        .timeoutTo(20.seconds, IO.pure(Left("Embaas API Timeout")))
+        |> attempt
       response.map:
         case Right(r) =>
           r.data
