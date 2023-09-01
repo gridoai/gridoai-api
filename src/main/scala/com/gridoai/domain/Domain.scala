@@ -3,18 +3,14 @@ import io.circe._
 import io.circe.generic.semiauto._
 import scala.util.Try
 import java.util.UUID
-import io.circe.Codec
-import io.circe.derivation.Configuration
-
-given Configuration = Configuration.default
-  .withDiscriminator("type")
-  .withTransformConstructorNames(_.toLowerCase())
-
-enum Plan:
-  case Free, Starter, Pro, Enterprise
+import io.circe.derivation.{Configuration, ConfiguredEnumCodec}
 
 object Plan:
-  given Codec[Plan] = Codec.AsObject.derivedConfigured
+  given Configuration =
+    Configuration.default.withTransformConstructorNames(_.toLowerCase)
+
+enum Plan derives ConfiguredEnumCodec:
+  case Free, Starter, Pro, Enterprise
 
 type UID = UUID
 
