@@ -54,6 +54,7 @@ def makeChunks(document: Document): List[Chunk] =
 def getChunks(
     calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int,
+    scope: Option[List[UID]],
     orgId: String,
     role: String,
     pageSize: Int = 100
@@ -63,29 +64,33 @@ def getChunks(
 
   def getChunksRecursively(
       offset: Int,
-      acc: List[SimilarChunk],
+      selectedChunks: List[SimilarChunk],
       totalTokens: Int
   ): IO[Either[String, List[SimilarChunk]]] =
-    if (totalTokens == tokenLimit) IO.pure(Right(acc))
+    if (totalTokens == tokenLimit) selectedChunks.asRight.pure[IO]
     else if (totalTokens > tokenLimit)
-      IO.pure(
-        Right(filterExcessTokens(acc, calculateChunkTokenQuantity, tokenLimit))
-      )
+      filterExcessTokens(
+        selectedChunks,
+        calculateChunkTokenQuantity,
+        tokenLimit
+      ).asRight.pure[IO]
     else
-      db.getNearChunks(vec, offset, pageSize, orgId, role)
+      db.getNearChunks(vec, scope, offset, pageSize, orgId, role)
         .flatMapRight:
           case Nil =>
-            IO.pure(Right(acc))
+            IO.pure(Right(selectedChunks))
           case chunks =>
             println(
               s"getChunks: offset:$offset pageSize:$pageSize totalTokens:$totalTokens tokenLimit:$tokenLimit"
             )
-            val newTotalTokens = chunks
-              .map(chunk => calculateChunkTokenQuantity(chunk.chunk))
-              .sum + totalTokens
+            val newSelectedChunks = selectedChunks ++ chunks
+            val newTotalTokens = mergeChunks(newSelectedChunks)
+              .map(_.chunk)
+              .map(calculateChunkTokenQuantity)
+              .sum
             getChunksRecursively(
               offset + pageSize,
-              acc ++ chunks,
+              newSelectedChunks,
               newTotalTokens
             )
 
@@ -114,19 +119,25 @@ def filterExcessTokens(
   def loop(
       remainingChunks: List[SimilarChunk],
       totalTokens: Int,
-      acc: List[SimilarChunk]
+      selectedChunks: List[SimilarChunk]
   ): List[SimilarChunk] =
     remainingChunks match
-      case head :: tail
-          if totalTokens + calculateChunkTokenQuantity(
-            head.chunk
-          ) <= tokenLimit =>
-        loop(
-          tail,
-          totalTokens + calculateChunkTokenQuantity(head.chunk),
-          head :: acc
-        )
-      case _ =>
-        acc.reverse
+      case currentChunk :: newRemainingChunks =>
+        val newSelectedChunks = mergeChunks(selectedChunks :+ currentChunk)
+        val newTotalTokens = newSelectedChunks
+          .map(_.chunk)
+          .map(calculateChunkTokenQuantity)
+          .sum
+        if newTotalTokens > tokenLimit then selectedChunks
+        else
+          loop(
+            newRemainingChunks,
+            newTotalTokens,
+            newSelectedChunks
+          )
+      case Nil => selectedChunks
 
   loop(chunks, 0, List.empty)
+
+def mergeChunks(chunks: List[SimilarChunk]): List[SimilarChunk] =
+  chunks

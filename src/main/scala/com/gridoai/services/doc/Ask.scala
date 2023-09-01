@@ -118,9 +118,13 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       .flatMapRight: newQuery =>
         println(s"AI's query: $newQuery")
         searchDoc(auth)(
-          newQuery,
-          llm.maxTokensForChunks(payload.messages, payload.basedOnDocsOnly),
-          llmModel |> llmToStr
+          SearchPayload(
+            query = newQuery,
+            tokenLimit =
+              llm.maxTokensForChunks(payload.messages, payload.basedOnDocsOnly),
+            llmName = llmModel |> llmToStr,
+            scope = payload.scope
+          )
         )
           .flatMapRight(
             askRecursively(

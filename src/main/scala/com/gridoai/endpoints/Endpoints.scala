@@ -56,17 +56,15 @@ val deleteEndpoint: SecuredEndpoint[String, String, Unit, Any] =
     .in(path[String]("id"))
     .out(emptyOutput)
 
-val searchEndpoint
-    : SecuredEndpoint[(String, Int, String), String, List[Chunk], Any] =
+val searchEndpoint: SecuredEndpoint[SearchPayload, String, List[
+  Chunk
+], Any] =
   auth.securedWithBearer
     .name("Search")
     .description("Search for documents in the knowledge base")
+    .post
     .in("search")
-    .in(query[String]("query"))
-    .in(query[Int]("tokenLimit"))
-    .in(
-      query[Option[String]]("llmName").map(_.getOrElse("Gpt35Turbo"))(Some(_))
-    )
+    .in(jsonBody[SearchPayload])
     .out(jsonBody[List[Chunk]])
 
 val healthCheckEndpoint: PublicEndpoint[Unit, Unit, String, Any] =

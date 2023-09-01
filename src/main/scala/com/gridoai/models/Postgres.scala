@@ -246,6 +246,7 @@ object PostgresClient {
 
     def getNearChunks(
         embedding: Embedding,
+        scope: Option[List[UID]],
         offset: Int,
         limit: Int,
         orgId: String,
@@ -254,7 +255,8 @@ object PostgresClient {
       traceMappable("getNearDocuments"):
         println("Getting near docs ")
         val vector = PGvector(embedding.vector.toArray)
-        val query =
+
+        val BaseQuery =
           sql"""select
             uid,
             document_uid,
@@ -266,11 +268,19 @@ object PostgresClient {
           from $chunksTable
           where
             document_organization = $orgId and
-            embedding_model = ${embedding.model}::$EmbeddingModelEnum
+            embedding_model = ${embedding.model}::$EmbeddingModelEnum"""
+
+        val scopeFilter = scope.flatMap(_.toNel) match
+          case Some(uids) =>
+            fr"and ${Fragments.in(fr"document_uid", uids)}"
+          case _ => fr""
+
+        val queryPagination = sql"""
           order by distance asc
           offset $offset
           limit $limit"""
-        query
+
+        (BaseQuery ++ scopeFilter ++ queryPagination)
           .query[NearChunkOutput]
           .to[List]
           .transact[F](xa)

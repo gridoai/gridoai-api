@@ -86,7 +86,18 @@ case class DocumentCreationPayload(
 
 case class Message(from: MessageFrom, message: String)
 
-case class AskPayload(messages: List[Message], basedOnDocsOnly: Boolean)
+case class AskPayload(
+    messages: List[Message],
+    basedOnDocsOnly: Boolean,
+    scope: Option[List[UID]]
+)
+
+case class SearchPayload(
+    query: String,
+    tokenLimit: Int,
+    llmName: String,
+    scope: Option[List[UID]]
+)
 
 case class AskResponse(message: String, sources: List[String])
 

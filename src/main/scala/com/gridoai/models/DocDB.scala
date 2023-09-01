@@ -47,6 +47,7 @@ trait DocDB[F[_]]:
 
   def getNearChunks(
       embedding: Embedding,
+      scope: Option[List[UID]],
       offset: Int,
       limit: Int,
       orgId: String,
