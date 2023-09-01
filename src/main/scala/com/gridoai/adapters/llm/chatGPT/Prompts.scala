@@ -26,14 +26,15 @@ def baseContextPrompt(
 def mergeMessages(messages: List[Message]): String =
   messages.map(m => s"${m.from}: ${m.message}").mkString("\n")
 
+def chunkToStr(chunk: Chunk): String =
+  s"chunk retrieved from: ${chunk.documentName}\nposition of the first chunk word in original document: ${chunk.startPos}\nposition of the last chunk word in the original document: ${chunk.endPos}\nchunk content: ${chunk.content}\n\n"
+
 def mergeChunks(chunks: List[Chunk]): String =
   if chunks.length > 0 then
     val mergedChunks = chunks
-      .map(chunk =>
-        s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
-      )
+      .map(chunkToStr)
       .mkString("\n")
-    s"Retrieved user's documents chunks:\n$mergedChunks"
+    s"Retrieved user's doc chunks:\n$mergedChunks"
   else ""
 
 def buildQueryToSearchDocumentsPrompt(

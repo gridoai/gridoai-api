@@ -66,9 +66,7 @@ object ChatGPTClient:
       llmOutput.map(_.choices.head.message.content).map(Right(_)) |> attempt
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
-      calculateTokenQuantity(
-        s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
-      )
+      chunk |> chunkToStr |> calculateTokenQuantity
 
     def maxTokensForChunks(
         messages: List[Message],
