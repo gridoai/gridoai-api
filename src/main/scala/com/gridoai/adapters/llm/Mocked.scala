@@ -19,7 +19,7 @@ class MockLLM[F[_]: Applicative] extends LLM[F]:
       chunks: List[Chunk],
       options: List[Action]
   ): F[Either[String, Action]] =
-    Action.Search.asRight.pure[F]
+    options.head.asRight.pure[F]
 
   def answer(
       chunks: List[Chunk],
