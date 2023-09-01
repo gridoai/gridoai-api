@@ -54,13 +54,13 @@ def optionPrompt(anyChunk: Boolean)(action: Action): String =
     case Action.Search =>
       anyChunk match
         case false =>
-          "1) Search (Choose this action if you believe the user's documents can give you the necessary information to answer the question or if you need more context. Searching is always a good idea.)"
+          "Search (Choose this action if you believe the user's documents can give you the necessary information to answer the question or if you need more context. Searching is always a good idea.)"
         case true =>
-          "1) Search again (Choose this action if the documents already searched don't provide the necessary information you need to answer the question, or if you need a different context)"
+          "Search again (Choose this action if the documents already searched don't provide the necessary information you need to answer the question, or if you need a different context)"
     case Action.Answer =>
-      "2) Answer (Choose this action if you already have enough information to answer the user)"
+      "Answer (Choose this action if you already have enough information to answer the user)"
     case Action.Ask =>
-      "3) Ask (Choose this action if you believe you need the user to clarify the issue for you)"
+      "Ask (Choose this action if you believe you need the user to clarify the issue for you)"
 
 def chooseActionPrompt(
     chunks: List[Chunk],
