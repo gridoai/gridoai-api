@@ -60,7 +60,15 @@ class API extends CatsEffectSuite {
   }
   test("Can't search documents without auth") {
     val responseWithoutAuth = basicRequest
-      .get(uri"http://test.com/search?query=foo&tokenLimit=1000")
+      .post(uri"http://test.com/search")
+      .body(
+        SearchPayload(
+          query = "foo",
+          tokenLimit = 1000,
+          llmName = "Gpt35Turbo",
+          scope = None
+        ).asJson.toString
+      )
       .send(serverStubOf(withService.searchDocs))
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
@@ -85,8 +93,16 @@ class API extends CatsEffectSuite {
   test("Searches for a chunk") {
 
     val authenticatedRequest = basicRequest
-      .get(uri"http://test.com/search?query=foo&tokenLimit=1000")
+      .post(uri"http://test.com/search")
       .headers(authHeader)
+      .body(
+        SearchPayload(
+          query = "foo",
+          tokenLimit = 1000,
+          llmName = "Gpt35Turbo",
+          scope = None
+        ).asJson.toString
+      )
       .send(serverStubOf(withService.searchDocs))
       .trace("Searches chunks")
       .map(_.body flatMap decode[List[Chunk]])
@@ -111,7 +127,8 @@ class API extends CatsEffectSuite {
       .body(
         AskPayload(
           messages = List(Message(from = MessageFrom.User, message = "Hi")),
-          basedOnDocsOnly = true
+          basedOnDocsOnly = true,
+          scope = None
         ).asJson.toString
       )
       .send(backendStub)

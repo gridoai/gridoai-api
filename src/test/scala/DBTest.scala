@@ -81,7 +81,7 @@ class DocumentModel extends CatsEffectSuite {
   test("Get near chunks") {
     for
       maybeChunks <-
-        DocsDB.getNearChunks(mockEmbedding, 0, 10, "org1", "member")
+        DocsDB.getNearChunks(mockEmbedding, None, 0, 10, "org1", "member")
       _ <- IO.println(maybeChunks)
       _ = assert(maybeChunks.isRight)
       chunks = maybeChunks.getOrElse(List.empty)
