@@ -57,7 +57,9 @@ case class Chunk(
     documentSource: Source,
     uid: UID,
     content: String,
-    tokenQuantity: Int
+    tokenQuantity: Int,
+    startPos: Int,
+    endPos: Int
 )
 
 case class Embedding(vector: List[Float], model: EmbeddingModel)
