@@ -2,6 +2,7 @@ package com.gridoai.adapters.llm.chatGPT
 
 import com.gridoai.domain.Chunk
 import com.gridoai.domain.Message
+import com.gridoai.domain.Action
 
 def baseContextPrompt(
     basedOnDocsOnly: Boolean,
@@ -48,28 +49,43 @@ def buildQueryToSearchDocumentsPrompt(
       s"You're a smart and reliable chatbot that builds natural language queries to search information to help answer the user's question. Your last query was \n$query\n and the output documents weren't that helpful. The new query will be used for a semantic search in the user's documents chunks using embeddings by multilingual-e5-base. The output MUST BE only the new query, nothing more."
   s"$instruction\n${mergeChunks(lastChunks)}\n${mergeMessages(messages)}\nQuery: "
 
-def chooseActionPrompt(chunks: List[Chunk], messages: List[Message]): String =
+def optionPrompt(anyChunk: Boolean)(action: Action): String =
+  action match
+    case Action.Search =>
+      anyChunk match
+        case false =>
+          "1) Search (Choose this action if you believe the user's documents can give you the necessary information to answer the question or if you need more context. Searching is always a good idea.)"
+        case true =>
+          "1) Search again (Choose this action if the documents already searched don't provide the necessary information you need to answer the question, or if you need a different context)"
+    case Action.Answer =>
+      "2) Answer (Choose this action if you already have enough information to answer the user)"
+    case Action.Ask =>
+      "3) Ask (Choose this action if you believe you need the user to clarify the issue for you)"
+
+def chooseActionPrompt(
+    chunks: List[Chunk],
+    messages: List[Message],
+    options: List[Action]
+): String =
 
   val chunksSection = mergeChunks(chunks)
 
   val header =
     "You're a smart and reliable chatbot that chooses an action to help answer the user's question. \"My documents\" is what the user will call all the documents you have access to."
 
-  val actions = List(
-    chunks.length > 0 match
-      case false =>
-        "1) Search (Choose this action if you believe the user's documents can give you the necessary information to answer the question or if you need more context. Searching is always a good idea.)"
-      case true =>
-        "1) Search again (Choose this action if the documents already searched don't provide the necessary information you need to answer the question, or if you need a different context)"
-    ,
-    "2) Answer (Choose this action if you already have enough information to answer the user)",
-    "3) Ask (Choose this action if you believe you need the user to clarify the issue for you)"
-  ).mkString("\n")
+  val actions = options
+    .map(optionPrompt(chunks.length > 0))
+    .zipWithIndex
+    .map: (str, idx) =>
+      s"${idx + 1}) $str"
+    .mkString("\n")
 
   val actionsSection = s"Available actions:\n$actions"
 
+  val numbers =
+    s"${(1 to (actions.length - 1)).toList.mkString(", ")}, or ${actions.length}"
   val footer =
-    "The output MUST BE only the action number (1, 2, or 3), nothing more."
+    s"The output MUST BE only the action number ($numbers), nothing more."
 
   val mergedMessages = mergeMessages(messages)
 

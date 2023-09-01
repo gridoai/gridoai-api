@@ -164,7 +164,8 @@ object Paml2Client extends LLM[IO]:
   def chooseAction(
       messages: List[Message],
       query: Option[String],
-      chunks: List[Chunk]
+      chunks: List[Chunk],
+      options: List[Action]
   ): IO[Either[String, Action]] =
     Action.Search.asRight.pure[IO]
 
