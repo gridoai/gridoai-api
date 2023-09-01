@@ -18,13 +18,16 @@ import com.stripe.model.Subscription
 import com.stripe.model.StripeObject
 import com.gridoai.domain.Plan
 import cats.effect.IO
-import com.gridoai.utils.flatMapRight
+import com.gridoai.utils.*
+import cats.data.EitherT
 
 val stripeKey = sys.env
   .get("STRIPE_SECRET_KEY")
   .getOrElse(throw new Exception("STRIPE_SECRET_KEY not found"))
-val _ = Stripe.apiKey = stripeKey
-val client = com.stripe.StripeClient(stripeKey)
+
+val client =
+  Stripe.apiKey = stripeKey
+  com.stripe.StripeClient(stripeKey)
 
 def getPlanById: String => Plan =
   case "prod_OXYliuLZeUgGCo" => Plan.Starter
@@ -71,41 +74,54 @@ def handleCreated(eventObj: StripeObject) =
 
   val necessaryData = (
     Option(customer.getEmail),
-    Option(customer.getMetadata.get("clerkId")),
-    Option(customer.getName).getOrElse("User"),
-    Option(subscription.getItems.getData.get(0).getPlan.getId)
+    Option(customer.getName).flatMap(_.split(" ").headOption).getOrElse("User"),
+    Option(subscription.getItems.getData.get(0).getPlan.getProduct)
   )
 
   necessaryData match
-    case (Some(email), Some(clerkId), (userName), Some(productId)) =>
+    case (Some(email), (userName), Some(productId)) =>
       val plan = getPlanById(productId)
-
-      ClerkClient.createOrg(clerkId, s"${userName} Org", plan)
+      ClerkClient
+        .listUsers(email)
+        .mapRight(_.head.id)
+        .flatMapRight(ClerkClient.createOrg(s"${userName} Org", plan))
     case _ => IO(Left(s"Missing data: ${necessaryData}"))
+
+def getUserOrgByEmail(email: String) =
+  (for
+    users <- EitherT(ClerkClient.listUsers(email))
+    uid <- EitherT.fromOption(users.headOption, "No user found").map(_.id)
+    memberships <- EitherT(ClerkClient.listMembershipsOfUser(uid))
+    orgOpt = memberships.data
+      .find(_.organization.created_by === uid)
+    org <- EitherT.fromOption(orgOpt, "No org found")
+  yield org.organization.id).value
+
+def cancelSubscriptionByEmail(email: String) =
+  getUserOrgByEmail(email).flatMapRight(ClerkClient.deleteOrg)
 
 def handleUpdated(eventObj: StripeObject) =
   val subscription = eventObj.asInstanceOf[Subscription]
   val customer = Customer.retrieve(subscription.getCustomer)
 
   val necessaryData = (
+    Option(subscription.getCancelAt()),
     Option(customer.getEmail),
-    Option(customer.getMetadata.get("clerkId")),
-    Option(subscription.getItems().getData().get(0).getId())
+    Option(subscription.getItems.getData.get(0).getPlan.getProduct)
   )
 
   necessaryData match
-    case (Some(email), Some(clerkId), Some(productId)) =>
+    case (None, Some(email), Some(productId)) =>
       val plan = getPlanById(productId)
-
-      ClerkClient
-        .listMembershipsOfUser(clerkId)
+      getUserOrgByEmail(email)
         .flatMapRight(
-          _.data
-            .find(_.organization.created_by === clerkId)
-            .map(_.organization.id)
-            .map(ClerkClient.updateOrganizationPlan(_, plan))
-            .getOrElse(IO(Left("No org found")))
+          ClerkClient.updateOrganizationPlan(
+            _,
+            plan
+          )
         )
+    case (Some(_), Some(email), _) =>
+      cancelSubscriptionByEmail(email).mapRight(_ => ())
     case _ => IO(Left(s"Missing data: ${necessaryData}"))
 
 def handleDeleted(
@@ -113,19 +129,10 @@ def handleDeleted(
 ) = {
   val subscription = eventObj.asInstanceOf[Subscription]
   val customer = Customer.retrieve(subscription.getCustomer)
-  Option(customer.getMetadata.get("clerkId")) match
-    case Some(clerkId) =>
-      ClerkClient
-        .listMembershipsOfUser(clerkId)
-        .flatMapRight(
-          _.data
-            .find(_.organization.created_by === clerkId)
-            .map(_.organization.id)
-            .map(ClerkClient.deleteOrg)
-            .getOrElse(IO(Left("No org found")))
-        )
-    case None =>
-      IO(Left(s"Missing clerkId"))
+
+  Option(customer.getEmail) match
+    case Some(email) => cancelSubscriptionByEmail(email)
+    case _           => IO(Left(s"Missing data: ${customer}"))
 
 }
 
@@ -134,19 +141,24 @@ def handleEvent(
     sigHeader: String
 ) = Sync[IO]
   .blocking {
-    val event1 = Webhook.constructEvent(
-      eventRaw,
-      sigHeader,
-      sys.env
-        .get("WEBHOOK_KEY")
-        .getOrElse(throw new Exception("WEBHOOK_KEY not found"))
-    )
-    println(event1.toJson())
+    // val event1 = Webhook.constructEvent(
+    //   eventRaw,
+    //   sigHeader,
+    //   sys.env
+    //     .get("WEBHOOK_KEY")
+    //     .getOrElse(throw new Exception("WEBHOOK_KEY not found"))
+    // )
+    // println(event1.toJson())
+    // Append to file
     val event = ApiResource.GSON.fromJson(eventRaw, classOf[Event])
     val dataObjectDeserializer = event.getDataObjectDeserializer
     val stripeObject = dataObjectDeserializer.getObject.get
 
     val eventType = event.getType
+    val file = new java.io.File(eventType + event.getCreated() + ".json")
+    val bw = new java.io.BufferedWriter(new java.io.FileWriter(file, true))
+    bw.write(eventRaw)
+    bw.close()
     println(s"Event type: ${eventType}")
     eventType match
       case "customer.subscription.created" => handleCreated(stripeObject)
