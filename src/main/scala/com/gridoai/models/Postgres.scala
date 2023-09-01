@@ -47,6 +47,8 @@ case class ChunkRow(
     document_name: String,
     document_source: String,
     content: String,
+    start_pos: Int,
+    end_pos: Int,
     embedding: List[Float],
     embedding_model: EmbeddingModel,
     token_quantity: Int,
@@ -62,6 +64,8 @@ extension (x: ChunkWithEmbedding)
       document_name = x.chunk.documentName,
       document_source = x.chunk.documentSource.toString,
       content = x.chunk.content,
+      start_pos = x.chunk.startPos,
+      end_pos = x.chunk.endPos,
       embedding = x.embedding.vector,
       embedding_model = x.embedding.model,
       token_quantity = x.chunk.tokenQuantity,
@@ -75,6 +79,8 @@ case class NearChunkOutput(
     document_name: String,
     document_source: String,
     content: String,
+    start_pos: Int,
+    end_pos: Int,
     token_quantity: Int,
     distance: Float
 )
@@ -90,7 +96,9 @@ extension (x: NearChunkOutput)
             documentSource = s,
             uid = x.uid,
             content = x.content,
-            tokenQuantity = x.token_quantity
+            tokenQuantity = x.token_quantity,
+            startPos = x.start_pos,
+            endPos = x.end_pos
           ),
           distance = x.distance
         )
@@ -167,13 +175,15 @@ object PostgresClient {
                   document_name,
                   document_source,
                   content,
+                  start_pos,
+                  end_pos,
                   embedding,
                   embedding_model,
                   token_quantity,
                   document_organization,
                   document_roles
                 ) values (
-                  ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
+                  ?, ?, ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
                 )"""
             ).updateMany(chunkRows)
           yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
@@ -263,6 +273,8 @@ object PostgresClient {
             document_name,
             document_source,
             content,
+            start_pos,
+            end_pos,
             token_quantity,
             embedding <=> $vector::vector as distance
           from $chunksTable
