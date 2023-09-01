@@ -66,89 +66,51 @@ def getChunks(
 
   def getChunksRecursively(
       offset: Int,
-      selectedChunks: List[SimilarChunk],
-      totalTokens: Int
-  ): IO[Either[String, List[SimilarChunk]]] =
-    if (totalTokens == tokenLimit) selectedChunks.asRight.pure[IO]
-    else if (totalTokens > tokenLimit)
-      filterExcessTokens(
-        selectedChunks,
-        calculateChunkTokenQuantity,
-        tokenLimit
-      ).asRight.pure[IO]
-    else
-      db.getNearChunks(vec, scope, offset, pageSize, orgId, role)
-        .flatMapRight:
-          case Nil =>
-            IO.pure(Right(selectedChunks))
-          case chunks =>
-            println(
-              s"getChunks: offset:$offset pageSize:$pageSize totalTokens:$totalTokens tokenLimit:$tokenLimit"
-            )
-            val newSelectedChunks = mergeNewChunksToList(selectedChunks, chunks)
-            val newTotalTokens = newSelectedChunks
-              .map(_.chunk)
-              .map(calculateChunkTokenQuantity)
-              .sum
-            getChunksRecursively(
-              offset + pageSize,
-              newSelectedChunks,
-              newTotalTokens
-            )
-
-  getChunksRecursively(0, List.empty, 0)
-
-/** This function filters out excess tokens from a list of chunks, starting from
-  * the end of the list.
-  *
-  * @param chunks
-  *   A list of chunks from which excess tokens need to be removed.
-  * @param calculateChunkTokenQuantity
-  *   A function that calculates the number of tokens in a chunk.
-  * @param tokenLimit
-  *   The maximum number of tokens allowed in the final list of chunks.
-  * @return
-  *   A list of chunks where the total number of tokens does not exceed the
-  *   token limit. Excess tokens are removed starting from the end of the input
-  *   list.
-  */
-def filterExcessTokens(
-    chunks: List[SimilarChunk],
-    calculateChunkTokenQuantity: Chunk => Int,
-    tokenLimit: Int
-): List[SimilarChunk] =
-  @annotation.tailrec
-  def loop(
-      remainingChunks: List[SimilarChunk],
-      totalTokens: Int,
       selectedChunks: List[SimilarChunk]
-  ): List[SimilarChunk] =
-    remainingChunks match
-      case currentChunk :: newRemainingChunks =>
-        val newSelectedChunks =
-          mergeNewChunkToList(selectedChunks, currentChunk)
-        val newTotalTokens = newSelectedChunks
-          .map(_.chunk)
-          .map(calculateChunkTokenQuantity)
-          .sum
-        if newTotalTokens > tokenLimit then selectedChunks
-        else
-          loop(
-            newRemainingChunks,
-            newTotalTokens,
+  ): IO[Either[String, List[SimilarChunk]]] =
+    db.getNearChunks(vec, scope, offset, pageSize, orgId, role)
+      .flatMapRight:
+        case Nil =>
+          IO.pure(Right(selectedChunks))
+        case chunks =>
+          println(
+            s"getChunks: offset:$offset pageSize:$pageSize tokenLimit:$tokenLimit"
+          )
+          val newSelectedChunks = mergeNewChunksToList(
+            selectedChunks,
+            calculateChunkTokenQuantity,
+            tokenLimit,
+            chunks
+          )
+          getChunksRecursively(
+            offset + pageSize,
             newSelectedChunks
           )
-      case Nil => selectedChunks
 
-  loop(chunks, 0, List.empty)
+  getChunksRecursively(0, List.empty)
 
 def mergeNewChunksToList(
     chunks: List[SimilarChunk],
+    calculateChunkTokenQuantity: Chunk => Int,
+    tokenLimit: Int,
     newChunks: List[SimilarChunk]
 ): List[SimilarChunk] =
   if newChunks.length > 0 then
     val (newChunk :: remainingChunks) = newChunks
-    mergeNewChunksToList(mergeNewChunkToList(chunks, newChunk), remainingChunks)
+    val chunkWithNewChunk = mergeNewChunkToList(chunks, newChunk)
+    val newTotalTokens = chunkWithNewChunk
+      .map(_.chunk)
+      .map(calculateChunkTokenQuantity)
+      .sum
+    if newTotalTokens == tokenLimit then chunkWithNewChunk
+    else if newTotalTokens > tokenLimit then chunks
+    else
+      mergeNewChunksToList(
+        chunkWithNewChunk,
+        calculateChunkTokenQuantity,
+        tokenLimit,
+        remainingChunks
+      )
   else chunks
 
 def mergeNewChunkToList(
