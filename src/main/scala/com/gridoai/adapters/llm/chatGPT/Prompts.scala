@@ -83,7 +83,7 @@ def chooseActionPrompt(
   val actionsSection = s"Available actions:\n$actions"
 
   val numbers =
-    s"${(1 to (actions.length - 1)).toList.mkString(", ")}, or ${actions.length}"
+    s"${(1 to (options.length - 1)).toList.mkString(", ")}, or ${options.length}"
   val footer =
     s"The output MUST BE only the action number ($numbers), nothing more."
 
