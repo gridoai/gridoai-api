@@ -275,7 +275,7 @@ object PostgresClient {
             fr"and ${Fragments.in(fr"document_uid", uids)}"
           case _ => fr""
 
-        val queryPagination = sql"""
+        val queryPagination = fr"""
           order by distance asc
           offset $offset
           limit $limit"""
