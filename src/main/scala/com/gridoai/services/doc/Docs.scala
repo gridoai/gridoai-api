@@ -29,15 +29,16 @@ import java.io.File
 
 def searchDoc(
     auth: AuthData
-)(text: String, tokenLimit: Int, llmModel: String)(using
+)(payload: SearchPayload)(using
     db: DocDB[IO]
 ): IO[Either[String, List[Chunk]]] =
   getEmbeddingAPI("embaas")
-    .embedChat(text)
+    .embedChat(payload.query)
     .flatMapRight(
       getChunks(
-        getLLM(llmModel |> strToLLM).calculateChunkTokenQuantity,
-        tokenLimit,
+        getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
+        payload.tokenLimit,
+        payload.scope,
         auth.orgId,
         auth.role
       )

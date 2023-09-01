@@ -7,6 +7,7 @@ import com.gridoai.mock.mockedDocument
 
 import scala.collection.mutable.ListBuffer
 import com.gridoai.utils.mapRight
+import scala.annotation.unused
 
 case class MockedDocument(
     doc: Document,
@@ -109,15 +110,26 @@ object MockDocDB extends DocDB[IO]:
     )
   def getNearChunks(
       embedding: Embedding,
+      scope: Option[List[UID]],
       offset: Int,
       limit: Int,
       orgId: String,
       role: String
   ): IO[Either[String, List[SimilarChunk]]] =
+    val scopeFilter = scope match
+      case Some(uids) => (uid => uids.contains(uid))
+      case None =>
+        def f(@unused _uid: UID): Boolean = true
+        f
+
     IO.pure(
       Right(
         allChunks.toList
-          .filter(row => row.orgId == orgId && row.role == role)
+          .filter(row =>
+            row.orgId == orgId && row.role == role && scopeFilter(
+              row.chunk.chunk.uid
+            )
+          )
           .drop(offset)
           .take(limit)
           .map(x =>
