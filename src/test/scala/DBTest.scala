@@ -45,7 +45,9 @@ class DocumentModel extends CatsEffectSuite {
                   documentSource = doc1.source,
                   uid = UUID.randomUUID(),
                   content = doc1.content,
-                  tokenQuantity = 4
+                  tokenQuantity = 4,
+                  startPos = 0,
+                  endPos = 0
                 ),
                 embedding = mockEmbedding
               )
@@ -67,7 +69,9 @@ class DocumentModel extends CatsEffectSuite {
                   documentSource = doc2.source,
                   uid = UUID.randomUUID(),
                   content = doc2.content,
-                  tokenQuantity = 4
+                  tokenQuantity = 4,
+                  startPos = 0,
+                  endPos = 0
                 ),
                 embedding = mockEmbedding
               )
@@ -89,7 +93,9 @@ class DocumentModel extends CatsEffectSuite {
                   documentSource = doc3.source,
                   uid = UUID.randomUUID(),
                   content = doc3.content,
-                  tokenQuantity = 4
+                  tokenQuantity = 4,
+                  startPos = 0,
+                  endPos = 0
                 ),
                 embedding = mockEmbedding
               )

@@ -178,19 +178,19 @@ def mergeNewChunkToList(
       ) :: notNearChunks
 
 def mergeTwoChunks(firstChunk: Chunk, secondChunk: Chunk): Chunk =
-  val allWords = firstChunk.chunk.content
+  val allWords = firstChunk.content
     .split(" ")
     .slice(
       0,
-      secondChunk.chunk.startPos - firstChunk.chunk.startPos
-    ) ++ secondChunk.chunk.content.split(" ")
+      secondChunk.startPos - firstChunk.startPos
+    ) ++ secondChunk.content.split(" ")
   Chunk(
-    documentUid = firstChunk.chunk.documentUid,
-    documentName = firstChunk.chunk.documentName,
-    documentSource = firstChunk.chunk.documentSource,
+    documentUid = firstChunk.documentUid,
+    documentName = firstChunk.documentName,
+    documentSource = firstChunk.documentSource,
     uid = UUID.randomUUID(),
     content = allWords.mkString(" "),
     tokenQuantity = 0,
-    startPos = firstChunk.chunk.startPos,
-    endPos = secondChunk.chunk.endPos
+    startPos = firstChunk.startPos,
+    endPos = secondChunk.endPos
   )
