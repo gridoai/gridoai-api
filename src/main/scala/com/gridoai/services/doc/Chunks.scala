@@ -30,21 +30,23 @@ def chunkContent(
     content: String,
     chunkSize: Int,
     overlapSize: Int
-): List[String] =
+): List[(String, Int, Int)] =
   val words = content.split(" ")
   calculateChunkStarts(words.length, chunkSize, overlapSize)
-    .map(i => words.slice(i, i + chunkSize).mkString(" "))
+    .map(i => (words.slice(i, i + chunkSize).mkString(" "), i, i + chunkSize))
 
 def makeChunks(document: Document): List[Chunk] =
   chunkContent(document.content, 200, 100)
-    .map(content =>
+    .map((content, startPos, endPos) =>
       Chunk(
         documentUid = document.uid,
         documentName = document.name,
         documentSource = document.source,
         uid = UUID.randomUUID(),
         content = content,
-        tokenQuantity = content.filter(_ != ' ').length / 4
+        tokenQuantity = content.filter(_ != ' ').length / 4,
+        startPos = startPos,
+        endPos = endPos
       )
     )
     .traceFn: chunks =>
@@ -83,8 +85,8 @@ def getChunks(
             println(
               s"getChunks: offset:$offset pageSize:$pageSize totalTokens:$totalTokens tokenLimit:$tokenLimit"
             )
-            val newSelectedChunks = selectedChunks ++ chunks
-            val newTotalTokens = mergeChunks(newSelectedChunks)
+            val newSelectedChunks = mergeNewChunksToList(selectedChunks, chunks)
+            val newTotalTokens = newSelectedChunks
               .map(_.chunk)
               .map(calculateChunkTokenQuantity)
               .sum
@@ -123,7 +125,8 @@ def filterExcessTokens(
   ): List[SimilarChunk] =
     remainingChunks match
       case currentChunk :: newRemainingChunks =>
-        val newSelectedChunks = mergeChunks(selectedChunks :+ currentChunk)
+        val newSelectedChunks =
+          mergeNewChunkToList(selectedChunks, currentChunk)
         val newTotalTokens = newSelectedChunks
           .map(_.chunk)
           .map(calculateChunkTokenQuantity)
@@ -139,5 +142,55 @@ def filterExcessTokens(
 
   loop(chunks, 0, List.empty)
 
-def mergeChunks(chunks: List[SimilarChunk]): List[SimilarChunk] =
-  chunks
+def mergeNewChunksToList(
+    chunks: List[SimilarChunk],
+    newChunks: List[SimilarChunk]
+): List[SimilarChunk] =
+  if newChunks.length > 0 then
+    val (newChunk :: remainingChunks) = newChunks
+    mergeNewChunksToList(mergeNewChunkToList(chunks, newChunk), remainingChunks)
+  else chunks
+
+def mergeNewChunkToList(
+    chunks: List[SimilarChunk],
+    newChunk: SimilarChunk
+): List[SimilarChunk] =
+
+  val (nearChunks, notNearChunks) = chunks.partition: c =>
+    c.chunk.documentUid == newChunk.chunk.documentUid
+      && c.chunk.startPos < newChunk.chunk.endPos
+      && c.chunk.endPos > newChunk.chunk.startPos
+
+  (newChunk :: nearChunks).sortBy(_.chunk.startPos) match
+    case List(singleChunk) => chunks :+ newChunk
+    case chunksToMerge @ List(firstChunk, secondChunk) =>
+      SimilarChunk(
+        chunk = mergeTwoChunks(firstChunk.chunk, secondChunk.chunk),
+        distance = chunksToMerge.map(_.distance).min
+      ) :: notNearChunks
+    case chunksToMerge @ List(firstChunk, secondChunk, thirdChunk) =>
+      SimilarChunk(
+        chunk = mergeTwoChunks(
+          mergeTwoChunks(firstChunk.chunk, secondChunk.chunk),
+          thirdChunk.chunk
+        ),
+        distance = chunksToMerge.map(_.distance).min
+      ) :: notNearChunks
+
+def mergeTwoChunks(firstChunk: Chunk, secondChunk: Chunk): Chunk =
+  val allWords = firstChunk.chunk.content
+    .split(" ")
+    .slice(
+      0,
+      secondChunk.chunk.startPos - firstChunk.chunk.startPos
+    ) ++ secondChunk.chunk.content.split(" ")
+  Chunk(
+    documentUid = firstChunk.chunk.documentUid,
+    documentName = firstChunk.chunk.documentName,
+    documentSource = firstChunk.chunk.documentSource,
+    uid = UUID.randomUUID(),
+    content = allWords.mkString(" "),
+    tokenQuantity = 0,
+    startPos = firstChunk.chunk.startPos,
+    endPos = secondChunk.chunk.endPos
+  )

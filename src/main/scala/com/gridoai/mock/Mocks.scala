@@ -16,7 +16,9 @@ val mockedChunk = ChunkWithEmbedding(
     documentName = "Sky observations",
     documentSource = Source.Upload,
     content = "The sky is blue",
-    tokenQuantity = 4
+    tokenQuantity = 4,
+    startPos = 0,
+    endPos = 0
   ),
   embedding = Embedding(vector = List(1, 2, 3), model = EmbeddingModel.Mocked)
 )
