@@ -127,20 +127,21 @@ object ChatGPTClient:
     def chooseAction(
         messages: List[Message],
         query: Option[String],
-        chunks: List[Chunk]
+        chunks: List[Chunk],
+        options: List[Action]
     ): F[Either[String, Action]] =
       (
         Seq(
           ChatCompletion.Message(
             role = ChatCompletion.Message.Role.System,
-            content = chooseActionPrompt(chunks, messages)
+            content = chooseActionPrompt(chunks, messages, options)
           )
         ),
         ChatCompletionSettings(maxTokens = Some(1), n = Some(1))
       )
         |> client.createChatCompletion
         |> getAnswerFromChat
-        |> (_.map(_.flatMap(strToAction)))
+        |> (_.map(_.flatMap(strToAction(options))))
 
     def buildQueryToSearchDocuments(
         messages: List[Message],
@@ -162,11 +163,15 @@ object ChatGPTClient:
         |> getAnswerFromChat
         |> (_.mapRight(_.trim()))
 
-    def strToAction(llmOutput: String): Either[String, Action] =
-      llmOutput.trim() match
-        case "1" => Action.Search.asRight
-        case "2" => Action.Answer.asRight
-        case "3" => Action.Ask.asRight
-        case e =>
-          println(s"bad action: $e")
+    def strToAction(options: List[Action])(
+        llmOutput: String
+    ): Either[String, Action] =
+      llmOutput
+        .trim()
+        .toIntOption
+        .map(_ - 1)
+        .flatMap(options.get) match
+        case None =>
+          println(s"bad action: $llmOutput")
           Left("Invalid LLM output")
+        case Some(action) => Right(action)

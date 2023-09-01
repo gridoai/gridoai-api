@@ -16,6 +16,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   val llmModel = LLMModel.Gpt35Turbo
   val llm = getLLM(llmModel)
   val useActionsFeature = true
+  println("Used llm: " + llm.toString())
 
   def askRecursively(
       lastQuery: Option[String],
@@ -23,8 +24,6 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   )(
       lastChunks: List[Chunk]
   ): IO[Either[String, AskResponse]] =
-    println("Used llm: " + llm.toString())
-
     chooseAction(
       lastQuery,
       lastChunks,
@@ -38,9 +37,17 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       searchesBeforeResponse: Int
   ): IO[Either[String, Action]] =
     if useActionsFeature then
-      if searchesBeforeResponse > 0 then
-        llm.chooseAction(payload.messages, lastQuery, lastChunks)
-      else Action.Answer.asRight.pure[IO]
+      val options =
+        if searchesBeforeResponse > 0 then
+          List(Action.Search, Action.Answer, Action.Ask)
+        else List(Action.Answer, Action.Ask)
+
+      llm.chooseAction(
+        payload.messages,
+        lastQuery,
+        lastChunks,
+        options
+      )
     else
       IO(searchesBeforeResponse match
         case 2 => Action.Search.asRight

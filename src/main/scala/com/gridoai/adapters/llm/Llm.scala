@@ -19,7 +19,8 @@ trait LLM[F[_]]:
   def chooseAction(
       messages: List[Message],
       query: Option[String],
-      chunks: List[Chunk]
+      chunks: List[Chunk],
+      options: List[Action]
   ): F[Either[String, Action]]
   def ask(
       chunks: List[Chunk],

@@ -16,7 +16,8 @@ class MockLLM[F[_]: Applicative] extends LLM[F]:
   def chooseAction(
       messages: List[Message],
       query: Option[String],
-      chunks: List[Chunk]
+      chunks: List[Chunk],
+      options: List[Action]
   ): F[Either[String, Action]] =
     Action.Search.asRight.pure[F]
 
