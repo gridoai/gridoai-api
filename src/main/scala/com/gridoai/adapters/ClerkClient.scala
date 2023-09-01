@@ -8,7 +8,6 @@ import io.circe.generic.auto.*
 import io.circe.parser.*
 import io.circe.*
 import io.circe.syntax.*
-import cats.implicits.*
 import sttp.model.{Header, MediaType}
 
 val CLERK_ENDPOINT = "https://api.clerk.com/v1"
@@ -22,7 +21,8 @@ case class PublicMetadata(
 
 case class User(
     id: String,
-    public_metadata: PublicMetadata
+    public_metadata: PublicMetadata,
+    email_addresses: List[EmailAddress]
 )
 
 case class UpdateUser(
@@ -33,18 +33,18 @@ case class OrganizationMetadata(
     plan: Plan
 )
 case class Organization(
-    `object`: String,
+    // `object`: String,
     id: String,
-    name: String,
-    slug: String,
-    members_count: Int,
-    max_allowed_memberships: Int,
-    admin_delete_enabled: Boolean,
+    // name: String,
+    // slug: String,
+    // members_count: Int,
+    // max_allowed_memberships: Int,
+    // admin_delete_enabled: Boolean,
     public_metadata: OrganizationMetadata,
     // private_metadata: Any,
-    created_by: String,
-    created_at: Int,
-    updated_at: Int
+    created_by: String
+    // created_at: Int,
+    // updated_at: Int
 )
 case class UserCreatedData(
     // birthday: String,
@@ -77,8 +77,8 @@ case class OrganizationMemberShipListData(
     id: String,
     `object`: String,
     role: String,
-    created_at: Int,
-    updated_at: Int,
+    // created_at: Int,
+    // updated_at: Int,
     organization: Organization,
     public_user_data: PublicUserData
 )
@@ -87,15 +87,15 @@ case class PublicUserData(
     user_id: String,
     first_name: String,
     last_name: String,
-    profile_image_url: String,
-    image_url: String,
-    has_image: Boolean,
+    // profile_image_url: String,
+    // image_url: String,
+    // has_image: Boolean,
     identifier: String
 )
 
 case class OrganizationMemberShipList(
-    data: Seq[OrganizationMemberShipListData],
-    total_count: Int
+    data: Seq[OrganizationMemberShipListData]
+    // total_count: Int
 )
 
 case class UserCreated(
@@ -127,10 +127,34 @@ def getMaxUsersByPlan: Plan => Option[Int] =
   case Pro        => Some(10)
   case Enterprise => None
 
+case class ListUsers(
+    email_address: List[String],
+    limit: Option[Int] = None
+)
+case class DeletionResponse(
+    `object`: String,
+    id: String,
+    deleted: Boolean
+)
 object ClerkClient:
 
   val Http = HttpClient(CLERK_ENDPOINT)
   private val authHeader = Header("Authorization", s"Bearer $CLERK_SECRET_KEY")
+
+  def listUsers(
+      email_address: String,
+      limit: Int = 1
+  ) =
+    Http
+      .get(s"/users?email_address=$email_address&limit=$limit")
+      .header(authHeader)
+      .contentType(MediaType.ApplicationJson)
+      .sendReq()
+      .map(
+        _.body.flatMap(
+          decode[List[User]](_).left.map(_.getMessage())
+        )
+      ) |> attempt
 
   def listMembershipsOfUser(
       userId: String
@@ -152,7 +176,7 @@ object ClerkClient:
       .sendReq()
       .map(
         _.body.flatMap(
-          decode[Organization](_).left.map(_.getMessage())
+          decode[DeletionResponse](_).left.map(_.getMessage())
         )
       ) |> attempt
 
@@ -173,9 +197,10 @@ object ClerkClient:
       ) |> attempt
 
   def createOrg(
-      by: String,
       name: String,
       plan: Plan
+  )(
+      by: String
   ): IO[Either[String, Organization]] =
     val body = CreateOrganization(
       name = name,
@@ -183,6 +208,8 @@ object ClerkClient:
       public_metadata = (OrganizationMetadata(plan)),
       max_allowed_memberships = getMaxUsersByPlan(plan)
     ).asJson.noSpaces
+    print("Creating org... ")
+    println(body)
     Http
       .post("/organizations")
       .body(body)
