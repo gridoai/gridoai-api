@@ -130,11 +130,12 @@ object ChatGPTClient:
         chunks: List[Chunk],
         options: List[Action]
     ): F[Either[String, Action]] =
+      val prompt = chooseActionPrompt(chunks, messages, options)
       (
         Seq(
           ChatCompletion.Message(
             role = ChatCompletion.Message.Role.System,
-            content = chooseActionPrompt(chunks, messages, options)
+            content = prompt
           )
         ),
         ChatCompletionSettings(maxTokens = Some(1), n = Some(1))
