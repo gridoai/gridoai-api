@@ -42,14 +42,19 @@ def reproc() =
     ) match
     case Right(docs) =>
       println(docs.map(_._1.name).mkString("\n"))
-      docs.map: (doc, org, roles) =>
-        mapDocumentsToDB(List(doc), getEmbeddingAPI("embaas"))
-          .flatMapRight(persistencePayload =>
-            println("Got persistencePayloads: " + persistencePayload.length)
-            docDb.addDocuments(
-              persistencePayload,
-              org,
-              roles.head
-            )
-          )
-          .unsafeRunSync()
+      mapDocumentsToDB(docs.map(_._1), getEmbeddingAPI("embaas"))
+        .mapRight(persistencePayload =>
+          println("Got persistencePayloads: " + persistencePayload.length)
+          docs
+            .zip(persistencePayload)
+            .map: (docInfo, singlePersistencePayload) =>
+              val (doc, org, roles) = docInfo
+              docDb
+                .addDocuments(
+                  List(singlePersistencePayload),
+                  org,
+                  roles.head
+                )
+                .unsafeRunSync()
+        )
+        .unsafeRunSync()
