@@ -79,6 +79,8 @@ libraryDependencies += "dev.maxmelnyk" %% "openai-scala" % "0.3.0"
 
 libraryDependencies += "com.knuddels" % "jtokkit" % "0.6.1"
 
+libraryDependencies += "com.github.tototoshi" %% "scala-csv" % "1.3.10"
+
 lazy val app = (project in file("app"))
   .settings(
     assembly / mainClass := Some("com.gridoai.ScalaHttpFunction")
