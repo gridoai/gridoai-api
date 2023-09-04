@@ -9,14 +9,20 @@ import io.circe.parser.*
 import io.circe.*
 import io.circe.syntax.*
 import sttp.model.{Header, MediaType}
+import io.circe.derivation.Configuration
+import io.circe.derivation.ConfiguredEnumCodec
+
+import cats.data.EitherT
 
 val CLERK_ENDPOINT = "https://api.clerk.com/v1"
 val CLERK_SECRET_KEY =
   sys.env.getOrElse("CLERK_SECRET_KEY", "")
 
 case class PublicMetadata(
-    googleDriveAccessToken: Option[String],
-    googleDriveRefreshToken: Option[String]
+    googleDriveAccessToken: Option[String] = None,
+    googleDriveRefreshToken: Option[String] = None,
+    plan: Option[Plan] = None,
+    customerId: Option[String] = None
 )
 
 case class User(
@@ -30,7 +36,7 @@ case class UpdateUser(
 )
 
 case class OrganizationMetadata(
-    plan: Plan
+    plan: Option[Plan]
 )
 case class Organization(
     // `object`: String,
@@ -118,14 +124,27 @@ case class CreateOrganization(
     slug: Option[String] = None,
     max_allowed_memberships: Option[Int] = None
 )
+object SessionStatus:
+  given Configuration =
+    Configuration.default.withTransformConstructorNames(_.toLowerCase)
+
+enum SessionStatus derives ConfiguredEnumCodec:
+  case Active, Revoked, Ended, Expired, Removed, Abandoned, Replaced
+
+case class Session(
+    last_active_organization_id: Option[String],
+    id: String,
+    user_id: String,
+    status: SessionStatus
+)
 
 import Plan._
 
 def getMaxUsersByPlan: Plan => Option[Int] =
-  case Free       => Some(1)
-  case Starter    => Some(3)
-  case Pro        => Some(10)
-  case Enterprise => None
+  case Free | Individual => Some(1)
+  case Starter           => Some(3)
+  case Pro               => Some(10)
+  case Enterprise        => None
 
 case class ListUsers(
     email_address: List[String],
@@ -136,135 +155,177 @@ case class DeletionResponse(
     id: String,
     deleted: Boolean
 )
+case class MergeAndUpdateUserMetadataPayload(
+    public_metadata: PublicMetadata
+)
 object ClerkClient:
 
   val Http = HttpClient(CLERK_ENDPOINT)
   private val authHeader = Header("Authorization", s"Bearer $CLERK_SECRET_KEY")
+  object user:
 
-  def listUsers(
-      email_address: String,
-      limit: Int = 1
-  ) =
-    Http
-      .get(s"/users?email_address=$email_address&limit=$limit")
-      .header(authHeader)
-      .contentType(MediaType.ApplicationJson)
-      .sendReq()
-      .map(
-        _.body.flatMap(
-          decode[List[User]](_).left.map(_.getMessage())
-        )
-      ) |> attempt
+    def byEmail(email: String) =
+      user.list(email).map(_.flatMap(_.headOption.toRight("No user found")))
 
-  def listMembershipsOfUser(
-      userId: String
-  ): IO[Either[String, OrganizationMemberShipList]] =
-    Http
-      .get(s"/users/$userId/organization_memberships")
-      .header(authHeader)
-      .sendReq()
-      .map(
-        _.body.flatMap(
-          decode[OrganizationMemberShipList](_).left.map(_.getMessage())
+    def getActiveOrgByEmail(email: String) =
+      (for
+        uid <- EitherT(user.byEmail(email)).map(_.id)
+        sessions <- EitherT(session.list(uid))
+        orgOpt = sessions
+          .find(_.last_active_organization_id.isDefined)
+        orgId <- EitherT.fromOption(
+          orgOpt.flatMap(_.last_active_organization_id),
+          "No org found"
         )
-      ) |> attempt
+      yield orgId).value
+    def getPublicMetadata(
+        userId: String
+    ): IO[Either[String, PublicMetadata]] =
+      Http
+        .get(s"/users/$userId")
+        .header(authHeader)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[User](_).left.map(_.getMessage())
+          )
+        )
+        .mapRight(
+          _.public_metadata
+        ) |> attempt
+    def mergeAndUpdateMetadata(
+        publicMetadata: PublicMetadata
+    )(userId: String) =
+      val body = MergeAndUpdateUserMetadataPayload(
+        publicMetadata
+      ).asJson.deepDropNullValues.noSpaces
+      Http
+        .patch(s"/users/$userId/metadata")
+        .body(body)
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[User](_).left.map(_.getMessage())
+          )
+        )
 
-  def deleteOrg(orgId: String) =
-    Http
-      .delete(s"/organizations/$orgId")
-      .header(authHeader)
-      .sendReq()
-      .map(
-        _.body.flatMap(
-          decode[DeletionResponse](_).left.map(_.getMessage())
-        )
-      ) |> attempt
+    def list(
+        email_address: String,
+        limit: Int = 1
+    ) =
+      Http
+        .get(s"/users?email_address=$email_address&limit=$limit")
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[List[User]](_).left.map(_.getMessage())
+          )
+        ) |> attempt
 
-  def getUserPublicMetadata(
-      userId: String
-  ): IO[Either[String, PublicMetadata]] =
-    Http
-      .get(s"/users/$userId")
-      .header(authHeader)
-      .sendReq()
-      .map(
-        _.body.flatMap(
-          decode[User](_).left.map(_.getMessage())
-        )
-      )
-      .mapRight(
-        _.public_metadata
-      ) |> attempt
+    def listMemberships(
+        userId: String
+    ): IO[Either[String, OrganizationMemberShipList]] =
+      Http
+        .get(s"/users/$userId/organization_memberships")
+        .header(authHeader)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[OrganizationMemberShipList](_).left.map(_.getMessage())
+          )
+        ) |> attempt
+  object session:
 
-  def createOrg(
-      name: String,
-      plan: Plan
-  )(
-      by: String
-  ): IO[Either[String, Organization]] =
-    val body = CreateOrganization(
-      name = name,
-      created_by = by,
-      public_metadata = (OrganizationMetadata(plan)),
-      max_allowed_memberships = getMaxUsersByPlan(plan)
-    ).asJson.noSpaces
-    print("Creating org... ")
-    println(body)
-    Http
-      .post("/organizations")
-      .body(body)
-      .header(authHeader)
-      .contentType(MediaType.ApplicationJson)
-      .sendReq()
-      .map(
-        _.body.flatMap(
-          decode[Organization](_).left.map(_.getMessage())
-        )
-      ) |> attempt
+    def list(
+        userId: String,
+        limit: Int = 10,
+        offset: Int = 0
+    ): IO[Either[String, List[Session]]] =
+      Http
+        .get(s"/sessions?limit=${limit}&offset=${offset}&user_id=${userId}")
+        .header(authHeader)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[List[Session]](_).left.map(_.getMessage())
+          )
+        ) |> attempt
+  object org:
+    def delete(orgId: String) =
+      Http
+        .delete(s"/organizations/$orgId")
+        .header(authHeader)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[DeletionResponse](_).left.map(_.getMessage())
+          )
+        ) |> attempt
 
-  def updateOrganizationPlan(
-      organizationId: String,
-      plan: Plan
-  ): IO[Either[String, Unit]] =
-    val body = UpdateOrganization(
-      public_metadata = OrganizationMetadata(plan),
-      max_allowed_memberships = getMaxUsersByPlan(plan)
-    ).asJson.noSpaces
-    Http
-      .patch(s"/organizations/$organizationId")
-      .body(body)
-      .header(authHeader)
-      .contentType(MediaType.ApplicationJson)
-      .sendReq()
-      .map(
-        _.body.flatMap(
-          decode[Organization](_).left.map(_.getMessage())
+    def create(
+        name: String,
+        plan: Plan
+    )(
+        by: String
+    ): IO[Either[String, Organization]] =
+      val body = CreateOrganization(
+        name = name,
+        created_by = by,
+        public_metadata = (OrganizationMetadata(Some(plan))),
+        max_allowed_memberships = getMaxUsersByPlan(plan)
+      ).asJson.noSpaces
+      print("Creating org... ")
+      println(body)
+      Http
+        .post("/organizations")
+        .body(body)
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[Organization](_).left.map(_.getMessage())
+          )
+        ) |> attempt
+
+    def updatePlan(
+        organizationId: String,
+        plan: Plan
+    ): IO[Either[String, Unit]] =
+      val body = UpdateOrganization(
+        public_metadata = OrganizationMetadata(Some(plan)),
+        max_allowed_memberships = getMaxUsersByPlan(plan)
+      ).asJson.noSpaces
+      Http
+        .patch(s"/organizations/$organizationId")
+        .body(body)
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[Organization](_).left.map(_.getMessage())
+          )
         )
-      )
-      .mapRight(_ => ()) |> attempt
+        .mapRight(_ => ()) |> attempt
 
   def setGDriveMetadata(userId: String)(
       googleDriveAccessToken: String,
       googleDriveRefreshToken: String
   ): IO[Either[String, (String, String)]] =
     println("Sending tokens to Clerk...")
-    val body = UpdateUser(
-      public_metadata = PublicMetadata(
-        Some(googleDriveAccessToken),
-        Some(googleDriveRefreshToken)
-      )
-    ).asJson.noSpaces
-    Http
-      .patch(s"/users/$userId")
-      .body(body)
-      .header(authHeader)
-      .contentType(MediaType.ApplicationJson)
-      .sendReq()
-      .map(
-        _.body.flatMap(
-          decode[User](_).left.map(_.getMessage())
+
+    user
+      .mergeAndUpdateMetadata(
+        PublicMetadata(
+          Some(googleDriveAccessToken),
+          Some(googleDriveRefreshToken)
         )
-      )
+      )(userId)
       .mapRight: user =>
         (
           user.public_metadata.googleDriveAccessToken,

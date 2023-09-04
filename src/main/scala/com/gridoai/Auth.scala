@@ -16,14 +16,16 @@ case class JWTPayload(
     sid: String,
     sub: String,
     orgPlan: Option[Plan],
-    userPlan: Option[Plan]
+    userPlan: Option[Plan],
+    customerId: Option[String] = None
 )
 
 case class AuthData(
     orgId: String,
     role: String,
     userId: String,
-    plan: Plan
+    plan: Plan,
+    customerId: Option[String]
 )
 
 val mockedJwt =
@@ -60,7 +62,8 @@ val getAuthDataFromJwt = (jwt: JWTPayload) =>
     orgId,
     role,
     jwt.sub,
-    jwt.userPlan.orElse(jwt.orgPlan).getOrElse(Plan.Free)
+    jwt.userPlan.orElse(jwt.orgPlan).getOrElse(Plan.Free),
+    jwt.customerId
   )
 
 def limitRole[A](role: String, error: A)(resource: => A) =

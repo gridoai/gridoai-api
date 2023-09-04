@@ -45,6 +45,12 @@ val webhooksClerk = endpoint
   .out(stringBody)
   .errorOut(stringBody)
 
+val billingSession =
+  auth.securedWithBearer.post
+    .in("billing" / "session")
+    .in(header[Option[String]]("Origin"))
+    .out(stringBody)
+
 val webhooksStripe = endpoint
   .in("webhooks" / "stripe")
   .in(stringBody)
@@ -140,7 +146,10 @@ val allEndpoints: List[AnyEndpoint] =
     createDocumentEndpoint.endpoint,
     authGDriveEndpoint.endpoint,
     importGDriveEndpoint.endpoint,
-    askEndpoint.endpoint
+    askEndpoint.endpoint,
+    webhooksClerk,
+    webhooksStripe,
+    billingSession.endpoint
   )
 
 val getSchema =

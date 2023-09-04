@@ -4,6 +4,7 @@ import com.gridoai.models.DocDB
 import com.gridoai.services.doc.*
 import cats.effect.IO
 import sttp.tapir.server.ServerEndpoint
+import com.gridoai.services.payments.createBillingSession
 
 object withService:
 
@@ -12,7 +13,7 @@ object withService:
 
   def webHooksEndpoint =
     webhooksClerk.serverLogic(
-      com.gridoai.adapters.payments.handleCreateCostumer[IO] _
+      com.gridoai.adapters.payments.handleCreateCustomer[IO] _
     )
 
   def webHooksStripeEndpoint =
@@ -44,6 +45,8 @@ object withService:
   def askLLM(implicit db: DocDB[IO]) =
     askEndpoint.serverLogic(ask _)
 
+  def billingSessionEndpoint = billingSession.serverLogic(createBillingSession)
+
   def allEndpoints(implicit db: DocDB[IO]): List[ServerEndpoint[Any, IO]] =
     List(
       searchDocs,
@@ -56,5 +59,6 @@ object withService:
       deleteDoc,
       listDocs,
       webHooksEndpoint,
-      webHooksStripeEndpoint
+      webHooksStripeEndpoint,
+      billingSessionEndpoint
     )

@@ -33,10 +33,10 @@ def authenticateGDrive(auth: AuthData)(
       .flatMapRight(ClerkClient.setGDriveMetadata(auth.userId))
 
 def fetchUserTokens(auth: AuthData): IO[Either[String, (String, String)]] =
-  ClerkClient
-    .getUserPublicMetadata(auth.userId)
+  ClerkClient.user
+    .getPublicMetadata(auth.userId)
     .flatMapRight:
-      case PublicMetadata(Some(x), Some(y)) => Right((x, y)).pure[IO]
+      case PublicMetadata(Some(x), Some(y), _, _) => Right((x, y)).pure[IO]
       case _ => Left("Make Google Drive authentication first").pure[IO]
 
 def partitionFilesFolders(
