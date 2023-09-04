@@ -10,7 +10,7 @@ object Plan:
     Configuration.default.withTransformConstructorNames(_.toLowerCase)
 
 enum Plan derives ConfiguredEnumCodec:
-  case Free, Starter, Pro, Enterprise
+  case Free, Starter, Pro, Enterprise, Individual
 
 type UID = UUID
 
