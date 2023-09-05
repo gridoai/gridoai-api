@@ -96,28 +96,34 @@ def handleCheckoutCompleted(
     eventObj: StripeObject
 ) =
   val session = eventObj.asInstanceOf[com.stripe.model.checkout.Session]
+  val planPromise = IO
+    .blocking(Subscription.retrieve(session.getSubscription()))
+    .attempt
+    .map(_.flatMap(getSubscriptionPlan(_).toRight("No plan found")))
 
   val orgNameField = session.getCustomFields.asScala.find: field =>
     val key = field.getKey
     key == "nomedaorganizao" || key == "organizationname"
   val customerId = session.getCustomer
+
   val necessaryData = (
     Option(session.getClientReferenceId()),
     Option(session.getCustomerDetails.getEmail),
     orgNameField.map(_.getText.getValue),
   )
 
-  val plan = Plan.Starter // Temporary, next webhook will update it
   necessaryData match
     case (None, Some(email), Some(orgName)) =>
       println("Got no client reference id, fetching by email...")
-      user
-        .byEmail(email)
-        .mapRight(_.id)
-        .flatMapRight(org.create(orgName, plan, customerId))
+      planPromise.flatMapRight: plan =>
+        user
+          .byEmail(email)
+          .mapRight(_.id)
+          .flatMapRight(org.upsert(orgName, plan, customerId))
 
     case (Some(id), Some(email), Some(orgName)) =>
-      (org.create(orgName, plan, customerId)(id))
+      planPromise.flatMapRight: plan =>
+        (org.upsert(orgName, plan, customerId)(id))
 
     case (Some(clientId), Some(email), None) =>
       user.mergeAndUpdateMetadata(
@@ -155,7 +161,7 @@ def getValueFromOptionOrIO[T, L](
 ): IO[Either[L, T]] =
   option match
     case Some(value) => IO.pure(Right(value))
-    case None        => io.map(_.left.map(_ => noneValue))
+    case None        => io.mapLeft(_ => noneValue)
 
 def upgradePlan(
     email: String,
@@ -182,6 +188,10 @@ def upgradePlan(
 
     case (Plan.Free) => IO(Left("Cannot upgrade to free plan"))
     case _           => getActiveOrgByEmail(email) !> (org.updatePlan(_, plan))
+
+def getSubscriptionPlan(sub: Subscription) =
+  Option(sub.getItems.getData.get(0).getPlan.getProduct)
+    .map(getPlanById)
 
 def handleSubscriptionUpdate(eventObj: StripeObject): IO[Either[String, Any]] =
   val subscription = eventObj.asInstanceOf[Subscription]
@@ -253,7 +263,7 @@ def handleEvent(
     eventType match
 
       case "customer.subscription.deleted" => handleDeleted(stripeObject)
-      case "customer.subscription.updated" | "customer.subscription.created" =>
+      case "customer.subscription.updated" =>
         handleSubscriptionUpdate(stripeObject)
       case "checkout.session.completed" =>
         handleCheckoutCompleted(stripeObject)
@@ -261,4 +271,4 @@ def handleEvent(
   }
   .flatten
   .attemptTap(IO.println)
-  .flatMapRight(_ => IO(Right("OK")))
+  .flatMapRight(_ => IO(Right("OK"))) |> attempt
