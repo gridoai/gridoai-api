@@ -13,6 +13,7 @@ import com.gridoai.models.PostgresClient
 import com.gridoai.auth.AuthData
 import com.gridoai.endpoints.FileUpload
 import com.gridoai.services.doc.uploadDocuments
+import com.gridoai.domain.Plan
 object fileMock:
   import java.nio.file.{Files, Paths}
   import sttp.client3.{StringBody}
@@ -64,7 +65,7 @@ class UploadApi extends CatsEffectSuite {
     println("sending request")
     for {
       uploadResult <- uploadDocuments(
-        AuthData("org1", "admin", "admin_1")
+        AuthData("org1", "admin", "admin_1", Plan.Enterprise, None)
       )(FileUpload(fileUpload))
 
       _ <- IO.println(uploadResult)
