@@ -45,7 +45,7 @@ case class OrganizationMetadata(
 case class Organization(
     // `object`: String,
     id: String,
-    // name: String,
+    name: String,
     // slug: String,
     // members_count: Int,
     // max_allowed_memberships: Int,
@@ -278,6 +278,26 @@ object ClerkClient:
             decode[DeletionResponse](_).left.map(_.getMessage())
           )
         ) |> attempt
+
+    def upsert(
+        name: String,
+        plan: Plan,
+        customerId: String
+    )(
+        by: String
+    ): IO[Either[String, Organization]] =
+      user.listMemberships(by).flatMapRight {
+        _.data.find(m =>
+          println(s"${m.organization.name}  VS  $name")
+          m.organization.name == name
+        ) match
+          case Some(membership) =>
+            println("Found membership, updating org...")
+            updatePlan(membership.organization.id, plan)
+          case None =>
+            println("No membership found, creating org...")
+            create(name, plan, customerId)(by)
+      }
 
     def create(
         name: String,
