@@ -2,6 +2,7 @@ package com.gridoai.adapters
 
 import com.gridoai.utils.*
 import cats.effect.IO
+import cats.implicits._
 import com.gridoai.adapters.*
 import com.gridoai.domain.*
 import io.circe.generic.auto.*
@@ -36,7 +37,10 @@ case class UpdateUser(
 )
 
 case class OrganizationMetadata(
-    plan: Option[Plan]
+    plan: Option[Plan] = None,
+    customerId: Option[String] = None,
+    googleDriveAccessToken: Option[String] = None,
+    googleDriveRefreshToken: Option[String] = None
 )
 case class Organization(
     // `object`: String,
@@ -113,7 +117,7 @@ case class Verification(
     strategy: String
 )
 case class UpdateOrganization(
-    public_metadata: OrganizationMetadata,
+    public_metadata: Option[OrganizationMetadata] = None,
     max_allowed_memberships: Option[Int] = None
 )
 
@@ -158,6 +162,9 @@ case class DeletionResponse(
 case class MergeAndUpdateUserMetadataPayload(
     public_metadata: PublicMetadata
 )
+case class MergeAndUpdateOrMetadataPayload(
+    public_metadata: OrganizationMetadata
+)
 object ClerkClient:
 
   val Http = HttpClient(CLERK_ENDPOINT)
@@ -167,17 +174,23 @@ object ClerkClient:
     def byEmail(email: String) =
       user.list(email).map(_.flatMap(_.headOption.toRight("No user found")))
 
+    def getFirstOrgByUID(uid: String) =
+      user
+        .listMemberships(uid)
+        .map(
+          _.flatMap(_.data.headOption.map(_.id).toRight("No org found"))
+        )
+
     def getActiveOrgByEmail(email: String) =
       (for
         uid <- EitherT(user.byEmail(email)).map(_.id)
         sessions <- EitherT(session.list(uid))
         orgOpt = sessions
           .find(_.last_active_organization_id.isDefined)
-        orgId <- EitherT.fromOption(
-          orgOpt.flatMap(_.last_active_organization_id),
-          "No org found"
-        )
+          .flatMap(_.last_active_organization_id)
+        orgId <- EitherT(orgOpt.fold(getFirstOrgByUID(uid))(_.asRight.pure[IO]))
       yield orgId).value
+
     def getPublicMetadata(
         userId: String
     ): IO[Either[String, PublicMetadata]] =
@@ -268,14 +281,18 @@ object ClerkClient:
 
     def create(
         name: String,
-        plan: Plan
+        plan: Plan,
+        customerId: String
     )(
         by: String
     ): IO[Either[String, Organization]] =
       val body = CreateOrganization(
         name = name,
         created_by = by,
-        public_metadata = (OrganizationMetadata(Some(plan))),
+        public_metadata = (OrganizationMetadata(
+          plan = Some(plan),
+          customerId = Some(customerId)
+        )),
         max_allowed_memberships = getMaxUsersByPlan(plan)
       ).asJson.noSpaces
       print("Creating org... ")
@@ -292,16 +309,23 @@ object ClerkClient:
           )
         ) |> attempt
 
-    def updatePlan(
+    def mergeAndUpdateMetadata(
         organizationId: String,
-        plan: Plan
-    ): IO[Either[String, Unit]] =
-      val body = UpdateOrganization(
-        public_metadata = OrganizationMetadata(Some(plan)),
-        max_allowed_memberships = getMaxUsersByPlan(plan)
-      ).asJson.noSpaces
+        plan: Option[Plan] = None,
+        customerId: Option[String] = None,
+        googleDriveAccessToken: Option[String] = None,
+        googleDriveRefreshToken: Option[String] = None
+    ): IO[Either[String, Organization]] =
+      val body = MergeAndUpdateOrMetadataPayload(
+        public_metadata = OrganizationMetadata(
+          plan,
+          customerId,
+          googleDriveAccessToken,
+          googleDriveRefreshToken
+        )
+      ).asJson.deepDropNullValues.noSpaces
       Http
-        .patch(s"/organizations/$organizationId")
+        .patch(s"/organizations/$organizationId/metadata")
         .body(body)
         .header(authHeader)
         .contentType(MediaType.ApplicationJson)
@@ -311,7 +335,28 @@ object ClerkClient:
             decode[Organization](_).left.map(_.getMessage())
           )
         )
-        .mapRight(_ => ()) |> attempt
+        |> attempt
+
+    def updatePlan(
+        organizationId: String,
+        plan: Plan
+    ): IO[Either[String, Organization]] =
+      val body = UpdateOrganization(
+        max_allowed_memberships = getMaxUsersByPlan(plan)
+      ).asJson.noSpaces
+      val req1 = mergeAndUpdateMetadata(organizationId, plan = Some(plan))
+      val req2 = Http
+        .patch(s"/organizations/$organizationId")
+        .body(body)
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[Organization](_).left.map(_.getMessage())
+          )
+        ) |> attempt
+      List(req1, req2).parSequence.map(_.last)
 
   def setGDriveMetadata(userId: String)(
       googleDriveAccessToken: String,

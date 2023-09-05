@@ -106,27 +106,18 @@ def handleCheckoutCompleted(
     Option(session.getCustomerDetails.getEmail),
     orgNameField.map(_.getText.getValue),
   )
-  def addCustomerID =
-    user.mergeAndUpdateMetadata(
-      PublicMetadata(
-        customerId = Some(customerId)
-      )
-    )
+
   val plan = Plan.Starter // Temporary, next webhook will update it
   necessaryData match
     case (None, Some(email), Some(orgName)) =>
       println("Got no client reference id, fetching by email...")
       user
-        .list(email)
-        .mapRight(_.head.id)
-        .flatMapRight(addCustomerID)
+        .byEmail(email)
         .mapRight(_.id)
-        .flatMapRight(org.create(orgName, plan))
+        .flatMapRight(org.create(orgName, plan, customerId))
 
     case (Some(id), Some(email), Some(orgName)) =>
-      addCustomerID(id)
-        .mapRight(_.id)
-        .flatMapRight(org.create(orgName, plan))
+      (org.create(orgName, plan, customerId)(id))
 
     case (Some(clientId), Some(email), None) =>
       user.mergeAndUpdateMetadata(
@@ -157,18 +148,15 @@ def cancelPlanByMail(email: String, plan: Plan) =
     case Plan.Free       => IO(Left("Cannot cancel free plan"))
     case _               => cancelOrgSubscriptionByEmail(email)
 
-import cats.effect.IO
-
 def getValueFromOptionOrIO[T, L](
     option: Option[T],
     io: IO[Either[L, T]],
     noneValue: L
-): IO[Either[L, T]] = {
-  option match {
+): IO[Either[L, T]] =
+  option match
     case Some(value) => IO.pure(Right(value))
     case None        => io.map(_.left.map(_ => noneValue))
-  }
-}
+
 def upgradePlan(
     email: String,
     plan: Plan,

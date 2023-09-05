@@ -17,7 +17,8 @@ case class JWTPayload(
     sub: String,
     orgPlan: Option[Plan],
     userPlan: Option[Plan],
-    customerId: Option[String] = None
+    customerId: Option[String] = None,
+    orgCustomerId: Option[String] = None
 )
 
 case class AuthData(
@@ -63,7 +64,7 @@ val getAuthDataFromJwt = (jwt: JWTPayload) =>
     role,
     jwt.sub,
     jwt.userPlan.orElse(jwt.orgPlan).getOrElse(Plan.Free),
-    jwt.customerId
+    jwt.orgCustomerId.orElse(jwt.customerId)
   )
 
 def limitRole[A](role: String, error: A)(resource: => A) =
