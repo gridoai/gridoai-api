@@ -4,6 +4,8 @@ import cats.Functor
 import cats.implicits.toFunctorOps
 import cats.ApplicativeError
 import cats.implicits._
+import cats.effect.implicits._
+
 import cats.Monad
 extension [A](a: A) {
   inline def |>[B](inline f: A => B): B = f(a)
@@ -131,3 +133,18 @@ def executeByParts[T, E, V](
         outputElements ++ newOutputElements
       )
     )
+
+def executeByPartsInParallel[T, E, V](
+    f: List[T] => IO[Either[E, List[V]]],
+    partitionSize: Int,
+    parallelismLevel: Int = 4
+)(elements: List[T]) =
+  elements
+    .grouped(partitionSize)
+    .toList
+    .parTraverseN(parallelismLevel)(f)
+    .map: results =>
+      val (errors, successes) = results.separate
+      errors.headOption match
+        case Some(error) => (Left(error))
+        case None        => (Right(successes.flatten))

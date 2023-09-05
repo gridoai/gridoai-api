@@ -26,7 +26,7 @@ import com.gridoai.auth.AuthData
 import sttp.model.Part
 
 import java.io.File
-
+val pageSize = sys.env.getOrElse("PAGE_SIZE", "2000").toInt
 def searchDoc(
     auth: AuthData
 )(payload: SearchPayload)(using
@@ -40,7 +40,8 @@ def searchDoc(
         payload.tokenLimit,
         payload.scope,
         auth.orgId,
-        auth.role
+        auth.role,
+        pageSize
       )
     )
     .traceRight: chunks =>
