@@ -22,7 +22,14 @@ case class GridoAIMLEmbeddingRequest(
 )
 
 case class MessageResponse[T](message: T)
+val embedParallelism =
+  sys.env.getOrElse("EMBEDDING_API_PARALLELISM", "8").toInt
+val embedPartitionSize =
+  sys.env.getOrElse("EMBEDDING_API_PARTITION_SIZE", "64").toInt
 
+val _ = println(
+  s"embedParallelism: $embedParallelism \n embedPartitionSize: $embedPartitionSize \n embeddingApiEndpoint: $embeddingApiEndpoint"
+)
 object GridoAIML extends EmbeddingAPI[IO]:
   val Http = HttpClient(embeddingApiEndpoint)
 
@@ -42,14 +49,18 @@ object GridoAIML extends EmbeddingAPI[IO]:
       instruction: String
   ): IO[Either[String, List[Embedding]]] =
     println(s"trying to get ${texts.length} embeddings using GridoAIML")
-    executeByParts(embedLessThan8(instruction), 8)(texts)
+    executeByPartsInParallel(
+      embedLessThan8(instruction),
+      embedPartitionSize,
+      embedParallelism
+    )(texts)
 
   def embedLessThan8(instruction: String)(
       texts: List[String]
   ): IO[Either[String, List[Embedding]]] =
     val body = GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     Http
-      .post(f"/embed")
+      .post("")
       .headers(Map("Content-Type" -> "application/json"))
       .body(body)
       .sendReq()
