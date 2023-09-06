@@ -241,24 +241,12 @@ def handleEvent(
     sigHeader: String
 ) = Sync[IO]
   .blocking {
-    // val event1 = Webhook.constructEvent(
-    //   eventRaw,
-    //   sigHeader,
-    //   sys.env
-    //     .get("WEBHOOK_KEY")
-    //     .getOrElse(throw new Exception("WEBHOOK_KEY not found"))
-    // )
-    // println(event1.toJson())
-    // Append to file
     val event = ApiResource.GSON.fromJson(eventRaw, classOf[Event])
 
     val stripeObject = event.getDataObjectDeserializer.getObject.get
 
     val eventType = event.getType
-    // val file = new java.io.File(eventType + event.getCreated() + ".json")
-    // val bw = new java.io.BufferedWriter(new java.io.FileWriter(file, true))
-    // bw.write(eventRaw)
-    // bw.close()
+
     println(s"Event type: ${eventType}")
     eventType match
 
