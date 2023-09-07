@@ -11,11 +11,6 @@ object withService:
   def searchDocs(implicit db: DocDB[IO]) =
     searchEndpoint.serverLogic(searchDoc _)
 
-  def webHooksEndpoint =
-    webhooksClerk.serverLogic(
-      com.gridoai.adapters.payments.handleCreateCustomer[IO] _
-    )
-
   def webHooksStripeEndpoint =
     webhooksStripe.serverLogic(
       com.gridoai.adapters.payments.handleEvent _
@@ -58,7 +53,6 @@ object withService:
       askLLM,
       deleteDoc,
       listDocs,
-      webHooksEndpoint,
       webHooksStripeEndpoint,
       billingSessionEndpoint
     )

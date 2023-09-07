@@ -38,25 +38,19 @@ val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
     .out(jsonBody[List[String]])
     .mapErrorOut(identity)(_.toString())
 
-val webhooksClerk = endpoint
-  .in("webhooks" / "clerk")
-  .in(jsonBody[UserCreated])
-  .in(header[String]("authorization"))
-  .out(stringBody)
-  .errorOut(stringBody)
-
-val billingSession =
+val billingSession: SecuredEndpoint[Option[String], String, String, Any] =
   auth.securedWithBearer.post
     .in("billing" / "session")
     .in(header[Option[String]]("Origin"))
     .out(stringBody)
 
-val webhooksStripe = endpoint
-  .in("webhooks" / "stripe")
-  .in(stringBody)
-  .in(header[String]("Stripe-Signature"))
-  .out(stringBody)
-  .errorOut(stringBody)
+val webhooksStripe: PublicEndpoint[(String, String), String, String, Any] =
+  endpoint
+    .in("webhooks" / "stripe")
+    .in(stringBody)
+    .in(header[String]("Stripe-Signature"))
+    .out(stringBody)
+    .errorOut(stringBody)
 
 val listEndpoint: SecuredEndpoint[(Int, Int), String, PaginatedResponse[
   List[Document]
@@ -147,7 +141,6 @@ val allEndpoints: List[AnyEndpoint] =
     authGDriveEndpoint.endpoint,
     importGDriveEndpoint.endpoint,
     askEndpoint.endpoint,
-    webhooksClerk,
     webhooksStripe,
     billingSession.endpoint
   )
