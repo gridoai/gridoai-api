@@ -38,6 +38,13 @@ case class UpdateUser(
 
 case class OrganizationMetadata(
     plan: Option[Plan] = None,
+    customerId: String,
+    googleDriveAccessToken: Option[String] = None,
+    googleDriveRefreshToken: Option[String] = None
+)
+
+case class OrganizationMetadataUpdate(
+    plan: Option[Plan] = None,
     customerId: Option[String] = None,
     googleDriveAccessToken: Option[String] = None,
     googleDriveRefreshToken: Option[String] = None
@@ -163,7 +170,7 @@ case class MergeAndUpdateUserMetadataPayload(
     public_metadata: PublicMetadata
 )
 case class MergeAndUpdateOrMetadataPayload(
-    public_metadata: OrganizationMetadata
+    public_metadata: OrganizationMetadataUpdate
 )
 object ClerkClient:
 
@@ -178,18 +185,27 @@ object ClerkClient:
       user
         .listMemberships(uid)
         .map(
-          _.flatMap(_.data.headOption.map(_.id).toRight("No org found"))
+          _.flatMap(_.data.headOption.toRight("No org found"))
         )
 
-    def getActiveOrgByEmail(email: String) =
+    def getActiveOrgByUid(
+        uid: String
+    ) =
       (for
-        uid <- EitherT(user.byEmail(email)).map(_.id)
         sessions <- EitherT(session.list(uid))
         orgOpt = sessions
           .find(_.last_active_organization_id.isDefined)
           .flatMap(_.last_active_organization_id)
-        orgId <- EitherT(orgOpt.fold(getFirstOrgByUID(uid))(_.asRight.pure[IO]))
+        orgId <- orgOpt match
+          case None        => EitherT(getFirstOrgByUID(uid)).map(_.organization)
+          case Some(value) => EitherT(org.get(value))
       yield orgId).value
+
+    def getActiveOrgByEmail(email: String) =
+      user
+        .byEmail(email)
+        .mapRight(_.id)
+        .flatMapRight(getActiveOrgByUid)
 
     def getPublicMetadata(
         userId: String
@@ -279,21 +295,36 @@ object ClerkClient:
           )
         ) |> attempt
 
+    def get(orgId: String) =
+      Http
+        .get(s"/organizations/$orgId")
+        .header(authHeader)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[Organization](_).left.map(_.getMessage())
+          )
+        ) |> attempt
+
     def upsert(
         name: String,
         plan: Plan,
-        customerId: String
+        customerId: String,
+        preUpdate: (
+            memberShip: OrganizationMemberShipListData
+        ) => IO[Either[Any, Any]] = _ => IO(Right(()))
     )(
         by: String
     ): IO[Either[String, Organization]] =
       user.listMemberships(by).flatMapRight {
-        _.data.find(m =>
-          println(s"${m.organization.name}  VS  $name")
-          m.organization.name == name
-        ) match
+        _.data.find(m => m.organization.name == name) match
           case Some(membership) =>
             println("Found membership, updating org...")
-            updatePlan(membership.organization.id, plan)
+            preUpdate(membership) !> updatePlan(
+              membership.organization.id,
+              plan,
+              (customerId)
+            )
           case None =>
             println("No membership found, creating org...")
             create(name, plan, customerId)(by)
@@ -311,7 +342,7 @@ object ClerkClient:
         created_by = by,
         public_metadata = (OrganizationMetadata(
           plan = Some(plan),
-          customerId = Some(customerId)
+          customerId = customerId
         )),
         max_allowed_memberships = getMaxUsersByPlan(plan)
       ).asJson.noSpaces
@@ -337,7 +368,7 @@ object ClerkClient:
         googleDriveRefreshToken: Option[String] = None
     ): IO[Either[String, Organization]] =
       val body = MergeAndUpdateOrMetadataPayload(
-        public_metadata = OrganizationMetadata(
+        public_metadata = OrganizationMetadataUpdate(
           plan,
           customerId,
           googleDriveAccessToken,
@@ -359,12 +390,17 @@ object ClerkClient:
 
     def updatePlan(
         organizationId: String,
-        plan: Plan
+        plan: Plan,
+        customerId: String
     ): IO[Either[String, Organization]] =
       val body = UpdateOrganization(
         max_allowed_memberships = getMaxUsersByPlan(plan)
       ).asJson.noSpaces
-      val req1 = mergeAndUpdateMetadata(organizationId, plan = Some(plan))
+      val req1 = mergeAndUpdateMetadata(
+        organizationId,
+        plan = Some(plan),
+        customerId = Some(customerId)
+      )
       val req2 = Http
         .patch(s"/organizations/$organizationId")
         .body(body)

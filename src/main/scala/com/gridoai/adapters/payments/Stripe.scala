@@ -7,12 +7,12 @@ import com.stripe._, param.CustomerCreateParams
 import java.util.HashMap
 import cats.effect.kernel.Sync
 import cats.implicits.*
+
 import com.stripe.model.Customer
 import com.gridoai.utils.attempt
 import com.stripe.net.ApiResource
 import com.stripe.model.Event
 
-import com.stripe.net.Webhook
 import com.gridoai.adapters.ClerkClient
 import com.gridoai.adapters.ClerkClient._
 
@@ -24,10 +24,13 @@ import com.gridoai.utils.*
 import collection.JavaConverters.collectionAsScalaIterableConverter
 import com.gridoai.adapters.PublicMetadata
 import com.gridoai.adapters.ClerkClient.user.getActiveOrgByEmail
-import com.stripe.param.billingportal.ConfigurationCreateParams
-import com.stripe.model.billingportal.Configuration
+
 import com.stripe.param.billingportal.SessionCreateParams
 import com.stripe.model.billingportal.Session
+import com.gridoai.adapters.OrganizationMemberShipListData
+
+import cats.Monad
+import cats.data.EitherT
 
 val stripeKey = sys.env
   .get("STRIPE_SECRET_KEY")
@@ -37,15 +40,21 @@ val client =
   Stripe.apiKey = stripeKey
   com.stripe.StripeClient(stripeKey)
 
-inline val starterPlanId = "prod_OXYliuLZeUgGCo"
-inline val proPlanId = "prod_OXYlBswtpMHlF4"
-inline val individualPlanId = "prod_OYJo6qEO5Y0Cu9"
+val starterPlanId = sys.env
+  .get("STRIPE_STARTER_PLAN_ID")
+  .getOrElse(throw new Exception("STRIPE_STARTER_PLAN_ID not found"))
+val proPlanId = sys.env
+  .get("STRIPE_PRO_PLAN_ID")
+  .getOrElse(throw new Exception("STRIPE_PRO_PLAN_ID not found"))
+val individualPlanId = sys.env
+  .get("STRIPE_INDIVIDUAL_PLAN_ID")
+  .getOrElse(throw new Exception("STRIPE_INDIVIDUAL_PLAN_ID not found"))
 
 inline def getPlanById: String => Plan = {
-  case `starterPlanId`    => Plan.Starter
-  case `proPlanId`        => Plan.Pro
-  case `individualPlanId` => Plan.Individual
-  case _                  => Plan.Free
+  case p if p == starterPlanId    => Plan.Starter
+  case p if p == proPlanId        => Plan.Pro
+  case p if p == individualPlanId => Plan.Individual
+  case _                          => Plan.Free
 }
 def createCustomerFromClerkPayload[F[_]](
     payload: UserCreated
@@ -92,14 +101,53 @@ def createCustomerPortalSession(customerId: String, baseUrl: String) =
     session.getUrl()
   }.attempt |> attempt
 
+def deleteCustomerUnsafe[F[_]: Monad](oldCustomerId: String)(using
+    F: Sync[F]
+) =
+  Sync[F].blocking {
+    client.customers().delete(oldCustomerId)
+  }.attempt |> attempt
+
+def deleteCustomer[F[_]](
+    oldCustomerId: String,
+    maybeNewCustomerID: Option[String]
+)(implicit
+    F: Sync[F]
+): F[Either[String, String]] =
+  maybeNewCustomerID match
+    case None =>
+      deleteCustomerUnsafe[F](oldCustomerId).mapRight(_ => oldCustomerId)
+    case Some(value) => deleteCustomer[F](oldCustomerId, value)
+
+def deleteCustomer[F[_]](oldCustomerId: String, newCustomerID: String)(implicit
+    F: Sync[F]
+): F[Either[String, String]] =
+  if oldCustomerId != newCustomerID then
+    deleteCustomerUnsafe[F](oldCustomerId).mapRight(_ => newCustomerID)
+  else F.pure(Right(newCustomerID))
+
+def deleteCustomerOfMembership[F[_]](newCustomerID: String)(
+    membership: OrganizationMemberShipListData
+)(using F: Sync[F]) =
+  deleteCustomer(
+    membership.organization.public_metadata.customerId,
+    newCustomerID
+  )
+
+def fetchPlanOfSubscription[F[_]](
+    subscriptionId: String
+)(using Sync[F]) = Sync[F]
+  .blocking {
+    Subscription.retrieve(subscriptionId)
+  }
+  .attempt
+  .map(_.flatMap(getSubscriptionPlan(_).toRight("No plan found"))) |> attempt
+
 def handleCheckoutCompleted(
     eventObj: StripeObject
 ) =
   val session = eventObj.asInstanceOf[com.stripe.model.checkout.Session]
-  val planPromise = IO
-    .blocking(Subscription.retrieve(session.getSubscription()))
-    .attempt
-    .map(_.flatMap(getSubscriptionPlan(_).toRight("No plan found")))
+  val planPromise = fetchPlanOfSubscription[IO](session.getSubscription)
 
   val orgNameField = session.getCustomFields.asScala.find: field =>
     val key = field.getKey
@@ -119,11 +167,24 @@ def handleCheckoutCompleted(
         user
           .byEmail(email)
           .mapRight(_.id)
-          .flatMapRight(org.upsert(orgName, plan, customerId))
+          .flatMapRight(
+            org.upsert(
+              orgName,
+              plan,
+              customerId,
+              preUpdate = deleteCustomerOfMembership[IO](customerId)
+            )
+          )
 
     case (Some(id), Some(email), Some(orgName)) =>
-      planPromise.flatMapRight: plan =>
-        (org.upsert(orgName, plan, customerId)(id))
+      planPromise
+        .flatMapRight: plan =>
+          (org.upsert(
+            orgName,
+            plan,
+            customerId,
+            preUpdate = deleteCustomerOfMembership[IO](customerId)
+          )(id))
 
     case (Some(clientId), Some(email), None) =>
       user.mergeAndUpdateMetadata(
@@ -135,7 +196,9 @@ def handleCheckoutCompleted(
     case _ => IO(Left(s"Missing data: ${necessaryData}"))
 
 def cancelOrgSubscriptionByEmail(email: String) =
-  getActiveOrgByEmail(email).flatMapRight(org.delete)
+  getActiveOrgByEmail(email)
+    .mapRight(_.id)
+    .flatMapRight(org.mergeAndUpdateMetadata(_, plan = (Some(Plan.Free))))
 
 def cancelUserPlan =
   user.mergeAndUpdateMetadata(
@@ -166,28 +229,36 @@ def getValueFromOptionOrIO[T, L](
 def upgradePlan(
     email: String,
     plan: Plan,
-    customerId: Option[String],
+    newCustomerId: Option[String],
     maybeClientId: Option[String]
 ) =
-  println(s"Upgrading plan to ${plan} for ${email} with ${customerId}")
-  val clientId = getValueFromOptionOrIO(
-    maybeClientId,
-    user.byEmail(email).mapRight(_.id),
-    "User not found"
-  )
+  println(s"Upgrading plan to ${plan} for ${email} with ${newCustomerId}")
+
   plan match
     case (Plan.Individual) =>
-      clientId.flatMapRight(
-        user.mergeAndUpdateMetadata(
-          PublicMetadata(
-            plan = Some(plan),
-            customerId = customerId
+      user
+        .byEmail(email)
+        .flatMapRight: user =>
+          IO(user.public_metadata.customerId.toRight("No customer id found"))
+            .flatMapRight(deleteCustomer[IO](_, newCustomerId))
+            .mapRight(_ => user.id)
+        .flatMapRight(
+          user.mergeAndUpdateMetadata(
+            PublicMetadata(
+              plan = Some(plan),
+              customerId = newCustomerId
+            )
           )
         )
-      )
 
     case (Plan.Free) => IO(Left("Cannot upgrade to free plan"))
-    case _           => getActiveOrgByEmail(email) !> (org.updatePlan(_, plan))
+    case _ =>
+      (for
+        orgData <- EitherT(getActiveOrgByEmail(email))
+        oldCustomerId = orgData.public_metadata.customerId
+        _ <- EitherT(deleteCustomer[IO](oldCustomerId, newCustomerId))
+        _ <- EitherT(org.updatePlan(orgData.id, plan, oldCustomerId))
+      yield ()).value
 
 def getSubscriptionPlan(sub: Subscription) =
   Option(sub.getItems.getData.get(0).getPlan.getProduct)
@@ -251,8 +322,10 @@ def handleEvent(
     eventType match
 
       case "customer.subscription.deleted" => handleDeleted(stripeObject)
+      // Cancel, renew, update
       case "customer.subscription.updated" =>
         handleSubscriptionUpdate(stripeObject)
+      // Checkout completed: update or create
       case "checkout.session.completed" =>
         handleCheckoutCompleted(stripeObject)
       case _ => IO(Left("Unhandled event type: " + event.getType))
