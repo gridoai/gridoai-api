@@ -1,7 +1,9 @@
 package com.gridoai.adapters.payments
 
 import com.gridoai.adapters.UserCreated
-import com.gridoai.utils.|>
+
+import com.stripe.net.Webhook
+
 import com.stripe._, param.CustomerCreateParams
 
 import java.util.HashMap
@@ -36,6 +38,10 @@ val stripeKey = sys.env
   .get("STRIPE_SECRET_KEY")
   .getOrElse(throw new Exception("STRIPE_SECRET_KEY not found"))
 
+val STRIPE_WEBHOOK_KEY = sys.env
+  .get("STRIPE_WEBHOOK_KEY")
+  .getOrElse(throw new Exception("STRIPE_WEBHOOK_KEY not found"))
+
 val client =
   Stripe.apiKey = stripeKey
   com.stripe.StripeClient(stripeKey)
@@ -43,19 +49,27 @@ val client =
 val starterPlanId = sys.env
   .get("STRIPE_STARTER_PLAN_ID")
   .getOrElse(throw new Exception("STRIPE_STARTER_PLAN_ID not found"))
+
 val proPlanId = sys.env
   .get("STRIPE_PRO_PLAN_ID")
   .getOrElse(throw new Exception("STRIPE_PRO_PLAN_ID not found"))
+
 val individualPlanId = sys.env
   .get("STRIPE_INDIVIDUAL_PLAN_ID")
   .getOrElse(throw new Exception("STRIPE_INDIVIDUAL_PLAN_ID not found"))
+
+val enterprisePlanId = sys.env
+  .get("STRIPE_ENTERPRISE_PLAN_ID")
+  .getOrElse(throw new Exception("STRIPE_ENTERPRISE_PLAN_ID not found"))
 
 inline def getPlanById: String => Plan = {
   case p if p == starterPlanId    => Plan.Starter
   case p if p == proPlanId        => Plan.Pro
   case p if p == individualPlanId => Plan.Individual
+  case p if p == enterprisePlanId => Plan.Enterprise
   case _                          => Plan.Free
 }
+
 def createCustomerFromClerkPayload[F[_]](
     payload: UserCreated
 )(using F: Sync[F]) =
@@ -312,7 +326,11 @@ def handleEvent(
     sigHeader: String
 ) = Sync[IO]
   .blocking {
-    val event = ApiResource.GSON.fromJson(eventRaw, classOf[Event])
+    val event = Webhook.constructEvent(
+      eventRaw,
+      sigHeader,
+      STRIPE_WEBHOOK_KEY
+    )
 
     val stripeObject = event.getDataObjectDeserializer.getObject.get
 
@@ -329,6 +347,7 @@ def handleEvent(
       case "checkout.session.completed" =>
         handleCheckoutCompleted(stripeObject)
       case _ => IO(Left("Unhandled event type: " + event.getType))
+
   }
   .flatten
   .attemptTap(IO.println)
