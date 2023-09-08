@@ -12,8 +12,6 @@ import cats.implicits.*
 
 import com.stripe.model.Customer
 import com.gridoai.utils.attempt
-import com.stripe.net.ApiResource
-import com.stripe.model.Event
 
 import com.gridoai.adapters.ClerkClient
 import com.gridoai.adapters.ClerkClient._
@@ -115,9 +113,7 @@ def createCustomerPortalSession(customerId: String, baseUrl: String) =
     session.getUrl()
   }.attempt |> attempt
 
-def deleteCustomerUnsafe[F[_]: Monad](oldCustomerId: String)(using
-    F: Sync[F]
-) =
+def deleteCustomerUnsafe[F[_]](oldCustomerId: String)(using Sync[F]) =
   Sync[F].blocking {
     client.customers().delete(oldCustomerId)
   }.attempt |> attempt
@@ -125,24 +121,22 @@ def deleteCustomerUnsafe[F[_]: Monad](oldCustomerId: String)(using
 def deleteCustomer[F[_]](
     oldCustomerId: String,
     maybeNewCustomerID: Option[String]
-)(implicit
-    F: Sync[F]
-): F[Either[String, String]] =
+)(using Sync[F]): F[Either[String, String]] =
   maybeNewCustomerID match
     case None =>
       deleteCustomerUnsafe[F](oldCustomerId).mapRight(_ => oldCustomerId)
     case Some(value) => deleteCustomer[F](oldCustomerId, value)
 
-def deleteCustomer[F[_]](oldCustomerId: String, newCustomerID: String)(implicit
-    F: Sync[F]
+def deleteCustomer[F[_]](oldCustomerId: String, newCustomerID: String)(using
+    SyncInstance: Sync[F]
 ): F[Either[String, String]] =
   if oldCustomerId != newCustomerID then
     deleteCustomerUnsafe[F](oldCustomerId).mapRight(_ => newCustomerID)
-  else F.pure(Right(newCustomerID))
+  else SyncInstance.pure(Right(newCustomerID))
 
 def deleteCustomerOfMembership[F[_]](newCustomerID: String)(
     membership: OrganizationMemberShipListData
-)(using F: Sync[F]) =
+)(using Sync[F]) =
   deleteCustomer(
     membership.organization.public_metadata.customerId,
     newCustomerID
