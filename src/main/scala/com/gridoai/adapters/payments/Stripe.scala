@@ -31,6 +31,7 @@ import com.gridoai.adapters.OrganizationMemberShipListData
 
 import cats.Monad
 import cats.data.EitherT
+import com.gridoai.adapters.ClerkClient.user.getOrgByCustomerId
 
 val stripeKey = sys.env
   .get("STRIPE_SECRET_KEY")
@@ -203,8 +204,8 @@ def handleCheckoutCompleted(
       )(clientId)
     case _ => IO(Left(s"Missing data: ${necessaryData}"))
 
-def cancelOrgSubscriptionByEmail(email: String) =
-  getActiveOrgByEmail(email)
+def cancelOrgSubscriptionByEmail(email: String, customerId: String) =
+  getOrgByCustomerId(email, customerId)
     .mapRight(_.id)
     .flatMapRight(org.mergeAndUpdateMetadata(_, plan = (Some(Plan.Free))))
 
@@ -218,12 +219,12 @@ def cancelUserPlan =
 def cancelUserPlanByEmail(email: String) =
   user.byEmail(email).mapRight(_.id).flatMapRight(cancelUserPlan)
 
-def cancelPlanByMail(email: String, plan: Plan) =
+def cancelPlanByMail(email: String, customerId: String, plan: Plan) =
   println(s"Cancelling plan ${plan} for ${email}")
   plan match
     case Plan.Individual => cancelUserPlanByEmail(email)
     case Plan.Free       => IO(Left("Cannot cancel free plan"))
-    case _               => cancelOrgSubscriptionByEmail(email)
+    case _               => cancelOrgSubscriptionByEmail(email, customerId)
 
 def getValueFromOptionOrIO[T, L](
     option: Option[T],
@@ -298,7 +299,7 @@ def handleSubscriptionUpdate(eventObj: StripeObject): IO[Either[String, Any]] =
       )
 
     case (Some(_), Some(email), Some(productId)) =>
-      cancelPlanByMail(email, getPlanById(productId))
+      cancelPlanByMail(email, customer.getId, getPlanById(productId))
     case _ => IO(Left(s"Missing data: ${necessaryData}"))
 
 def handleDeleted(
@@ -312,7 +313,7 @@ def handleDeleted(
     Option(subscription.getItems.getData.get(0).getPlan.getProduct)
   ) match
     case (Some(email), Some(planId)) =>
-      cancelPlanByMail(email, getPlanById(planId))
+      cancelPlanByMail(email, customer.getId, getPlanById(planId))
     case _ => IO(Left(s"Missing data: ${customer}"))
 
 def handleEvent(

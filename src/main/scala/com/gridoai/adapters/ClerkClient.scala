@@ -207,6 +207,18 @@ object ClerkClient:
         .mapRight(_.id)
         .flatMapRight(getActiveOrgByUid)
 
+    def getOrgByCustomerId(email: String, customerId: String) =
+      user
+        .byEmail(email)
+        .mapRight(_.id)
+        .flatMapRight(user.listMemberships)
+        .flatMapRight(
+          _.data
+            .find(_.organization.public_metadata.customerId == customerId) match
+            case Some(membership) => IO.pure(Right(membership.organization))
+            case None             => IO.pure(Left("No org found"))
+        )
+
     def getPublicMetadata(
         userId: String
     ): IO[Either[String, PublicMetadata]] =
