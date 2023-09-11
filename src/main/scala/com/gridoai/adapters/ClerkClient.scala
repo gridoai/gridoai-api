@@ -1,4 +1,4 @@
-package com.gridoai.adapters
+package com.gridoai.adapters.clerk
 
 import com.gridoai.utils.*
 import cats.effect.IO
@@ -149,14 +149,6 @@ case class Session(
     status: SessionStatus
 )
 
-import Plan._
-
-def getMaxUsersByPlan: Plan => Option[Int] =
-  case Free | Individual => Some(1)
-  case Starter           => Some(3)
-  case Pro               => Some(10)
-  case Enterprise        => None
-
 case class ListUsers(
     email_address: List[String],
     limit: Option[Int] = None
@@ -169,7 +161,7 @@ case class DeletionResponse(
 case class MergeAndUpdateUserMetadataPayload(
     public_metadata: PublicMetadata
 )
-case class MergeAndUpdateOrMetadataPayload(
+case class MergeAndUpdateOrgMetadataPayload(
     public_metadata: OrganizationMetadataUpdate
 )
 object ClerkClient:
@@ -177,7 +169,16 @@ object ClerkClient:
   val Http = HttpClient(CLERK_ENDPOINT)
   private val authHeader = Header("Authorization", s"Bearer $CLERK_SECRET_KEY")
   object user:
-
+    def get(uid: String) =
+      Http
+        .get(s"/users/$uid")
+        .header(authHeader)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[User](_).left.map(_.getMessage())
+          )
+        ) |> attempt
     def byEmail(email: String) =
       user.list(email).map(_.flatMap(_.headOption.toRight("No user found")))
 
@@ -187,25 +188,6 @@ object ClerkClient:
         .map(
           _.flatMap(_.data.headOption.toRight("No org found"))
         )
-
-    def getActiveOrgByUid(
-        uid: String
-    ) =
-      (for
-        sessions <- EitherT(session.list(uid))
-        orgOpt = sessions
-          .find(_.last_active_organization_id.isDefined)
-          .flatMap(_.last_active_organization_id)
-        orgId <- orgOpt match
-          case None        => EitherT(getFirstOrgByUID(uid)).map(_.organization)
-          case Some(value) => EitherT(org.get(value))
-      yield orgId).value
-
-    def getActiveOrgByEmail(email: String) =
-      user
-        .byEmail(email)
-        .mapRight(_.id)
-        .flatMapRight(getActiveOrgByUid)
 
     def getOrgByCustomerId(email: String, customerId: String) =
       user
@@ -234,6 +216,7 @@ object ClerkClient:
         .mapRight(
           _.public_metadata
         ) |> attempt
+
     def mergeAndUpdateMetadata(
         publicMetadata: PublicMetadata
     )(userId: String) =
@@ -379,7 +362,7 @@ object ClerkClient:
         googleDriveAccessToken: Option[String] = None,
         googleDriveRefreshToken: Option[String] = None
     ): IO[Either[String, Organization]] =
-      val body = MergeAndUpdateOrMetadataPayload(
+      val body = MergeAndUpdateOrgMetadataPayload(
         public_metadata = OrganizationMetadataUpdate(
           plan,
           customerId,

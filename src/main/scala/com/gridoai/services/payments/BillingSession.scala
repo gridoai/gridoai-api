@@ -1,5 +1,5 @@
 package com.gridoai.services.payments
-import com.gridoai.adapters.payments.createCustomerPortalSession
+import com.gridoai.adapters.stripe.createCustomerPortalSession
 import com.gridoai.auth.AuthData
 import cats.effect.IO
 

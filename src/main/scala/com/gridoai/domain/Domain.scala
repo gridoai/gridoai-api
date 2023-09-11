@@ -12,6 +12,13 @@ object Plan:
 enum Plan derives ConfiguredEnumCodec:
   case Free, Starter, Pro, Enterprise, Individual
 
+import Plan._
+def getMaxUsersByPlan: Plan => Option[Int] =
+  case Free | Individual => Some(1)
+  case Starter           => Some(3)
+  case Pro               => Some(10)
+  case Enterprise        => None
+
 type UID = UUID
 
 enum MessageFrom:
