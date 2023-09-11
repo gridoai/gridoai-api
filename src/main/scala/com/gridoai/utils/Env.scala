@@ -11,7 +11,7 @@ private val envFromFile: Map[String, String] =
       val parts = line.split("=", 2).toList
       parts.headOption.getOrElse("") -> parts.lastOption.getOrElse("")
     vars.toMap
-  catch Map.empty
+  catch case _ => Map.empty
 
 def requireEnvImpl(name: Expr[String])(using Quotes): Expr[String] = {
   import quotes.reflect.*

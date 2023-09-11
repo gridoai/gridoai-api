@@ -43,24 +43,6 @@ inline def getPlanById: String => Plan = {
   case _                                   => Plan.Free
 }
 
-def createCustomerFromClerkPayload[F[_]](
-    payload: UserCreated
-)(using F: Sync[F]) =
-  Sync[F].blocking:
-    CustomerCreateParams
-      .builder()
-      .setEmail(payload.data.email_addresses.head.email_address)
-      .setName(
-        payload.data.first_name + " " + payload.data.last_name.getOrElse("")
-      )
-      .setMetadata(
-        new HashMap[String, String]() {
-          put("clerkId", payload.data.id)
-        }
-      )
-      .build()
-      |> client.customers().create
-
 def createCustomerPortalSession(customerId: String, baseUrl: String) =
   Sync[IO].blocking {
     val params = SessionCreateParams
