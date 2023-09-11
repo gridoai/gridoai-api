@@ -6,8 +6,8 @@ import com.gridoai.models.*
 import com.gridoai.utils.*
 import com.gridoai.adapters.fileStorage.*
 import com.gridoai.adapters.GoogleClient
-import com.gridoai.adapters.ClerkClient
-import com.gridoai.adapters.PublicMetadata
+import com.gridoai.adapters.clerk.ClerkClient
+import com.gridoai.adapters.clerk.PublicMetadata
 import cats.effect.IO
 import cats.implicits.*
 import com.gridoai.parsers.FileFormat

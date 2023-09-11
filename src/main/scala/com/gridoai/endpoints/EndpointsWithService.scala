@@ -5,7 +5,7 @@ import com.gridoai.services.doc.*
 import cats.effect.IO
 import sttp.tapir.server.ServerEndpoint
 import com.gridoai.services.payments.createBillingSession
-
+import com.gridoai.adapters.stripe
 object withService:
 
   def searchDocs(implicit db: DocDB[IO]) =
@@ -13,7 +13,7 @@ object withService:
 
   def webHooksStripeEndpoint =
     webhooksStripe.serverLogic(
-      com.gridoai.adapters.payments.handleEvent _
+      stripe.handleEvent _
     )
 
   def healthCheck =
