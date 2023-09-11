@@ -4,12 +4,14 @@ import scala.io.Source
 import scala.quoted.*
 
 private val envFromFile: Map[String, String] =
-  val src = Source.fromFile(".env")
-  val lines = src.getLines()
-  val vars = lines.map: line =>
-    val parts = line.split("=", 2).toList
-    parts.headOption.getOrElse("") -> parts.lastOption.getOrElse("")
-  vars.toMap
+  if sys.env.get("ENV").map(_.toLowerCase).contains("local") then
+    val src = Source.fromFile(".env")
+    val lines = src.getLines()
+    val vars = lines.map: line =>
+      val parts = line.split("=", 2).toList
+      parts.headOption.getOrElse("") -> parts.lastOption.getOrElse("")
+    vars.toMap
+  else Map.empty
 
 def requireEnvImpl(name: Expr[String])(using Quotes): Expr[String] = {
   import quotes.reflect.*
