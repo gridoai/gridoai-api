@@ -24,7 +24,7 @@ import collection.JavaConverters.collectionAsScalaIterableConverter
 import com.stripe.param.billingportal.SessionCreateParams
 import com.stripe.model.billingportal.Session
 
-val STRIPE_SECRET_KEYS = getEnv("STRIPE_SECRET_KEY")
+val STRIPE_SECRET_KEY = getEnv("STRIPE_SECRET_KEY")
 val STRIPE_WEBHOOK_KEY = getEnv("STRIPE_WEBHOOK_KEY")
 val STRIPE_STARTER_PLAN_ID = getEnv("STRIPE_STARTER_PLAN_ID")
 val STRIPE_PRO_PLAN_ID = getEnv("STRIPE_PRO_PLAN_ID")
@@ -32,8 +32,8 @@ val STRIPE_INDIVIDUAL_PLAN_ID = getEnv("STRIPE_INDIVIDUAL_PLAN_ID")
 val STRIPE_ENTERPRISE_PLAN_ID = getEnv("STRIPE_ENTERPRISE_PLAN_ID")
 
 val client =
-  Stripe.apiKey = STRIPE_SECRET_KEYS
-  com.stripe.StripeClient(STRIPE_SECRET_KEYS)
+  Stripe.apiKey = STRIPE_SECRET_KEY
+  com.stripe.StripeClient(STRIPE_SECRET_KEY)
 
 inline def getPlanById: String => Plan = {
   case p if p == STRIPE_STARTER_PLAN_ID    => Plan.Starter

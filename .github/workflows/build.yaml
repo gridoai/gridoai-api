@@ -67,6 +67,12 @@ jobs:
           POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
           OPENAI_API_KEY: mocked
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_KEY: ${{ secrets.STRIPE_WEBHOOK_KEY }}
+          STRIPE_STARTER_PLAN_ID: ${{ secrets.STRIPE_STARTER_PLAN_ID }}
+          STRIPE_PRO_PLAN_ID: ${{ secrets.STRIPE_PRO_PLAN_ID }}
+          STRIPE_INDIVIDUAL_PLAN_ID: ${{ secrets.STRIPE_INDIVIDUAL_PLAN_ID }}
+          STRIPE_ENTERPRISE_PLAN_ID: ${{ secrets.STRIPE_ENTERPRISE_PLAN_ID }}
           USE_MOCKED_LLM: true
         run: sbt test
 
