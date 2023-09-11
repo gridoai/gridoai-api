@@ -12,7 +12,7 @@ import com.stripe.model.Customer
 import com.gridoai.utils.attempt
 
 import com.gridoai.adapters.clerk.*
-import com.gridoai.adapters.clerk.ClerkClient.*
+import com.gridoai.adapters.clerk.ClerkClient as clerk
 
 import com.stripe.model.Subscription
 import com.stripe.model.StripeObject
@@ -23,8 +23,6 @@ import collection.JavaConverters.collectionAsScalaIterableConverter
 
 import com.stripe.param.billingportal.SessionCreateParams
 import com.stripe.model.billingportal.Session
-
-import com.gridoai.adapters.clerk.ClerkClient.user.getOrgByCustomerId
 
 val STRIPE_SECRET_KEYS = getEnv("STRIPE_SECRET_KEY")
 val STRIPE_WEBHOOK_KEY = getEnv("STRIPE_WEBHOOK_KEY")
@@ -137,11 +135,11 @@ def handleCheckoutCompleted(
     case (None, Some(email), Some(orgName)) =>
       println("Got no client reference id, fetching by email...")
       planPromise.flatMapRight: plan =>
-        user
+        clerk.user
           .byEmail(email)
           .mapRight(_.id)
           .flatMapRight(
-            org.upsert(
+            clerk.org.upsert(
               orgName,
               plan,
               customerId,
@@ -152,7 +150,7 @@ def handleCheckoutCompleted(
     case (Some(id), Some(email), Some(orgName)) =>
       planPromise
         .flatMapRight: plan =>
-          (org.upsert(
+          (clerk.org.upsert(
             orgName,
             plan,
             customerId,
@@ -160,7 +158,7 @@ def handleCheckoutCompleted(
           )(id))
 
     case (Some(clientId), Some(email), None) =>
-      user.mergeAndUpdateMetadata(
+      clerk.user.mergeAndUpdateMetadata(
         PublicMetadata(
           plan = Some(Plan.Individual),
           customerId = Some(customerId)
@@ -169,22 +167,23 @@ def handleCheckoutCompleted(
     case _ => IO(Left(s"Missing data: ${necessaryData}"))
 
 def cancelOrgPlan(orgId: String) =
-  org.mergeAndUpdateMetadata(orgId, plan = (Some(Plan.Free)))
+  clerk.org.mergeAndUpdateMetadata(orgId, plan = (Some(Plan.Free)))
 
 def cancelOrgSubscriptionByEmail(email: String, customerId: String) =
-  getOrgByCustomerId(email, customerId)
+  clerk.user
+    .getOrgByCustomerId(email, customerId)
     .mapRight(_.id)
     .flatMapRight(cancelOrgPlan)
 
 def cancelUserPlan =
-  user.mergeAndUpdateMetadata(
+  clerk.user.mergeAndUpdateMetadata(
     PublicMetadata(
       plan = Some(Plan.Free)
     )
   )
 
 def cancelUserPlanByEmail(email: String) =
-  user.byEmail(email).mapRight(_.id).flatMapRight(cancelUserPlan)
+  clerk.user.byEmail(email).mapRight(_.id).flatMapRight(cancelUserPlan)
 
 def cancelPlanByMail(
     email: String,
