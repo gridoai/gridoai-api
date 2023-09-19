@@ -138,4 +138,4 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       case MessageFrom.Bot =>
         IO.pure(Left("Last message should be from the user"))
       case MessageFrom.User =>
-        askRecursively(None, 2)(List.empty)
+        doSearchAction(None, List.empty, 2)
