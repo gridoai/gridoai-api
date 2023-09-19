@@ -178,15 +178,6 @@ def cancelPlanByMail(
     case Plan.Free       => IO(Left("Cannot cancel free plan"))
     case _               => cancelOrgSubscriptionByEmail(email, customerId)
 
-def getValueFromOptionOrIO[T, L](
-    option: Option[T],
-    io: IO[Either[L, T]],
-    noneValue: L
-): IO[Either[L, T]] =
-  option match
-    case Some(value) => IO.pure(Right(value))
-    case None        => io.mapLeft(_ => noneValue)
-
 def getSubscriptionPlan(sub: Subscription) =
   Option(sub.getItems.getData.get(0).getPlan.getProduct)
     .map(getPlanById)
