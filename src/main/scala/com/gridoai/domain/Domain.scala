@@ -15,8 +15,8 @@ enum Plan derives ConfiguredEnumCodec:
 import Plan._
 def getMaxUsersByPlan: Plan => Option[Int] =
   case Free | Individual => Some(1)
-  case Starter           => Some(3)
-  case Pro               => Some(10)
+  case Starter           => Some(10)
+  case Pro               => Some(100)
   case Enterprise        => None
 
 type UID = UUID
