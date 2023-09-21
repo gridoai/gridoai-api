@@ -41,7 +41,7 @@ def http4sAppBuilder(using DocDB[IO]) =
     .withHost(ipv4"0.0.0.0")
     .withHttp2
     .withPort(
-      Port.fromString(getEnv("PORT")).getOrElse(port"8080")
+      sys.env.get("PORT").flatMap(Port.fromString).getOrElse(port"8080")
     )
     .withHttpApp(httpApp)
 
