@@ -34,4 +34,6 @@ def requireEnvImpl(name: Expr[String])(using Quotes): Expr[String] = {
   }
 }
 
-inline def getEnv(inline name: String) = ${ requireEnvImpl('name) }
+inline def getEnv(inline name: String) = sys.env
+  .get(name)
+  .getOrElse(throw new Exception(s"Required env var $name is not set"))
