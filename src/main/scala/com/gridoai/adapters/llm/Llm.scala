@@ -9,6 +9,7 @@ import com.gridoai.adapters.openAiClientBackend
 import com.gridoai.adapters.llm.chatGPT.ChatGPTClient
 import com.gridoai.adapters.llm.palm2.Paml2Client
 import com.gridoai.adapters.llm.mocked.MockLLM
+import com.gridoai.adapters.syncCatsBackend
 
 trait LLM[F[_]]:
   def calculateChunkTokenQuantity(chunk: Chunk): Int
@@ -42,7 +43,7 @@ trait LLM[F[_]]:
 
 def getLLMByName(llm: LLMModel): LLM[IO] =
   llm match
-    case LLMModel.Gpt35Turbo => ChatGPTClient(openAiClientBackend)
+    case LLMModel.Gpt35Turbo => ChatGPTClient(syncCatsBackend)
     case LLMModel.Palm2      => Paml2Client
     case LLMModel.Mocked     => MockLLM[IO]
 

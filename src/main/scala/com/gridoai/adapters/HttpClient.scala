@@ -13,6 +13,9 @@ val catsBackend =
     .resource[IO]()
     .use(IO.pure)
 
+val syncCatsBackend =
+  catsBackend.unsafeRunSync()
+
 import java.net.URI
 def makeAzureURIOfOpenAI(originalURI: URI): URI = {
   val newPath =

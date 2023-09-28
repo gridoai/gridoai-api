@@ -14,10 +14,10 @@ import com.knuddels.jtokkit.api.ModelType
 
 val ENC_GPT35TURBO = Encodings
   .newDefaultEncodingRegistry()
-  .getEncodingForModel(ModelType.GPT_3_5_TURBO_16K)
+  .getEncodingForModel(ModelType.GPT_3_5_TURBO)
 
 object ChatGPTClient:
-  val maxInputTokens = 10_000
+  val maxInputTokens = 3_000
 
   def messageFromToRole: MessageFrom => ChatCompletion.Message.Role =
     case MessageFrom.Bot  => ChatCompletion.Message.Role.Assistant
@@ -58,7 +58,10 @@ object ChatGPTClient:
   def apply[F[_]](sttpBackend: SttpBackend[F, Any])(using
       MonadError[F, Throwable]
   ) = new LLM[F]:
-    val client = OpenAIClient(sttpBackend)
+    val client = OpenAIClient(
+      System.getenv("OPENAI_API_KEY"),
+      Some(System.getenv("OPENAI_ORG_ID"))
+    )(sttpBackend)
 
     def getAnswerFromChat(
         llmOutput: F[ChatCompletion]
