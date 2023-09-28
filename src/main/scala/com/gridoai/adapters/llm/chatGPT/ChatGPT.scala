@@ -59,8 +59,8 @@ object ChatGPTClient:
       MonadError[F, Throwable]
   ) = new LLM[F]:
     val client = OpenAIClient(
-      System.getenv("OPENAI_API_KEY"),
-      Some(System.getenv("OPENAI_ORG_ID"))
+      getEnv("OPENAI_API_KEY"),
+      Some(getEnv("OPENAI_ORG_ID"))
     )(sttpBackend)
 
     def getAnswerFromChat(
