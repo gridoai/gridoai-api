@@ -77,9 +77,12 @@ object GoogleClient:
       .flatMapRight: flow =>
         println("Google authorization code flow builded.")
         println("Sending request to get token...")
-        flowAndCodeToTokens(flow, code, redirectUri).mapRight(t =>
+        flowAndCodeToTokens(flow, code, redirectUri).map(_.flatMap: t =>
           println("Tokens got!")
-          (t.getAccessToken, t.getRefreshToken)
+          Option(t.getRefreshToken) match
+            case Some(refreshToken) =>
+              Right((t.getAccessToken, refreshToken))
+            case None => Left("Missing refresh token")
         )
 
   def refreshToken(
