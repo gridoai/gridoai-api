@@ -30,7 +30,7 @@ def authenticateGDrive(auth: AuthData)(
         redirectUri,
         SCOPES
       )
-      .flatMapRight(ClerkClient.setGDriveMetadata(auth.userId))
+      .flatMapRight(ClerkClient.setGDriveMetadata(auth.orgId))
 
 def fetchUserTokens(auth: AuthData): IO[Either[String, (String, String)]] =
   ClerkClient.user

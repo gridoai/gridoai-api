@@ -13,8 +13,6 @@ import sttp.model.{Header, MediaType}
 import io.circe.derivation.Configuration
 import io.circe.derivation.ConfiguredEnumCodec
 
-import cats.data.EitherT
-
 val CLERK_ENDPOINT = "https://api.clerk.com/v1"
 val CLERK_SECRET_KEY =
   sys.env.getOrElse("CLERK_SECRET_KEY", "")
@@ -409,23 +407,22 @@ object ClerkClient:
         ) |> attempt
       List(req1, req2).parSequence.map(_.last)
 
-  def setGDriveMetadata(userId: String)(
+  def setGDriveMetadata(orgId: String)(
       googleDriveAccessToken: String,
       googleDriveRefreshToken: String
   ): IO[Either[String, (String, String)]] =
     println("Sending tokens to Clerk...")
 
-    user
+    org
       .mergeAndUpdateMetadata(
-        PublicMetadata(
-          Some(googleDriveAccessToken),
-          Some(googleDriveRefreshToken)
-        )
-      )(userId)
-      .mapRight: user =>
+        orgId,
+        googleDriveAccessToken = Some(googleDriveAccessToken),
+        googleDriveRefreshToken = Some(googleDriveRefreshToken)
+      )
+      .mapRight: organization =>
         (
-          user.public_metadata.googleDriveAccessToken,
-          user.public_metadata.googleDriveRefreshToken
+          organization.public_metadata.googleDriveAccessToken,
+          organization.public_metadata.googleDriveRefreshToken
         )
       .map(_.flatMap:
         case (Some(x), Some(y)) =>
