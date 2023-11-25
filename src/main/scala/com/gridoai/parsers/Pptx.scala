@@ -12,7 +12,6 @@ import com.gridoai.parsers.{ExtractTextError, FileFormat}
 def extractTextFromPptx(
     content: Array[Byte]
 ): Either[ExtractTextError, String] = Try {
-  println("Parsing pptx")
   XMLSlideShow(
     ByteArrayInputStream(content)
   ).getSlides.asScala.toList

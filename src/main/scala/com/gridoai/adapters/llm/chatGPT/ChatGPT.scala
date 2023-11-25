@@ -11,12 +11,15 @@ import cats.MonadError
 import cats.implicits.*
 import com.knuddels.jtokkit.Encodings
 import com.knuddels.jtokkit.api.ModelType
+import org.slf4j.LoggerFactory
 
 val ENC_GPT35TURBO = Encodings
   .newDefaultEncodingRegistry()
   .getEncodingForModel(ModelType.GPT_3_5_TURBO)
 
 object ChatGPTClient:
+  val logger = LoggerFactory.getLogger(getClass.getName)
+
   val maxInputTokens = 3_000
 
   def messageFromToRole: MessageFrom => ChatCompletion.Message.Role =
@@ -43,6 +46,7 @@ object ChatGPTClient:
       case None => List()
     val chat = messages.map(messageToClientMessage)
     val fullSeq = (contextMessage ++ chat).toSeq
+    logger.info(s"messages: $messages, context: ${context}")
     (fullSeq, ChatCompletionSettings())
 
   def calculateTokenQuantity = ENC_GPT35TURBO.countTokens
@@ -81,7 +85,7 @@ object ChatGPTClient:
       ).map(calculateTokenQuantity).max
       val messageTokens = calculateMessagesTokenQuantity(messages)
       val res = maxInputTokens - messageTokens - contextTokens
-      println(s"askMaxTokens: $res")
+      logger.info(s"askMaxTokens: $res")
       res
 
     def answer(
@@ -107,6 +111,7 @@ object ChatGPTClient:
         searchedBefore: Boolean,
         askUser: Boolean
     ): F[Either[String, String]] =
+
       val mergedChunks = chunks
         .map(chunk =>
           s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
@@ -114,12 +119,13 @@ object ChatGPTClient:
         .mkString("\n")
       val context =
         s"${baseContextPrompt(basedOnDocsOnly, askUser, searchedBefore)}\n$mergedChunks"
-      println(
+      logger.info(
         s"Total tokens in chunks: ${calculateTokenQuantity(mergedChunks)}"
       )
-      println(
+      logger.info(
         s"Total tokens in messages: ${calculateMessagesTokenQuantity(messages)}"
       )
+
       messages
         |> makePayloadWithContext(Some(context))
         |> client.createChatCompletion
@@ -174,6 +180,6 @@ object ChatGPTClient:
         .map(_ - 1)
         .flatMap(options.get) match
         case None =>
-          println(s"bad action: $llmOutput")
+          logger.info(s"bad action: $llmOutput")
           Left("Invalid LLM output")
         case Some(action) => Right(action)

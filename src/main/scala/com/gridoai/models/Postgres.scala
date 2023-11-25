@@ -8,6 +8,7 @@ import cats.syntax.list.*
 import doobie.postgres.*
 import doobie.postgres.implicits.*
 import com.pgvector.PGvector
+import cats.implicits._
 
 import com.gridoai.domain.*
 import com.gridoai.utils.*
@@ -128,10 +129,7 @@ val chunksTable = pgObj("chunks")
 val EmbeddingModelEnum = pgObj("embedding_model")
 
 object PostgresClient {
-  def apply[F[_]: Async](implicit
-      lh: doobie.LogHandler = doobie.LogHandler.nop
-  ): DocDB[F] = new DocDB[F] {
-    import cats.implicits._
+  def apply[F[_]: Async]: DocDB[F] = new DocDB[F] {
 
     val xa = Transactor.fromDriverManager[F](
       "org.postgresql.Driver",

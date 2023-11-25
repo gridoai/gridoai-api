@@ -17,23 +17,14 @@ import cats.effect.ExitCode
 import com.comcast.ip4s.Port
 import com.comcast.ip4s.port
 import com.gridoai.utils.getEnv
+
 def routes(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(endpoints.withService.allEndpoints)
 
 def httpApp(implicit db: DocDB[IO]): HttpApp[IO] =
-  ErrorHandling.Recover.total(
-    ErrorAction.log(
-      Router(
-        "/" -> CORS.policy.withAllowOriginAll(routes)
-      ).orNotFound,
-      messageFailureLogAction = (t, msg) =>
-        IO.println(msg) >>
-          IO.println(t),
-      serviceErrorLogAction = (t, msg) =>
-        IO.println(msg) >>
-          IO.println(t)
-    )
-  )
+  Router(
+    "/" -> CORS.policy.withAllowOriginAll(routes)
+  ).orNotFound
 
 def http4sAppBuilder(using DocDB[IO]) =
   EmberServerBuilder
