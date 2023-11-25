@@ -33,12 +33,8 @@ jobs:
           echo "Stage is ${STAGE_NAME}"
 
       - uses: actions/checkout@v3
-      - name: Set up JDK 17
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: "17" # for a specific JDK 17; or '17' for the latest JDK 17
-          distribution: "graalvm" # New 'distribution' option
-          cache: "sbt"
+      - name: Set up Scala CLI
+        uses: VirtusLab/scala-cli-setup@v0.1
 
       - name: Set up PostgreSQL CLI
         run: sudo apt-get install -y postgresql-client
@@ -74,24 +70,13 @@ jobs:
           STRIPE_INDIVIDUAL_PLAN_ID: ${{ secrets.STRIPE_INDIVIDUAL_PLAN_ID }}
           STRIPE_ENTERPRISE_PLAN_ID: ${{ secrets.STRIPE_ENTERPRISE_PLAN_ID }}
           USE_MOCKED_LLM: true
-        run: sbt test
+        run: scala-cli test
 
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK 17
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: "17" # for a specific JDK 17; or '17' for the latest JDK 17
-          distribution: "graalvm" # New 'distribution' option
-          cache: "sbt"
-
-      - name: Generate .jar
-        run: sbt assembly
-
-      - name: Save jar
-        uses: actions/upload-artifact@v2
-        with:
-          name: jar
-          path: target/scala-3.3.0/API-assembly-0.1.0-SNAPSHOT.jar
+      - uses: coursier/cache-action@v6.3
+      - uses: VirtusLab/scala-cli-setup@v0.1
+      - name: Package application
+        run: make pkg
