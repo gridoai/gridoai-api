@@ -36,4 +36,5 @@ metals.sbt
 # Postgres
 postgres/schema.sql
 
-deployment/app.jar
+deployment/app
+.scala-build
