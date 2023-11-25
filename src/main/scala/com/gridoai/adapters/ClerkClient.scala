@@ -12,6 +12,7 @@ import io.circe.syntax.*
 import sttp.model.{Header, MediaType}
 import io.circe.derivation.Configuration
 import io.circe.derivation.ConfiguredEnumCodec
+import org.slf4j.LoggerFactory
 
 val CLERK_ENDPOINT = "https://api.clerk.com/v1"
 val CLERK_SECRET_KEY =
@@ -163,6 +164,7 @@ case class MergeAndUpdateOrgMetadataPayload(
     public_metadata: OrganizationMetadataUpdate
 )
 object ClerkClient:
+  val logger = LoggerFactory.getLogger(getClass.getName)
 
   val Http = HttpClient(CLERK_ENDPOINT)
   private val authHeader = Header("Authorization", s"Bearer $CLERK_SECRET_KEY")
@@ -312,14 +314,14 @@ object ClerkClient:
       user.listMemberships(by).flatMapRight {
         _.data.find(m => m.organization.name == name) match
           case Some(membership) =>
-            println("Found membership, updating org...")
+            logger.info("Found membership, updating org...")
             preUpdate(membership) !> updatePlan(
               membership.organization.id,
               plan,
               (customerId)
             )
           case None =>
-            println("No membership found, creating org...")
+            logger.info("No membership found, creating org...")
             create(name, plan, customerId)(by)
       }
 
@@ -340,7 +342,7 @@ object ClerkClient:
         max_allowed_memberships = getMaxUsersByPlan(plan)
       ).asJson.noSpaces
       print("Creating org... ")
-      println(body)
+      logger.info(body)
       Http
         .post("/organizations")
         .body(body)
@@ -411,7 +413,7 @@ object ClerkClient:
       googleDriveAccessToken: String,
       googleDriveRefreshToken: String
   ): IO[Either[String, (String, String)]] =
-    println("Sending tokens to Clerk...")
+    logger.info("Sending tokens to Clerk...")
 
     org
       .mergeAndUpdateMetadata(
@@ -426,7 +428,7 @@ object ClerkClient:
         )
       .map(_.flatMap:
         case (Some(x), Some(y)) =>
-          println("Tokens sent!")
+          logger.info("Tokens sent!")
           Right((x, y))
         case _ =>
           Left("Some information was not set")

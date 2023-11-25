@@ -8,9 +8,10 @@ import com.gridoai.adapters.GoogleClient
 import java.io.ByteArrayOutputStream
 import scala.jdk.CollectionConverters._
 import cats.effect.kernel.Sync
+import org.slf4j.LoggerFactory
 
 object GDriveClient:
-
+  val logger = LoggerFactory.getLogger(getClass.getName)
   def mapMimeTypes: String => Option[String] =
     case "application/vnd.google-apps.presentation" =>
       Some(
@@ -35,7 +36,7 @@ object GDriveClient:
         val query = folderIds
           .map(folderId => s"'$folderId' in parents")
           .mkString(" or ")
-        println(s"query: $query")
+        logger.info(s"query: $query")
         Sync[IO].blocking(
           driveService
             .files()
@@ -58,13 +59,13 @@ object GDriveClient:
               val outputStream = ByteArrayOutputStream()
               mapMimeTypes(file.mimeType) match
                 case Some(mimeType) =>
-                  println("Exporting file from Google Drive...")
+                  logger.info("Exporting file from Google Drive...")
                   driveService
                     .files()
                     .`export`(file.id, mimeType)
                     .executeMediaAndDownloadTo(outputStream)
                 case None =>
-                  println("Downloading file from Google Drive...")
+                  logger.info("Downloading file from Google Drive...")
                   driveService
                     .files()
                     .get(file.id)

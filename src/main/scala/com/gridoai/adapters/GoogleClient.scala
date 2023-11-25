@@ -19,6 +19,7 @@ import scala.util.Try
 import scala.jdk.CollectionConverters.SeqHasAsJava
 import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest
 import concurrent.duration.DurationInt
+import org.slf4j.LoggerFactory
 
 val CLIENT_ID =
   sys.env.getOrElse("GOOGLE_CLIENT_ID", "")
@@ -26,6 +27,7 @@ val CLIENT_SECRET =
   sys.env.getOrElse("GOOGLE_CLIENT_SECRET", "")
 
 object GoogleClient:
+  val logger = LoggerFactory.getLogger(getClass.getName)
 
   private def flowAndCodeToTokens(
       flow: GoogleAuthorizationCodeFlow,
@@ -44,6 +46,7 @@ object GoogleClient:
       scopes: List[String]
   ): Either[String, GoogleAuthorizationCodeFlow] =
     Try:
+
       val httpTransport = NetHttpTransport()
       val jsonFactory = GsonFactory.getDefaultInstance()
       val secrets = GoogleClientSecrets
@@ -70,15 +73,15 @@ object GoogleClient:
       scopes: List[String]
   ): IO[Either[String, (String, String)]] =
 
-    println("Building google authorization code flow...")
+    logger.info("Building google authorization code flow...")
 
     buildGoogleAuthorizationCodeFlow(scopes)
       .pure[IO]
       .flatMapRight: flow =>
-        println("Google authorization code flow builded.")
-        println("Sending request to get token...")
+        logger.info("Google authorization code flow builded.")
+        logger.info("Sending request to get token...")
         flowAndCodeToTokens(flow, code, redirectUri).map(_.flatMap: t =>
-          println("Tokens got!")
+          logger.info("Tokens got!")
           Option(t.getRefreshToken) match
             case Some(refreshToken) =>
               Right((t.getAccessToken, refreshToken))

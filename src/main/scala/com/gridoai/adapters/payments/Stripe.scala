@@ -23,6 +23,7 @@ import collection.JavaConverters.collectionAsScalaIterableConverter
 
 import com.stripe.param.billingportal.SessionCreateParams
 import com.stripe.model.billingportal.Session
+import org.slf4j.LoggerFactory
 
 val STRIPE_SECRET_KEY = getEnv("STRIPE_SECRET_KEY")
 val STRIPE_WEBHOOK_KEY = getEnv("STRIPE_WEBHOOK_KEY")
@@ -42,6 +43,8 @@ inline def getPlanById: String => Plan = {
   case p if p == STRIPE_ENTERPRISE_PLAN_ID => Plan.Enterprise
   case _                                   => Plan.Free
 }
+
+val logger = LoggerFactory.getLogger("Stripe")
 
 def createCustomerPortalSession(customerId: String, baseUrl: String) =
   Sync[IO].blocking {
@@ -64,7 +67,7 @@ def deleteCustomer[F[_]](
     oldCustomerId: String,
     maybeNewCustomerID: Option[String]
 )(using Sync[F]): F[Either[String, String]] =
-  println(s"Deleting customer ${oldCustomerId} with ${maybeNewCustomerID}")
+  logger.info(s"Deleting customer ${oldCustomerId} with ${maybeNewCustomerID}")
   maybeNewCustomerID match
     case None =>
       deleteCustomerUnsafe[F](oldCustomerId).mapRight(_ => oldCustomerId)
@@ -104,18 +107,18 @@ def handleCheckoutCompleted(
     val key = field.getKey
     key == "nomedaorganizao" || key == "organizationname"
   val customerId = session.getCustomer
-  println(s"Got customer id: ${customerId}")
-  println(s"Got org name field: ${orgNameField}")
-  println(s"Customer details: ${session.getCustomerDetails}")
+  logger.info(s"Got customer id: ${customerId}")
+  logger.info(s"Got org name field: ${orgNameField}")
+  logger.info(s"Customer details: ${session.getCustomerDetails}")
   val necessaryData = (
     Option(session.getClientReferenceId()),
     Option(session.getCustomerDetails.getEmail),
-    orgNameField.map(_.getText.getValue),
+    orgNameField.map(_.getText.getValue)
   )
 
   necessaryData match
     case (None, Some(email), Some(orgName)) =>
-      println("Got no client reference id, fetching by email...")
+      logger.info("Got no client reference id, fetching by email...")
       planPromise.flatMapRight: plan =>
         clerk.user
           .byEmail(email)
@@ -172,7 +175,7 @@ def cancelPlanByMail(
     customerId: String,
     plan: Plan
 ) =
-  println(s"Cancelling plan ${plan} for ${email}")
+  logger.info(s"Cancelling plan ${plan} for ${email}")
   plan match
     case Plan.Individual => cancelUserPlanByEmail(email)
     case Plan.Free       => IO(Left("Cannot cancel free plan"))
@@ -191,9 +194,9 @@ def handleSubscriptionUpdate(eventObj: StripeObject): IO[Either[String, Any]] =
     Option(subscription.getCancelAt),
     Option(customer.getEmail),
     Option(subscription.getItems.getData.get(0).getPlan.getProduct)
-      .map(getPlanById),
+      .map(getPlanById)
   )
-  println(
+  logger.info(
     s"Got necessary data: ${necessaryData} in event handleSubscriptionUpdate"
   )
 
@@ -232,7 +235,7 @@ def handleEvent(
 
     val eventType = event.getType
 
-    println(s"Event type: ${eventType}")
+    logger.info(s"Event type: ${eventType}")
     eventType match
 
       case "customer.subscription.deleted" => handleDeleted(stripeObject)
@@ -246,5 +249,5 @@ def handleEvent(
 
   }
   .flatten
-  .attemptTap(IO.println)
+  .attemptTap(x => IO(logger.info(x.toString())))
   .flatMapRight(_ => IO(Right("OK"))) |> attempt

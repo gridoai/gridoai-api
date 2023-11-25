@@ -27,6 +27,8 @@ import sttp.model.Part
 
 import java.io.File
 val pageSize = sys.env.getOrElse("PAGE_SIZE", "2000").toInt
+val logger = org.slf4j.LoggerFactory.getLogger("com.gridoai.services.doc")
+
 def searchDoc(
     auth: AuthData
 )(payload: SearchPayload)(using
@@ -59,7 +61,7 @@ def extractText(
     body: Array[Byte],
     format: Option[FileFormat] = None
 ): IO[Either[ExtractTextError, String]] = traceMappable("extractText"):
-  println("file name: " + name)
+  logger.info("file name: " + name)
 
   val currentFormat = (format, FileFormat.ofFilename(name)) match
     case (Some(f), _)    => Some(f)
@@ -138,7 +140,7 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     (Left(List(Left(UnauthorizedError(authErrorMsg(Some(auth.role))))))
       .pure[IO])
   ):
-    println(s"Uploading files... ${source.files.length}")
+    logger.info(s"Uploading files... ${source.files.length}")
     source.files
       .map(parseFileForPersistence)
       .parSequence
@@ -152,7 +154,7 @@ def listDocuments(auth: AuthData)(
     end: Int
 )(using db: DocDB[IO]): IO[Either[String, PaginatedResponse[List[Document]]]] =
   traceMappable("listDocuments"):
-    println("Listing docs... ")
+    logger.info("Listing docs... ")
     db.listDocuments(auth.orgId, auth.role, start, end)
 
 def deleteDocument(auth: AuthData)(id: String)(using
@@ -163,7 +165,7 @@ def deleteDocument(auth: AuthData)(id: String)(using
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
     traceMappable("deleteDocument"):
-      println("Deleting doc... ")
+      logger.info("Deleting doc... ")
       db.deleteDocument(UUID.fromString(id), auth.orgId, auth.role)
 
 def createDoc(auth: AuthData)(
@@ -190,15 +192,15 @@ def mapDocumentsToDB[F[_]: Monad](
     documents: List[Document],
     embeddingApi: EmbeddingAPI[F]
 ): F[Either[String, List[DocumentPersistencePayload]]] =
-  println("Mapping documents to db... " + documents.length)
+  logger.info("Mapping documents to db... " + documents.length)
 
   val chunks = documents.flatMap(makeChunks)
-  println("Got chunks, n: " + chunks.length)
+  logger.info("Got chunks, n: " + chunks.length)
   embeddingApi
     .embedChunks(chunks)
     .map(_.flatMap(validateSize(chunks)))
     .mapRight: embeddings =>
-      println("Got embeddings: " + embeddings.length)
+      logger.info("Got embeddings: " + embeddings.length)
       val embeddingChunk =
         chunks.zip(embeddings).map(ChunkWithEmbedding.apply.tupled)
       val chunksMap =
@@ -224,11 +226,11 @@ def upsertDocs(auth: AuthData)(
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
     traceMappable("upsertDocs"):
-      println("Upserting docs... ")
+      logger.info("Upserting docs... ")
       if documents.length > 0 then
         mapDocumentsToDB(documents, getEmbeddingAPI("embaas"))
           .flatMapRight(persistencePayload =>
-            println("Got persistencePayloads: " + persistencePayload.length)
+            logger.info("Got persistencePayloads: " + persistencePayload.length)
             db.addDocuments(
               persistencePayload,
               auth.orgId,

@@ -12,6 +12,7 @@ import cats.effect.IO
 import cats.implicits.*
 import com.gridoai.parsers.FileFormat
 import java.util.UUID
+import org.slf4j.LoggerFactory
 
 val SCOPES = List("https://www.googleapis.com/auth/drive.readonly")
 
@@ -23,7 +24,7 @@ def authenticateGDrive(auth: AuthData)(
     auth.role,
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
-    println("Authenticating gdrive...")
+    logger.info("Authenticating gdrive...")
     GoogleClient
       .exchangeCodeForTokens(
         code,
@@ -112,7 +113,7 @@ def importGDriveDocuments(auth: AuthData)(
     auth.role,
     Left(authErrorMsg(Some(auth.role))).pure[IO]
   ):
-    println("importing data from gdrive...")
+    logger.info("importing data from gdrive...")
 
     fetchUserTokens(auth)
       !> getGDriveClient(auth.userId)
@@ -152,8 +153,8 @@ def findAllFilesInFolders(
       .flatMapRight: elements =>
         val (files, newFolders) =
           elements.partition(_.mimeType != "application/vnd.google-apps.folder")
-        println(s"find ${files.length} files!")
-        println(s"find ${newFolders.length} folders!")
+        logger.info(s"find ${files.length} files!")
+        logger.info(s"find ${newFolders.length} folders!")
         if newFolders.length > 0 then
           findAllFilesInFolders(gdriveClient, newFolders.map(_.id)).mapRight(
             newFiles => files ++ newFiles
@@ -171,7 +172,7 @@ def getGDriveClient(userId: String)(
     .flatMap:
       case Right(_) => Right(initialGDriveClient).pure[IO]
       case Left(_) =>
-        println("Trying to refresh token...")
+        logger.info("Trying to refresh token...")
         GoogleClient
           .refreshToken(refreshToken)
           .flatMapRight(ClerkClient.setGDriveMetadata(userId))

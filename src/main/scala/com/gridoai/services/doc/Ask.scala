@@ -9,6 +9,7 @@ import com.gridoai.utils.*
 
 import com.gridoai.adapters.*
 import com.gridoai.auth.AuthData
+import org.slf4j.LoggerFactory
 
 def ask(auth: AuthData)(payload: AskPayload)(implicit
     db: DocDB[IO]
@@ -16,7 +17,8 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   val llmModel = LLMModel.Gpt35Turbo
   val llm = getLLM(llmModel)
   val useActionsFeature = true
-  println("Used llm: " + llm.toString())
+  val logger = LoggerFactory.getLogger(getClass.getName)
+  logger.info("Used llm: " + llm.toString())
 
   def askRecursively(
       lastQuery: Option[String],
@@ -74,7 +76,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, AskResponse]] =
-    println("AI decided to ask...")
+    logger.info("AI decided to ask...")
     llm
       .ask(
         lastChunks,
@@ -93,7 +95,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, AskResponse]] =
-    println("AI decided to answer...")
+    logger.info("AI decided to answer...")
     llm
       .answer(
         lastChunks,
@@ -112,11 +114,11 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, AskResponse]] =
-    println("AI decided to search...")
+    logger.info("AI decided to search...")
     llm
       .buildQueryToSearchDocuments(payload.messages, lastQuery, lastChunks)
       .flatMapRight: newQuery =>
-        println(s"AI's query: $newQuery")
+        logger.info(s"AI's query: $newQuery")
         searchDoc(auth)(
           SearchPayload(
             query = newQuery,
