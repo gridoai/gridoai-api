@@ -35,7 +35,7 @@
 //> using dep com.google.auth:google-auth-library-oauth2-http:1.20.0
 //> using dep com.google.api-client:google-api-client:2.2.0
 //> using dep com.google.oauth-client:google-oauth-client-jetty:1.34.1
-//> using dep com.google.apis:google-api-services-drive:v3-rev20181213-1.28.0
+//> using dep com.google.apis:google-api-services-drive:v3-rev20230822-2.0.0
 
 // Scala libraries
 //> using dep org.scala-lang.modules::scala-java8-compat:1.0.2
