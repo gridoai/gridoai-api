@@ -61,7 +61,7 @@ def extractText(
     body: Array[Byte],
     format: Option[FileFormat] = None
 ): IO[Either[ExtractTextError, String]] = traceMappable("extractText"):
-  logger.info("file name: " + name)
+  logger.info(s"Extracting text ${name}, ${format}")
 
   val currentFormat = (format, FileFormat.ofFilename(name)) match
     case (Some(f), _)    => Some(f)
