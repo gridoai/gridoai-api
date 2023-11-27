@@ -48,7 +48,7 @@ object GoogleClient:
     Try:
 
       val httpTransport = NetHttpTransport()
-      val jsonFactory = GsonFactory.getDefaultInstance()
+      val jsonFactory = GsonFactory.getDefaultInstance
       val secrets = GoogleClientSecrets
         .Details()
         .setClientId(CLIENT_ID)
