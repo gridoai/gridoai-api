@@ -18,3 +18,5 @@ redeploy: makejar submit-img deploy
 start: 
 	./deployment/app
 
+dev:
+	@scala-cli --revolver .
