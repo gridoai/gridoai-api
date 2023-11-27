@@ -82,10 +82,11 @@ def downloadAndParseFiles(auth: AuthData, gdriveClient: FileStorage[IO])(
 def createOrUpdateFiles(auth: AuthData)(
     filesToUpload: List[Document]
 )(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
+  logger.info(s"Creating or updating ${filesToUpload.length} files...")
   db.listDocumentsBySource(filesToUpload.map(_.source), auth.orgId, auth.role)
     .mapRight(filesToUpdate =>
       filesToUpload.map(fileToUpload =>
-        filesToUpdate.filter(_.source == fileToUpload.source).headOption match
+        filesToUpdate.find(_.source == fileToUpload.source) match
           case Some(fileToUpdate) =>
             Document(
               uid = fileToUpdate.uid,
@@ -141,21 +142,33 @@ def parseGoogleMimeTypes(mimeType: String): Option[FileFormat] =
   mimeType match
     case "application/vnd.google-apps.presentation" => Some(FileFormat.PPTX)
     case "application/vnd.google-apps.document"     => Some(FileFormat.DOCX)
-    case _                                          => None
+    case unknown => Some(FileFormat.fromString(unknown))
 
+val supportedMimes = List(
+  "application/vnd.google-apps.presentation",
+  "application/vnd.google-apps.document",
+  "application/vnd.google-apps.spreadsheet",
+  "application/vnd.google-apps.sheet",
+  "text/plain",
+  "text/html",
+  "application/pdf"
+)
 def findAllFilesInFolders(
     gdriveClient: FileStorage[IO],
     folders: List[String]
 ): IO[Either[String, List[FileMeta]]] =
-  if folders.length > 0 then
+  if folders.nonEmpty then
     gdriveClient
       .listFiles(folders)
       .flatMapRight: elements =>
+        val validFiles = elements.filter(supportedMimes contains _.mimeType)
         val (files, newFolders) =
-          elements.partition(_.mimeType != "application/vnd.google-apps.folder")
+          validFiles.partition(
+            _.mimeType != "application/vnd.google-apps.folder"
+          )
         logger.info(s"find ${files.length} files!")
         logger.info(s"find ${newFolders.length} folders!")
-        if newFolders.length > 0 then
+        if newFolders.nonEmpty then
           findAllFilesInFolders(gdriveClient, newFolders.map(_.id)).mapRight(
             newFiles => files ++ newFiles
           )
