@@ -18,3 +18,13 @@ object FileFormat:
       case other        => Unknown(other)
   def ofFilename(filename: String) =
     filename.split("\\.").lastOption.map(ofExtension)
+  def fromString(s: String) =
+    s match
+      case "application/pdf" => PDF
+      case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" =>
+        DOCX
+      case "application/vnd.openxmlformats-officedocument.presentationml.presentation" =>
+        PPTX
+      case "text/plain" | "text/markdown" | "text/x-markdown" => Plaintext
+      case "text/html"                                        => HTML
+      case other                                              => Unknown(other)
