@@ -35,7 +35,7 @@ object withService:
     authGDriveEndpoint.serverLogic(authenticateGDrive _)
 
   def importGDriveDocs(implicit db: DocDB[IO]) =
-    importGDriveEndpoint.serverLogic(importGDriveDocuments _)
+    importGDriveEndpoint.serverLogic(importGDriveDocuments)
 
   def askLLM(implicit db: DocDB[IO]) =
     askEndpoint.serverLogic(ask _)
