@@ -1,6 +1,6 @@
 //> using scala 3
 
-//> using option -Xmax-inlines:33
+//> using option "-Xmax-inlines:33"
 
 //> using publish.organization "com.gridoai"
 //> using publish.name "gridoai-api"
