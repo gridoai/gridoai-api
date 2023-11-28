@@ -2,9 +2,9 @@
 
 //> using option "-Xmax-inlines:33"
 
-//> using publish.organization com.gridoai
-//> using publish.name gridoai-api
-//> using publish.version 0.1.0-SNAPSHOT
+//> using publish.organization "com.gridoai"
+//> using publish.name "gridoai-api"
+//> using publish.version "0.1.0-SNAPSHOT"
 
 //> using packaging.packageType assembly
 
