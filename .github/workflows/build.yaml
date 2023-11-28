@@ -81,4 +81,4 @@ jobs:
         run: curl -sSLf https://scala-cli.virtuslab.org/get | sh
 
       - name: Package application
-        run: make pkg
+        run: scala-cli --power package . -o ./deployment/app  -f
