@@ -33,8 +33,10 @@ jobs:
           echo "Stage is ${STAGE_NAME}"
 
       - uses: actions/checkout@v3
-      - name: Set up Scala CLI
-        uses: VirtusLab/scala-cli-setup@v0.1
+      - name: Install scala cli
+        run: |
+          curl -sSLf https://scala-cli.virtuslab.org/get | sh
+          source ~/.profile
 
       - name: Set up PostgreSQL CLI
         run: sudo apt-get install -y postgresql-client
@@ -78,7 +80,9 @@ jobs:
       - uses: actions/checkout@v3
       - uses: coursier/cache-action@v6.3
       - name: Install scala cli
-        run: curl -sSLf https://scala-cli.virtuslab.org/get | sh
+        run: |
+          curl -sSLf https://scala-cli.virtuslab.org/get | sh
+          source ~/.profile
 
       - name: Package application
         run: scala-cli --power package . -o ./deployment/app  -f
