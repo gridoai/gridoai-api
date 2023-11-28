@@ -37,6 +37,7 @@ jobs:
         run: |
           curl -fLo scala-cli.deb https://github.com/Virtuslab/scala-cli/releases/latest/download/scala-cli-x86_64-pc-linux.deb
           sudo dpkg -i scala-cli.deb
+          scala-cli config power true
 
       - name: Set up PostgreSQL CLI
         run: sudo apt-get install -y postgresql-client
@@ -83,6 +84,7 @@ jobs:
         run: |
           curl -fLo scala-cli.deb https://github.com/Virtuslab/scala-cli/releases/latest/download/scala-cli-x86_64-pc-linux.deb
           sudo dpkg -i scala-cli.deb
+          scala-cli config power true
 
       - name: Package application
         run: scala-cli --power package . -o ./deployment/app  -f
