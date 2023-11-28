@@ -70,7 +70,7 @@ jobs:
           STRIPE_INDIVIDUAL_PLAN_ID: ${{ secrets.STRIPE_INDIVIDUAL_PLAN_ID }}
           STRIPE_ENTERPRISE_PLAN_ID: ${{ secrets.STRIPE_ENTERPRISE_PLAN_ID }}
           USE_MOCKED_LLM: true
-        run: scala-cli test
+        run: scala-cli test .
 
   build:
     runs-on: ubuntu-latest
