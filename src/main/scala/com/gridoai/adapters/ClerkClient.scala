@@ -409,22 +409,23 @@ object ClerkClient:
         ) |> attempt
       List(req1, req2).parSequence.map(_.last)
 
-  def setGDriveMetadata(orgId: String)(
+  def setGDriveMetadata(userId: String)(
       googleDriveAccessToken: String,
       googleDriveRefreshToken: String
   ): IO[Either[String, (String, String)]] =
     logger.info("Sending tokens to Clerk...")
 
-    org
+    user
       .mergeAndUpdateMetadata(
-        orgId,
-        googleDriveAccessToken = Some(googleDriveAccessToken),
-        googleDriveRefreshToken = Some(googleDriveRefreshToken)
-      )
-      .mapRight: organization =>
+        PublicMetadata(
+          Some(googleDriveAccessToken),
+          Some(googleDriveRefreshToken)
+        )
+      )(userId)
+      .mapRight: user =>
         (
-          organization.public_metadata.googleDriveAccessToken,
-          organization.public_metadata.googleDriveRefreshToken
+          user.public_metadata.googleDriveAccessToken,
+          user.public_metadata.googleDriveRefreshToken
         )
       .map(_.flatMap:
         case (Some(x), Some(y)) =>
