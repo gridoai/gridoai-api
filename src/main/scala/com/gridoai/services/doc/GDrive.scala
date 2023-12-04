@@ -147,11 +147,11 @@ def parseGoogleMimeTypes(mimeType: String): Option[FileFormat] =
 val supportedMimes = List(
   "application/vnd.google-apps.presentation",
   "application/vnd.google-apps.document",
-  "application/vnd.google-apps.spreadsheet",
-  "application/vnd.google-apps.sheet",
   "text/plain",
-  "text/html",
-  "application/pdf"
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/x-markdown"
 )
 def findAllFilesInFolders(
     gdriveClient: FileStorage[IO],
@@ -162,6 +162,8 @@ def findAllFilesInFolders(
       .listFiles(folders)
       .flatMapRight: elements =>
         val validFiles = elements.filter(supportedMimes contains _.mimeType)
+        logger.info(s"find ${validFiles.length} valid files!")
+        validFiles.foreach(f => logger.info(s"file: ${f.name}"))
         val (files, newFolders) =
           validFiles.partition(
             _.mimeType != "application/vnd.google-apps.folder"
