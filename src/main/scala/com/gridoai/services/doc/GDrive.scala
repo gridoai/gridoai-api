@@ -126,7 +126,7 @@ def parseGDriveFileForPersistence(
   extractAndCleanText(
     file.meta.name,
     file.content,
-    parseGoogleMimeTypes(file.meta.mimeType)
+    parseGoogleMimeTypes(file.meta.mimeType, file.meta.name)
   )
     .mapLeft(_.toString)
     .mapRight(content =>
@@ -138,11 +138,15 @@ def parseGDriveFileForPersistence(
       )
     )
 
-def parseGoogleMimeTypes(mimeType: String): Option[FileFormat] =
+def parseGoogleMimeTypes(
+    mimeType: String,
+    name: String = ""
+): Option[FileFormat] =
   mimeType match
     case "application/vnd.google-apps.presentation" => Some(FileFormat.PPTX)
     case "application/vnd.google-apps.document"     => Some(FileFormat.DOCX)
-    case unknown => Some(FileFormat.fromString(unknown))
+    case "application/octet-stream" => FileFormat.ofFilename(name)
+    case unknown                    => Some(FileFormat.fromString(unknown))
 
 val supportedMimes = List(
   "application/vnd.google-apps.presentation",
@@ -151,8 +155,11 @@ val supportedMimes = List(
   "application/pdf",
   "text/plain",
   "text/markdown",
-  "text/x-markdown"
+  "text/x-markdown",
+  "application/vnd.google-apps.folder",
+  "application/octet-stream"
 )
+
 def findAllFilesInFolders(
     gdriveClient: FileStorage[IO],
     folders: List[String]
