@@ -106,7 +106,8 @@ case class Message(from: MessageFrom, message: String)
 case class AskPayload(
     messages: List[Message],
     basedOnDocsOnly: Boolean,
-    scope: Option[List[UID]]
+    scope: Option[List[UID]],
+    useActions: Boolean = false
 )
 
 case class SearchPayload(

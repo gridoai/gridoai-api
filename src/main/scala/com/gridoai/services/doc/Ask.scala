@@ -16,8 +16,8 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
 ): IO[Either[String, AskResponse]] =
   val llmModel = LLMModel.Gpt35Turbo
   val llm = getLLM(llmModel)
-  val useActionsFeature = true
   val logger = LoggerFactory.getLogger(getClass.getName)
+
   logger.info("Used llm: " + llm.toString())
 
   def askRecursively(
@@ -38,7 +38,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, Action]] =
-    if useActionsFeature then
+    if payload.useActions then
       val options =
         if searchesBeforeResponse > 0 then
           List(Action.Search, Action.Answer, Action.Ask)
@@ -56,7 +56,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         case 1 => Action.Answer.asRight
         case _ =>
           Left(
-            s"Invalid state. searchesBeforeResponse = $searchesBeforeResponse and useActionsFeature = $useActionsFeature"
+            s"Invalid state. searchesBeforeResponse = $searchesBeforeResponse and payload.useActions = $payload.useActions"
           )
       )
 
