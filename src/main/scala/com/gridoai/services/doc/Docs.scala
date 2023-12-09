@@ -51,7 +51,7 @@ def searchDoc(
         .map(chunk => s"${chunk.chunk.documentName} (${chunk.distance})")
         .mkString(", ")
       s"result chunks: $chunksInfo"
-    .mapRight(_.map(_.chunk))
+    .mapRight(_.map(_.chunk).reverse)
 
 def mapExtractToUploadError(e: ExtractTextError) =
   (FileParseError(e.format, e.message))
