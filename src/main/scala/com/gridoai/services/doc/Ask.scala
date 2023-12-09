@@ -18,7 +18,11 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   val llm = getLLM(llmModel)
   val logger = LoggerFactory.getLogger(getClass.getName)
 
-  logger.info("Used llm: " + llm.toString())
+  logger.info(s"messages: ${payload.messages}")
+  logger.info(s"llm: ${llm.toString}")
+  logger.info(s"basedOnDocsOnly: ${payload.basedOnDocsOnly}")
+  logger.info(s"useActions: ${payload.useActions}")
+  logger.info(s"scope: ${payload.scope}")
 
   def askRecursively(
       lastQuery: Option[String],
@@ -127,13 +131,10 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
             llmName = llmModel |> llmToStr,
             scope = payload.scope
           )
+        ) !> askRecursively(
+          Some(newQuery),
+          searchesBeforeResponse - 1
         )
-          .flatMapRight(
-            askRecursively(
-              Some(newQuery),
-              searchesBeforeResponse - 1
-            )
-          )
 
   traceMappable("ask"):
     payload.messages.last.from match
