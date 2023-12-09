@@ -82,9 +82,10 @@ def buildQueryToSearchDocumentsPrompt(
       |to search information to help answer the user's question. Your last query
       |was""".stripMargin.replace("\n", " ")
       val part2 =
-        """and the output documents chunks weren't that helpful. The new query will be used
+        """and the output documents chunks weren't helpful. The new query will be used
         |for a semantic search in the user's documents chunks using embeddings by
-        |multilingual-e5-base. The output MUST BE only the new query, nothing more.""".stripMargin
+        |multilingual-e5-base. The output MUST BE only the new query, nothing more.
+        |The new query MUST BE different from the last query.""".stripMargin
           .replace("\n", " ")
       s"$part1\n\n$query\n\n$part2"
   s"$instruction\n${mergeChunks(lastChunks)}\n${mergeMessages(messages)}\nQuery: "
