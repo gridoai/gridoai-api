@@ -158,6 +158,7 @@ object ChatGPTClient:
     ): F[Either[String, String]] =
       val prompt =
         buildQueryToSearchDocumentsPrompt(messages, lastQuery, lastChunks)
+      logger.info(s"Prompt to build query: $prompt")
       (
         Seq(
           ChatCompletion.Message(
