@@ -112,11 +112,7 @@ object ChatGPTClient:
         askUser: Boolean
     ): F[Either[String, String]] =
 
-      val mergedChunks = chunks
-        .map(chunk =>
-          s"name: ${chunk.documentName}\ncontent: ${chunk.content}\n\n"
-        )
-        .mkString("\n")
+      val mergedChunks = mergeChunks(chunks)
       val context =
         s"${baseContextPrompt(basedOnDocsOnly, askUser, searchedBefore)}\n$mergedChunks"
       logger.info(
