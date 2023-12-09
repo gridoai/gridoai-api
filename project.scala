@@ -77,3 +77,4 @@
 //> using test.dep "org.scalatest::scalatest:3.2.17"
 
 //> using test.dep "org.scalameta::munit:0.7.29"
+//> using resourceDir "src/main/resources"
