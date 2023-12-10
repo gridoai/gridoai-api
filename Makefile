@@ -23,7 +23,7 @@ pushpkg:
 	scp -i $(KEY_PATH) ./deployment/app ubuntu@api.gridoai.com:/home/ubuntu/app
 
 restart-remote-app:
-	ssh -i $(KEY_PATH) ubuntu@api.gridoai.com "nohup bash /home/ubuntu/restart.sh &"
+	ssh -i $(KEY_PATH) ubuntu@api.gridoai.com "nohup bash /home/ubuntu/restart.sh >> /home/ubuntu/nohup.out &" &
 
 deploy: pkg pushpkg restart-remote-app
 	
