@@ -9,6 +9,7 @@ import io.circe.*
 import io.circe.syntax.*
 import cats.implicits.*
 import com.gridoai.utils.*
+import org.slf4j.LoggerFactory
 
 val embeddingApiEndpoint = sys.env.getOrElse(
   "EMBEDDING_API_ENDPOINT",
@@ -23,7 +24,7 @@ case class GridoAIMLEmbeddingRequest(
 
 case class MessageResponse[T](message: T)
 val embedParallelism =
-  sys.env.getOrElse("EMBEDDING_API_PARALLELISM", "8").toInt
+  sys.env.getOrElse("EMBEDDING_API_PARALLELISM", "4").toInt
 val embedPartitionSize =
   sys.env.getOrElse("EMBEDDING_API_PARTITION_SIZE", "64").toInt
 
@@ -31,6 +32,7 @@ val _ = println(
   s"embedParallelism: $embedParallelism \n embedPartitionSize: $embedPartitionSize \n embeddingApiEndpoint: $embeddingApiEndpoint"
 )
 object GridoAIML extends EmbeddingAPI[IO]:
+  val logger = LoggerFactory.getLogger(getClass.getName)
   val Http = HttpClient(embeddingApiEndpoint)
 
   def embedChat(text: String): IO[Either[String, Embedding]] =
@@ -48,16 +50,23 @@ object GridoAIML extends EmbeddingAPI[IO]:
       texts: List[String],
       instruction: String
   ): IO[Either[String, List[Embedding]]] =
-    println(s"trying to get ${texts.length} embeddings using GridoAIML")
+    val partitionCount = texts.length / embedPartitionSize
+    logger.info("Using GridoAIML")
+    logger.info(
+      s"Trying to get ${texts.length} embeddings divided into $partitionCount partitions and sending groups of $embedParallelism partitions"
+    )
     executeByPartsInParallel(
-      embedLessThan8(instruction),
+      embedPartitionOfTexts(instruction),
       embedPartitionSize,
       embedParallelism
     )(texts)
 
-  def embedLessThan8(instruction: String)(
+  def embedPartitionOfTexts(instruction: String)(
       texts: List[String]
   ): IO[Either[String, List[Embedding]]] =
+    logger.info(
+      s"Sending partition of ${texts.length} texts"
+    )
     val body = GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     Http
       .post("")
@@ -71,6 +80,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
       )
       .mapRight(
         _.message.map(vec =>
+          logger.info(s"Partition of ${texts.length} texts received.")
           Embedding(vector = vec, model = EmbeddingModel.MultilingualE5Base)
         )
       ) |> attempt
