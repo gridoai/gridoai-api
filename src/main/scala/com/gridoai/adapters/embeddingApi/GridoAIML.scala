@@ -26,7 +26,7 @@ case class MessageResponse[T](message: T)
 val embedParallelism =
   sys.env.getOrElse("EMBEDDING_API_PARALLELISM", "4").toInt
 val embedPartitionSize =
-  sys.env.getOrElse("EMBEDDING_API_PARTITION_SIZE", "64").toInt
+  sys.env.getOrElse("EMBEDDING_API_PARTITION_SIZE", "128").toInt
 
 val _ = println(
   s"embedParallelism: $embedParallelism \n embedPartitionSize: $embedPartitionSize \n embeddingApiEndpoint: $embeddingApiEndpoint"
