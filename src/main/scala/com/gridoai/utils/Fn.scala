@@ -141,7 +141,6 @@ def executeByPartsInParallel[T, E, V](
 )(elements: List[T]) =
   elements
     .grouped(partitionSize)
-    .toList
     .grouped(parallelismLevel)
     .toList
     .traverse(_.parTraverseN(parallelismLevel)(f))
