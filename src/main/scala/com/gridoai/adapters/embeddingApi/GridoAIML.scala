@@ -73,14 +73,13 @@ object GridoAIML extends EmbeddingAPI[IO]:
       .headers(Map("Content-Type" -> "application/json"))
       .body(body)
       .sendReq()
-      .map(
-        _.body.flatMap(
+      .map: response =>
+        logger.info(s"Partition of ${texts.length} texts received.")
+        response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
-      )
       .mapRight(
         _.message.map(vec =>
-          logger.info(s"Partition of ${texts.length} texts received.")
           Embedding(vector = vec, model = EmbeddingModel.MultilingualE5Base)
         )
       ) |> attempt
