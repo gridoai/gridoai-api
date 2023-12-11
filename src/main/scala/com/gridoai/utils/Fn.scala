@@ -142,9 +142,11 @@ def executeByPartsInParallel[T, E, V](
   elements
     .grouped(partitionSize)
     .toList
-    .parTraverseN(parallelismLevel)(f)
+    .grouped(parallelismLevel)
+    .toList
+    .traverse(_.parTraverseN(parallelismLevel)(f))
     .map: results =>
-      val (errors, successes) = results.separate
+      val (errors, successes) = results.flatten.separate
       errors.headOption match
         case Some(error) => (Left(error))
         case None        => (Right(successes.flatten))
