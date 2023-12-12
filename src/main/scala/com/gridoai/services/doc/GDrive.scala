@@ -120,7 +120,17 @@ def importGDriveDocuments(auth: AuthData)(
       !> getGDriveClient(auth.userId)
       !> getAndAddGDriveDocs(auth, fileIds)
 
-def parseGDriveFileForPersistence(
+  def refreshToken(auth: AuthData)(
+      refreshToken: String
+  ): IO[Either[String, (String, String)]] =
+    limitRole(
+      auth.role,
+      Left(authErrorMsg(Some(auth.role))).pure[IO]
+    ):
+      logger.info("refreshing gdrive token...")
+      GoogleClient
+        .refreshToken(refreshToken)
+        .flatMapRight(ClerkClient.setGDriveMetadata(auth.userId))
     file: File
 ): IO[Either[String, Document]] =
   extractAndCleanText(
