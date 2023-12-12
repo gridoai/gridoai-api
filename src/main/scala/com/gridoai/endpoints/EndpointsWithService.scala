@@ -2,6 +2,7 @@ package com.gridoai.endpoints
 
 import com.gridoai.models.DocDB
 import com.gridoai.services.doc.*
+import com.gridoai.services.doc.GDrive.*
 import cats.effect.IO
 import sttp.tapir.server.ServerEndpoint
 import com.gridoai.services.payments.createBillingSession
@@ -32,13 +33,16 @@ object withService:
     listEndpoint.serverLogic(listDocuments _)
 
   def authGDrive =
-    authGDriveEndpoint.serverLogic(authenticateGDrive _)
+    authGDriveEndpoint.serverLogic(GDrive.auth _)
 
   def importGDriveDocs(implicit db: DocDB[IO]) =
-    importGDriveEndpoint.serverLogic(importGDriveDocuments)
+    importGDriveEndpoint.serverLogic(GDrive.importDocs)
 
   def askLLM(implicit db: DocDB[IO]) =
     askEndpoint.serverLogic(ask _)
+
+  def refreshGDriveToken =
+    refreshGDriveTokenEndpoint.serverLogic(GDrive.refreshToken _)
 
   def billingSessionEndpoint = billingSession.serverLogic(createBillingSession)
 
@@ -54,5 +58,6 @@ object withService:
       deleteDoc,
       listDocs,
       webHooksStripeEndpoint,
-      billingSessionEndpoint
+      billingSessionEndpoint,
+      refreshGDriveToken
     )
