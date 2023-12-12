@@ -130,6 +130,19 @@ val askEndpoint: SecuredEndpoint[AskPayload, String, AskResponse, Any] =
     .in(jsonBody[AskPayload])
     .out(jsonBody[AskResponse])
 
+case class RefreshTokenPayload(refreshToken: String)
+
+val refreshGDriveTokenEndpoint
+    : SecuredEndpoint[RefreshTokenPayload, String, (String, String), Any] =
+  auth.securedWithBearer
+    .name("Refresh Google Drive Token")
+    .description("Refresh Google Drive Token")
+    .post
+    .in("gdrive")
+    .in("refresh")
+    .in(jsonBody[RefreshTokenPayload])
+    .out(jsonBody[(String, String)])
+
 val allEndpoints: List[AnyEndpoint] =
   List(
     fileUploadEndpoint.endpoint,
@@ -142,6 +155,7 @@ val allEndpoints: List[AnyEndpoint] =
     importGDriveEndpoint.endpoint,
     askEndpoint.endpoint,
     webhooksStripe,
+    refreshGDriveTokenEndpoint.endpoint,
     billingSession.endpoint
   )
 
