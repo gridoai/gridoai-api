@@ -122,6 +122,10 @@ object GDrive:
         !> getClient(auth.userId)
         !> getAndAddDocs(auth, fileIds)
 
+  def refreshAndSetToken(refreshToken: String, userId: String) = GoogleClient
+    .refreshToken(refreshToken)
+    .flatMapRight(ClerkClient.setGDriveMetadata(userId))
+
   def refreshToken(auth: AuthData)(
       refreshTokenPayload: RefreshTokenPayload
   ): IO[Either[String, (String, String)]] =
@@ -130,9 +134,7 @@ object GDrive:
       Left(authErrorMsg(Some(auth.role))).pure[IO]
     ):
       logger.info("refreshing gdrive token...")
-      GoogleClient
-        .refreshToken(refreshTokenPayload.refreshToken)
-        .flatMapRight(ClerkClient.setGDriveMetadata(auth.userId))
+      refreshAndSetToken(refreshTokenPayload.refreshToken, auth.userId)
 
   def parseFileForPersistence(
       file: File
@@ -209,9 +211,7 @@ object GDrive:
         case Right(_) => Right(initialGDriveClient).pure[IO]
         case Left(_) =>
           logger.info("Trying to refresh token...")
-          GoogleClient
-            .refreshToken(refreshToken)
-            .flatMapRight(ClerkClient.setGDriveMetadata(userId))
+          refreshAndSetToken(refreshToken, userId)
             .mapRight((newAccessToken, _) =>
               getFileStorage("gdrive")(newAccessToken)
             )
