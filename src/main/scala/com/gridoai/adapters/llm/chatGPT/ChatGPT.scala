@@ -114,7 +114,7 @@ object ChatGPTClient:
 
       val mergedChunks = mergeChunks(chunks)
       val context =
-        s"${baseContextPrompt(basedOnDocsOnly, askUser, searchedBefore)}\n$mergedChunks"
+        s"${baseContextPrompt(basedOnDocsOnly, askUser, searchedBefore)}\n\n$mergedChunks"
       logger.info(
         s"Total tokens in chunks: ${calculateTokenQuantity(mergedChunks)}"
       )
