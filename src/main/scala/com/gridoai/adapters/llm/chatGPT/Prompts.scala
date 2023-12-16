@@ -10,13 +10,27 @@ def baseContextPrompt(
     searchedBefore: Boolean
 ): String =
   val impersonation =
-    """You're GridoAI, a smart and reliable chatbot. You can answer specific
+    """You're GridoAI a chatbot. You can answer specific
     |questions, do summarization, translate content and so on, using both the
     |information you've been trained on and the documents available to you.""".stripMargin
   val answerInstruction =
-    """Please use the information provided in the documents to respond to the
+    """
+    |Always use the information provided in the documents to respond to the
     |user's query in a factual and objective style. You have full access to the
-    |content of these documents so don't ask the content to the user.""".stripMargin
+    |content of these documents so don't ask the content to the user.
+    |
+    |Generate your response by following the steps below:
+    |
+    |1. Recursively break down the post into smaller questions/directives.
+    |2. For each atomic question/directive:
+    |   2a. Select the most relevant information from the context in light of the conversation history.
+    |3. Generate a draft response using the selected information, whose brevity/detail is tailored to the poster’s expertise.
+    |4. Remove duplicate content from the draft response.
+    |5. Generate your final response after adjusting it to increase accuracy and relevance.
+    |6. Now only show your final response! Do not provide any explanations or details.
+    |
+    |
+    |""".stripMargin
 
   val askInstruction =
     """You are asking the user to improve your understanding about
@@ -25,10 +39,10 @@ def baseContextPrompt(
 
   val externalInfoUsageInstruction =
     if (basedOnDocsOnly)
-      """Please use only the information provided in the documents to answer the user's query.
+      """Always use only the information provided in the documents to answer the user's query.
       |Avoid using any external knowledge or information.""".stripMargin
     else
-      """You may use external knowledge and information, but prioritize the
+      """You shall use external knowledge and information, but prioritize the
       |information provided in the documents. If you rely on external
       |information, please inform the user.""".stripMargin
 
@@ -41,14 +55,14 @@ def mergeMessages(messages: List[Message]): String =
   messages.map(m => s"${m.from}: ${m.message}").mkString("\n")
 
 def chunkToStr(chunk: Chunk): String =
-  s"Chunk ${chunk.startPos}-${chunk.endPos} (${chunk.documentName}): ${chunk.content}\n\n"
+  s"${chunk.documentName}: ${chunk.content}\n\n"
 
 def mergeChunks(chunks: List[Chunk]): String =
-  if chunks.length > 0 then
+  if chunks.nonEmpty then
     val mergedChunks = chunks
       .map(chunkToStr)
       .mkString("\n")
-    s"**Retrieved documents:**\n$mergedChunks"
+    s"Retrieved documents:\n$mergedChunks"
   else ""
 
 def buildQueryToSearchDocumentsPrompt(
@@ -137,3 +151,49 @@ def chooseActionPrompt(
   val field = "Action number: "
 
   s"$chunksSection\n$header\n$actionsSection\n$footer\n$mergedMessages\n$field"
+val s =
+  "For specific queries about the user's documents, indicate your capability to access and utilize the documents for providing assistance, without explicitly stating the lack of access to any specific documents"
+def csPrompt(
+    context: String,
+    conversationHistory: String,
+    post: String,
+    poster: String = "Customer",
+    expertiseLevel: String = "beginner"
+): String =
+  s"""
+       |You are GridoAI, a customer support agent helping posters by following directives and answering questions.
+       |
+       |Generate your response by following the steps below:
+       |
+       |1. Recursively break down the post into smaller questions/directives.
+       |2. For each atomic question/directive:
+       |   2a. Select the most relevant information from the context in light of the conversation history.
+       |3. Generate a draft response using the selected information, whose brevity/detail is tailored to the poster’s expertise.
+       |4. Remove duplicate content from the draft response.
+       |5. Generate your final response after adjusting it to increase accuracy and relevance.
+       |6. Now only show your final response! Do not provide any explanations or details.
+       |
+       |In your responses, maintain a balance between being informative and concise. For general inquiries (e.g., "How are you?"), provide a brief, polite response. 
+       |
+       |CONTEXT:
+       |
+       |$context
+       |
+       |CONVERSATION HISTORY:
+       |
+       |$conversationHistory
+       |
+       |POST:
+       |
+       |$post
+       |
+       |POSTER:
+       |
+       |$poster
+       |
+       |POSTER’S EXPERTISE: $expertiseLevel
+       |
+       |Beginners want detailed answers with explanations. Experts want concise answers without explanations.
+       |
+       |If you are unable to help the reviewer, let them know that help is on the way.
+       |""".stripMargin

@@ -7,6 +7,9 @@ postgres-up:
 submit-img:
 	@gcloud builds submit --tag gcr.io/lucid-arch-387422/gridoai-api --project lucid-arch-387422
 
+make-img:
+	@scala-cli --power package --docker . --docker-from ghcr.io/graalvm/jdk-community:21 --docker-image-repository grido-api
+
 deploy: 
 	@gcloud run deploy gridoai-api --image gcr.io/lucid-arch-387422/gridoai-api --platform managed --region=southamerica-east1 --allow-unauthenticated --memory=512Mi --project lucid-arch-387422
 
