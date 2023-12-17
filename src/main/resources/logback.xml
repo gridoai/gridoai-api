@@ -2,29 +2,24 @@
 
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="com.gridoai.HealthCheckFilter"/>
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <filter class="com.gridoai.HealthCheckFilter"/>
         <http>
             <url>https://bt17-lfwt7va.ingress.axiom.co</url>
         </http>
         <format>
             <label>
-                <pattern>app=${name},host=${HOSTNAME},level=%level</pattern>
-                <readMarkers>true</readMarkers>
+                <pattern>app=api,host=${HOSTNAME},level=%level,class=%logger{36},thread=%thread</pattern>
+                <readMarkers>false</readMarkers>
             </label>
+
             <message>
-                <pattern>
-{
-   "level":"%level",
-   "class":"%logger{36}",
-   "thread":"%thread",
-   "message": "%message",
-   "requestId": "%X{X-Request-ID}"
-}
-                </pattern>
+                <pattern>%message</pattern>
             </message>
         </format>
     </appender>

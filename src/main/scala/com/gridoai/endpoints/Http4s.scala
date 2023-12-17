@@ -17,6 +17,9 @@ import cats.effect.ExitCode
 import com.comcast.ip4s.Port
 import com.comcast.ip4s.port
 import com.gridoai.utils.getEnv
+import cats.effect.kernel.Sync
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 def routes(implicit db: DocDB[IO]): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(endpoints.withService.allEndpoints)
@@ -29,6 +32,7 @@ def httpApp(implicit db: DocDB[IO]): HttpApp[IO] =
 def http4sAppBuilder(using DocDB[IO]) =
   EmberServerBuilder
     .default[IO]
+    .withLogger(Slf4jLogger.getLogger[IO])
     .withHost(ipv4"0.0.0.0")
     .withHttp2
     .withPort(
