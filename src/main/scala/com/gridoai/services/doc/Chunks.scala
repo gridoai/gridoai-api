@@ -53,48 +53,12 @@ def makeChunks(document: Document): List[Chunk] =
       val uids = chunks.map(_.uid).mkString(", ")
       s"generated chunks: $uids"
 
-def getChunks(
-    calculateChunkTokenQuantity: Chunk => Int,
-    tokenLimit: Int,
-    scope: Option[List[UID]],
-    orgId: String,
-    role: String,
-    pageSize: Int = 100
-)(
-    vec: Embedding
-)(implicit db: DocDB[IO]): IO[Either[String, List[SimilarChunk]]] =
-
-  def getChunksRecursively(
-      offset: Int,
-      selectedChunks: List[SimilarChunk]
-  ): IO[Either[String, List[SimilarChunk]]] =
-    db.getNearChunks(vec, scope, offset, pageSize, orgId, role)
-      .flatMapRight:
-        case Nil =>
-          IO.pure(Right(selectedChunks))
-        case chunks =>
-          println(
-            s"getChunks: offset:$offset pageSize:$pageSize tokenLimit:$tokenLimit"
-          )
-          val newSelectedChunks = mergeNewChunksToList(
-            selectedChunks,
-            calculateChunkTokenQuantity,
-            tokenLimit,
-            chunks
-          )
-          getChunksRecursively(
-            offset + pageSize,
-            newSelectedChunks
-          )
-
-  getChunksRecursively(0, List.empty)
-
 def mergeNewChunksToList(
-    chunks: List[SimilarChunk],
+    chunks: List[RelevantChunk],
     calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int,
-    newChunks: List[SimilarChunk]
-): List[SimilarChunk] =
+    newChunks: List[RelevantChunk]
+): List[RelevantChunk] =
   if newChunks.length > 0 then
     val (newChunk :: remainingChunks) = newChunks
     val chunkWithNewChunk = mergeNewChunkToList(chunks, newChunk)
@@ -114,9 +78,9 @@ def mergeNewChunksToList(
   else chunks
 
 def mergeNewChunkToList(
-    chunks: List[SimilarChunk],
-    newChunk: SimilarChunk
-): List[SimilarChunk] =
+    chunks: List[RelevantChunk],
+    newChunk: RelevantChunk
+): List[RelevantChunk] =
 
   val (nearChunks, notNearChunks) = chunks.partition: c =>
     c.chunk.documentUid == newChunk.chunk.documentUid
@@ -126,17 +90,17 @@ def mergeNewChunkToList(
   (newChunk :: nearChunks).sortBy(_.chunk.startPos) match
     case List(singleChunk) => chunks :+ newChunk
     case chunksToMerge @ List(firstChunk, secondChunk) =>
-      SimilarChunk(
+      RelevantChunk(
         chunk = mergeTwoChunks(firstChunk.chunk, secondChunk.chunk),
-        distance = chunksToMerge.map(_.distance).min
+        relevance = chunksToMerge.map(_.relevance).max
       ) :: notNearChunks
     case chunksToMerge @ List(firstChunk, secondChunk, thirdChunk) =>
-      SimilarChunk(
+      RelevantChunk(
         chunk = mergeTwoChunks(
           mergeTwoChunks(firstChunk.chunk, secondChunk.chunk),
           thirdChunk.chunk
         ),
-        distance = chunksToMerge.map(_.distance).min
+        relevance = chunksToMerge.map(_.relevance).max
       ) :: notNearChunks
 
 def mergeTwoChunks(firstChunk: Chunk, secondChunk: Chunk): Chunk =

@@ -5,6 +5,7 @@ import cats.effect.IO
 import cats.implicits.*
 import com.gridoai.adapters.llm.*
 import com.gridoai.adapters.embeddingApi.*
+import com.gridoai.adapters.rerankApi.*
 import com.gridoai.domain.*
 import com.gridoai.models.DocDB
 import com.gridoai.utils.*
@@ -36,22 +37,34 @@ def searchDoc(
 ): IO[Either[String, List[Chunk]]] =
   getEmbeddingAPI("embaas")
     .embedChat(payload.query)
-    .flatMapRight(
-      getChunks(
-        getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
-        payload.tokenLimit,
-        payload.scope,
-        auth.orgId,
-        auth.role,
-        pageSize
-      )
-    )
+    .flatMapRight: vec =>
+      db.getNearChunks(vec, payload.scope, 0, 1000, auth.orgId, auth.role)
     .traceRight: chunks =>
       val chunksInfo = chunks
-        .map(chunk => s"${chunk.chunk.documentName} (${chunk.distance})")
+        .map(chunk =>
+          s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.distance})"
+        )
         .mkString(", ")
-      s"result chunks: $chunksInfo"
-    .mapRight(_.map(_.chunk).reverse)
+      s"db retrieval result chunks: $chunksInfo"
+    .mapRight(_.map(_.chunk))
+    .flatMapRight: chunks =>
+      getRerankAPI("cohere")
+        .rerank(RerankPayload(query = payload.query, chunks = chunks))
+    .mapRight: chunks =>
+      mergeNewChunksToList(
+        List.empty,
+        getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
+        payload.tokenLimit,
+        chunks
+      ).sortBy(_.relevance).reverse
+    .traceRight: chunks =>
+      val chunksInfo = chunks
+        .map(chunk =>
+          s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.relevance})"
+        )
+        .mkString("\n")
+      s"rerank result chunks: $chunksInfo"
+    .mapRight(_.map(_.chunk))
 
 def mapExtractToUploadError(e: ExtractTextError) =
   (FileParseError(e.format, e.message))

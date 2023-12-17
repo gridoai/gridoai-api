@@ -89,6 +89,11 @@ case class SimilarChunk(
     distance: Float
 )
 
+case class RelevantChunk(
+    chunk: Chunk,
+    relevance: Float
+)
+
 case class DocumentCreationPayload(
     name: String,
     content: String
