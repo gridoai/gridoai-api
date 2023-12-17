@@ -26,10 +26,8 @@ def getRerankAPI(name: String): RerankAPI[IO] =
 
 def getRerankApiByName(name: String) =
   name match
-    // case "mocked" => Mocked
-    // case "gridoai-ml" => GridoAIML
     case "cohere" =>
       CohereClient(
         HttpClient("https://api.cohere.ai"),
         sys.env("COHERE_API_KEY")
-      ) // .withFallback(GridoAIML)
+      )
