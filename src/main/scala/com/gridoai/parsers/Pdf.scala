@@ -17,6 +17,7 @@ object PdfBoxParser extends PdfParser[IO]:
   def getText(doc: PDDocument) =
     Sync[IO].delay {
       val stripper = new PDFTextStripper()
+      stripper.setSortByPosition(true)
       stripper.getText(doc)
     }
 
