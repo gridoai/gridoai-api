@@ -56,7 +56,7 @@ def searchDoc(
         getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
         payload.tokenLimit,
         chunks
-      ).sortBy(_.relevance).reverse
+      )
     .traceRight: chunks =>
       val chunksInfo = chunks
         .map(chunk =>
