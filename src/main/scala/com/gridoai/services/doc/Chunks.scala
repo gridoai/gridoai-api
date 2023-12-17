@@ -75,7 +75,7 @@ def mergeNewChunksToList(
         tokenLimit,
         remainingChunks
       )
-  else chunks
+  else chunks.sortBy(_.relevance).reverse
 
 def mergeNewChunkToList(
     chunks: List[RelevantChunk],
