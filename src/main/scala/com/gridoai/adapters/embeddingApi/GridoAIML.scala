@@ -16,8 +16,8 @@ val embeddingApiEndpointSingle = sys.env.getOrElse(
   "http://127.0.0.1:8000"
 )
 
-val embeddingApiEndpointMany = sys.env.getOrElse(
-  "EMBEDDING_API_ENDPOINT_MANY",
+val embeddingApiEndpointBatch = sys.env.getOrElse(
+  "EMBEDDING_API_ENDPOINT_BATCH",
   "http://127.0.0.1:8000"
 )
 
@@ -37,12 +37,12 @@ val _ = println(
   s"""embedParallelism: $embedParallelism
   embedPartitionSize: $embedPartitionSize
   embeddingApiEndpointSingle: $embeddingApiEndpointSingle
-  embeddingApiEndpointMany: $embeddingApiEndpointMany"""
+  embeddingApiEndpointBatch: $embeddingApiEndpointBatch"""
 )
 object GridoAIML extends EmbeddingAPI[IO]:
   val logger = LoggerFactory.getLogger(getClass.getName)
   val HttpSingle = HttpClient(embeddingApiEndpointSingle)
-  val HttpMany = HttpClient(embeddingApiEndpointMany)
+  val HttpBatch = HttpClient(embeddingApiEndpointBatch)
 
   def embedChat(text: String): IO[Either[String, Embedding]] =
     embed(
@@ -50,12 +50,12 @@ object GridoAIML extends EmbeddingAPI[IO]:
       "query"
     )
   def embedChunks(chunks: List[Chunk]): IO[Either[String, List[Embedding]]] =
-    embedMany(
+    embedBatch(
       chunks.map(_.content),
       "passage"
     )
 
-  def embedMany(
+  def embedBatch(
       texts: List[String],
       instruction: String
   ): IO[Either[String, List[Embedding]]] =
@@ -77,7 +77,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
       s"Sending partition of ${texts.length} texts"
     )
     val body = GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
-    HttpMany
+    HttpBatch
       .post("")
       .headers(Map("Content-Type" -> "application/json"))
       .body(body)
