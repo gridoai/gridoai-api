@@ -20,7 +20,7 @@ class AblyNotificationService[F[_]: Async]()
   val logger = org.slf4j.LoggerFactory.getLogger(
     getClass()
   )
-  override def notifyUpload(
+  def notifyUpload(
       status: UploadStatus,
       user: String
   ): F[Either[String, Unit]] =
