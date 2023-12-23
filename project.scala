@@ -78,3 +78,6 @@
 
 //> using test.dep "org.scalameta::munit:0.7.29"
 //> using resourceDir "src/main/resources"
+//> using dep io.ably:ably-java:1.2.33
+//> using dep com.softwaremill.sttp.tapir::tapir-swagger-ui-bundle:1.9.6
+

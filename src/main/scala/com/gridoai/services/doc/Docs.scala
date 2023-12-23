@@ -27,6 +27,10 @@ import com.gridoai.auth.AuthData
 import sttp.model.Part
 
 import java.io.File
+
+import com.gridoai.adapters.notifications.UploadStatus
+import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.adapters.notifications.UploadNotificationService
 val pageSize = sys.env.getOrElse("PAGE_SIZE", "2000").toInt
 val logger = org.slf4j.LoggerFactory.getLogger("com.gridoai.services.doc")
 
@@ -146,21 +150,47 @@ def saveUploadedDocs(auth: AuthData)(
     .mapLeft(e => List(FileUploadError.DocumentCreationError(e).asLeft))
 
 def uploadDocuments(auth: AuthData)(source: FileUpload)(using
-    db: DocDB[IO]
-): IO[Either[FileUpErr, FileUpOutput]] =
+    db: DocDB[IO],
+    notificationService: UploadNotificationService[IO]
+): IO[Either[FileUpErr, Unit]] =
   limitRole(
     auth.role,
     (Left(List(Left(UnauthorizedError(authErrorMsg(Some(auth.role))))))
       .pure[IO])
   ):
     logger.info(s"Uploading files... ${source.files.length}")
-    source.files
-      .map(parseFileForPersistence)
-      .parSequence
-      .flatMap: eithers =>
-        val (errors, payloads) = eithers.partitionMap(identity)
-        if (errors.nonEmpty) Left(eithers.map(_.map(_.name))).pure[IO]
-        else saveUploadedDocs(auth)(payloads)
+
+    notificationService
+      .notifyUpload(
+        UploadStatus.Processing,
+        auth.userId
+      )
+      .start >>
+      source.files
+        .map(parseFileForPersistence)
+        .parSequence
+        .flatMap: eithers =>
+          val (errors, payloads) = eithers.partitionMap(identity)
+          if (errors.nonEmpty) Left(eithers.map(_.map(_.name))).pure[IO]
+          else saveUploadedDocs(auth)(payloads)
+        .flatMapRight(_ =>
+          notificationService
+            .notifyUpload(
+              UploadStatus.Success,
+              auth.userId
+            )
+        )
+        .flatMapLeft(e => {
+          logger.error(s"Error uploading files: ${e}")
+          notificationService
+            .notifyUpload(
+              UploadStatus.Failure,
+              auth.userId
+            )
+
+        })
+        .start
+      >> Right(()).pure[IO]
 
 def listDocuments(auth: AuthData)(
     start: Int,

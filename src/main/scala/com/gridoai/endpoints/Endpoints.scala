@@ -31,11 +31,11 @@ enum FileUploadError:
 
 val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
   Either[FileUploadError, String]
-] | String, List[String], Any] =
+] | String, Unit, Any] =
   auth.securedWithBearer.post
     .in("upload")
     .in(multipartBody[FileUpload])
-    .out(jsonBody[List[String]])
+    .out(jsonBody[Unit])
     .mapErrorOut(identity)(_.toString())
 
 val billingSession: SecuredEndpoint[Option[String], String, String, Any] =
@@ -51,6 +51,14 @@ val webhooksStripe: PublicEndpoint[(String, String), String, String, Any] =
     .in(header[String]("Stripe-Signature"))
     .out(stringBody)
     .errorOut(stringBody)
+
+val notificationAuthEndpoint =
+  auth.securedWithBearer
+    .name("Notification Auth")
+    .description("Authenticate client to access notification service")
+    .in("notifications")
+    .in("auth")
+    .out(stringBody)
 
 val listEndpoint: SecuredEndpoint[(Int, Int), String, PaginatedResponse[
   List[Document]
