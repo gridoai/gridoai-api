@@ -20,16 +20,27 @@ import com.gridoai.utils.getEnv
 import cats.effect.kernel.Sync
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.adapters.notifications.UploadNotificationService
 
-def routes(implicit db: DocDB[IO]): HttpRoutes[IO] =
-  Http4sServerInterpreter[IO]().toRoutes(endpoints.withService.allEndpoints)
+def routes(implicit
+    db: DocDB[IO],
+    ns: UploadNotificationService[IO]
+): HttpRoutes[IO] =
+  Http4sServerInterpreter[IO]().toRoutes(endpoints.withService().allEndpoints)
 
-def httpApp(implicit db: DocDB[IO]): HttpApp[IO] =
+def httpApp(implicit
+    db: DocDB[IO],
+    ns: UploadNotificationService[IO]
+): HttpApp[IO] =
   Router(
     "/" -> CORS.policy.withAllowOriginAll(routes)
   ).orNotFound
 
-def http4sAppBuilder(using DocDB[IO]) =
+def http4sAppBuilder(implicit
+    db: DocDB[IO],
+    ns: UploadNotificationService[IO]
+) =
   EmberServerBuilder
     .default[IO]
     .withLogger(Slf4jLogger.getLogger[IO])
@@ -40,7 +51,7 @@ def http4sAppBuilder(using DocDB[IO]) =
     )
     .withHttpApp(httpApp)
 
-def runHttp4s(using DocDB[IO]) =
+def runHttp4s(implicit db: DocDB[IO], ns: UploadNotificationService[IO]) =
   http4sAppBuilder.build
     .use(_ => IO.never)
     .as(ExitCode.Success)

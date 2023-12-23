@@ -7,9 +7,12 @@ import cats.effect.IO
 import sttp.tapir.server.ServerEndpoint
 import com.gridoai.services.payments.createBillingSession
 import com.gridoai.adapters.stripe
-object withService:
+import com.gridoai.services.createNotificationServiceToken
+import sttp.tapir.swagger.bundle.SwaggerInterpreter
+import com.gridoai.adapters.notifications.UploadNotificationService
+class withService(implicit db: DocDB[IO], ns: UploadNotificationService[IO]):
 
-  def searchDocs(implicit db: DocDB[IO]) =
+  def searchDocs =
     searchEndpoint.serverLogic(searchDoc _)
 
   def webHooksStripeEndpoint =
@@ -20,25 +23,30 @@ object withService:
   def healthCheck =
     healthCheckEndpoint.serverLogic(_ => IO.pure(Right("OK")))
 
-  def createDocument(implicit db: DocDB[IO]) =
+  def createDocument =
     createDocumentEndpoint.serverLogic(createDoc _)
 
-  def uploadDocs(implicit db: DocDB[IO]) =
+  def uploadDocs =
     fileUploadEndpoint.serverLogic(uploadDocuments _)
 
-  def deleteDoc(implicit db: DocDB[IO]) =
+  def deleteDoc =
     deleteEndpoint.serverLogic(deleteDocument _)
 
-  def listDocs(implicit db: DocDB[IO]) =
+  def authNotification =
+    notificationAuthEndpoint.serverLogic(authData =>
+      _ => createNotificationServiceToken(authData)
+    )
+
+  def listDocs =
     listEndpoint.serverLogic(listDocuments _)
 
   def authGDrive =
     authGDriveEndpoint.serverLogic(GDrive.auth _)
 
-  def importGDriveDocs(implicit db: DocDB[IO]) =
+  def importGDriveDocs =
     importGDriveEndpoint.serverLogic(GDrive.importDocs)
 
-  def askLLM(implicit db: DocDB[IO]) =
+  def askLLM =
     askEndpoint.serverLogic(ask _)
 
   def refreshGDriveToken =
@@ -46,7 +54,7 @@ object withService:
 
   def billingSessionEndpoint = billingSession.serverLogic(createBillingSession)
 
-  def allEndpoints(implicit db: DocDB[IO]): List[ServerEndpoint[Any, IO]] =
+  def apiEndpoints: List[ServerEndpoint[Any, IO]] =
     List(
       searchDocs,
       healthCheck,
@@ -59,5 +67,11 @@ object withService:
       listDocs,
       webHooksStripeEndpoint,
       billingSessionEndpoint,
-      refreshGDriveToken
+      refreshGDriveToken,
+      authNotification
     )
+  def docEndpoints: List[ServerEndpoint[Any, IO]] =
+    SwaggerInterpreter()
+      .fromServerEndpoints[IO](apiEndpoints, "gridoai-api", "1.0.0")
+  def allEndpoints: List[ServerEndpoint[Any, IO]] =
+    docEndpoints ++ apiEndpoints

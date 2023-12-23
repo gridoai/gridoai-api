@@ -12,14 +12,8 @@ import com.gridoai.models.DocDB
 import de.killaitis.http4s.*
 
 import org.http4s.ember.server.EmberServerBuilder
-
-class ScalaHttpFunction extends HttpFunction {
-  def service(request: HttpRequest, response: HttpResponse) =
-
-    given docDb: DocDB[IO] = PostgresClient[IO]
-    (Http4sCloudFunction(endpoints.http4s.httpApp).service(request, response))
-
-}
+import com.gridoai.adapters.notifications.AblyNotificationService
+import com.gridoai.adapters.notifications.UploadNotificationService
 
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
@@ -29,6 +23,7 @@ object Main extends IOApp {
     else
 
       given docDb: DocDB[IO] = PostgresClient[IO]
+      given ns: UploadNotificationService[IO] = AblyNotificationService[IO]
 
       endpoints.http4s.runHttp4s
 
