@@ -11,15 +11,14 @@ trait PdfParser[F[_]]:
   def close(doc: PDDocument): F[Unit]
 
 object PdfBoxParser extends PdfParser[IO]:
+  val stripper = new PDFTextStripper()
+  stripper.setSortByPosition(true)
+
   def load(bytes: Array[Byte]) =
     Sync[IO].delay(PDDocument.load(bytes))
 
   def getText(doc: PDDocument) =
-    Sync[IO].delay {
-      val stripper = new PDFTextStripper()
-      stripper.setSortByPosition(true)
-      stripper.getText(doc)
-    }
+    Sync[IO].delay(stripper.getText(doc))
 
   def close(doc: PDDocument) =
     Sync[IO].delay(doc.close())
