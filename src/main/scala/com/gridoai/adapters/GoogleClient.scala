@@ -20,8 +20,6 @@ import scala.jdk.CollectionConverters.SeqHasAsJava
 import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest
 import concurrent.duration.DurationInt
 import org.slf4j.LoggerFactory
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver
 
 val CLIENT_ID =
   sys.env.getOrElse("GOOGLE_CLIENT_ID", "")
