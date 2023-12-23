@@ -52,7 +52,7 @@ val webhooksStripe: PublicEndpoint[(String, String), String, String, Any] =
     .out(stringBody)
     .errorOut(stringBody)
 
-val notificationAuthEndpoint =
+val notificationAuthEndpoint: SecuredEndpoint[Unit, String, String, Any] =
   auth.securedWithBearer
     .name("Notification Auth")
     .description("Authenticate client to access notification service")
