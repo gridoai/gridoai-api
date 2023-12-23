@@ -11,15 +11,8 @@ trait NotificationService[F[_]] {
 enum UploadStatus:
   case Failure, Success, Scheduled, Processing
 
-trait UploadNotificationService[F[_]] {
+trait UploadNotificationService[F[_]]:
   def notifyUpload(
       status: UploadStatus,
       userId: String
-  ): F[Either[String, Unit]]
-}
-
-trait UploadNotificationPersister[F[_]]:
-  def persistUploadNotification(
-      status: UploadStatus,
-      fileId: String
   ): F[Either[String, Unit]]
