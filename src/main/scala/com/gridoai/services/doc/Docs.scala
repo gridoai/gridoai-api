@@ -160,7 +160,7 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
   ):
     logger.info(s"Uploading files... ${source.files.length}")
 
-    notifyIOProgress(auth.userId, notificationService):
+    notifyUploadProgress(auth.userId):
       source.files
         .map(parseFileForPersistence)
         .parSequence

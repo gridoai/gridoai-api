@@ -122,7 +122,7 @@ object GDrive:
       Left(authErrorMsg(Some(auth.role))).pure[IO]
     ):
       logger.info("importing data from gdrive...")
-      notifyIOProgress(auth.userId, ns):
+      notifyUploadProgress(auth.userId):
         fetchUserTokens(auth)
           !> getClient(auth.userId)
           !> getAndAddDocs(auth, fileIds)
