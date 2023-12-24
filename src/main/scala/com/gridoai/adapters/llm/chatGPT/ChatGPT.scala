@@ -129,7 +129,7 @@ object ChatGPTClient:
 
     def chooseAction(
         messages: List[Message],
-        query: Option[String],
+        queries: List[String],
         chunks: List[Chunk],
         options: List[Action]
     ): F[Either[String, Action]] =
@@ -147,26 +147,36 @@ object ChatGPTClient:
         |> getAnswerFromChat
         |> (_.map(_.flatMap(strToAction(options))))
 
-    def buildQueryToSearchDocuments(
+    def buildQueriesToSearchDocuments(
         messages: List[Message],
-        lastQuery: Option[String],
+        lastQueries: List[String],
         lastChunks: List[Chunk]
-    ): F[Either[String, String]] =
+    ): F[Either[String, List[String]]] =
       val prompt =
-        buildQueryToSearchDocumentsPrompt(messages, lastQuery, lastChunks)
+        buildQueriesToSearchDocumentsPrompt(
+          messages.dropRight(1),
+          lastQueries,
+          lastChunks
+        )
+
+      val fullConversation = ChatCompletion.Message(
+        role = ChatCompletion.Message.Role.System,
+        content = prompt
+      ) :: (buildQueriesExample :+ Message(
+        from = MessageFrom.User,
+        message = mergeMessages(messages)
+      )).map(messageToClientMessage)
+
       logger.info(s"Prompt to build query: $prompt")
       (
-        Seq(
-          ChatCompletion.Message(
-            role = ChatCompletion.Message.Role.System,
-            content = prompt
-          )
-        ),
+        fullConversation,
         ChatCompletionSettings(maxTokens = Some(1_000), n = Some(1))
       )
         |> client.createChatCompletion
         |> getAnswerFromChat
-        |> (_.mapRight(_.trim()))
+        |> (_.mapRight(
+          _.trace.split("\n").map(_.trim).filter(!_.isEmpty).take(3).toList
+        ))
 
     def strToAction(options: List[Action])(
         llmOutput: String

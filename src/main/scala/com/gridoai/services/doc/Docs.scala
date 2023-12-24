@@ -45,12 +45,7 @@ def searchDoc(
     .flatMapRight: vec =>
       db.getNearChunks(vec, payload.scope, 0, 1000, auth.orgId, auth.role)
     .traceRight: chunks =>
-      val chunksInfo = chunks
-        .map(chunk =>
-          s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.distance})"
-        )
-        .mkString(", ")
-      s"db retrieval result chunks: $chunksInfo"
+      s"db retrieval result chunks: ${chunks.length} chunks"
     .mapRight(_.map(_.chunk))
     .flatMapRight: chunks =>
       getRerankAPI("cohere")

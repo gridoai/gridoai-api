@@ -19,7 +19,7 @@ trait LLM[F[_]]:
   ): Int
   def chooseAction(
       messages: List[Message],
-      query: Option[String],
+      queries: List[String],
       chunks: List[Chunk],
       options: List[Action]
   ): F[Either[String, Action]]
@@ -35,11 +35,11 @@ trait LLM[F[_]]:
       messages: List[Message],
       searchedBefore: Boolean
   ): F[Either[String, String]]
-  def buildQueryToSearchDocuments(
+  def buildQueriesToSearchDocuments(
       messages: List[Message],
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk]
-  ): F[Either[String, String]]
+  ): F[Either[String, List[String]]]
 
 def getLLMByName(llm: LLMModel): LLM[IO] =
   llm match
