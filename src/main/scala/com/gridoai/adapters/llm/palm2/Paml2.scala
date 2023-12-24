@@ -10,8 +10,7 @@ import io.circe.*
 import io.circe.generic.auto.*
 import io.circe.parser.*
 import io.circe.syntax.*
-import com.gridoai.utils.attempt
-import com.gridoai.utils.|>
+import com.gridoai.utils._
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
 val projectId = "lucid-arch-387422"
@@ -163,17 +162,17 @@ object Paml2Client extends LLM[IO]:
 
   def chooseAction(
       messages: List[Message],
-      query: Option[String],
+      queries: List[String],
       chunks: List[Chunk],
       options: List[Action]
   ): IO[Either[String, Action]] =
     Action.Search.asRight.pure[IO]
 
-  def buildQueryToSearchDocuments(
+  def buildQueriesToSearchDocuments(
       messages: List[Message],
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk]
-  ): IO[Either[String, String]] =
+  ): IO[Either[String, List[String]]] =
 
     val mergedMessages =
       messages
@@ -186,7 +185,7 @@ object Paml2Client extends LLM[IO]:
           s"$chatMergePrompt\n\nProvide a laconic summary for the following conversation: $mergedMessages"
       )
     )
-    singleMessage
+    (singleMessage
       |> makePayloadWithContext("", topP = 0.95, topK = 40)
       |> call
-      |> getAnswer
+      |> getAnswer).mapRight(List(_))

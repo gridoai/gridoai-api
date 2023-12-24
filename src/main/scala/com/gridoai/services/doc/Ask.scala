@@ -25,20 +25,20 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   logger.info(s"scope: ${payload.scope}")
 
   def askRecursively(
-      lastQuery: Option[String],
+      lastQueries: List[String],
       searchesBeforeResponse: Int
   )(
       lastChunks: List[Chunk]
   ): IO[Either[String, AskResponse]] =
     chooseAction(
-      lastQuery,
+      lastQueries,
       lastChunks,
       searchesBeforeResponse
     )
-      !> runAction(lastQuery, lastChunks, searchesBeforeResponse)
+      !> runAction(lastQueries, lastChunks, searchesBeforeResponse)
 
   def chooseAction(
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, Action]] =
@@ -50,7 +50,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
 
       llm.chooseAction(
         payload.messages,
-        lastQuery,
+        lastQueries,
         lastChunks,
         options
       )
@@ -65,7 +65,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       )
 
   def runAction(
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   )(action: Action): IO[Either[String, AskResponse]] =
@@ -73,10 +73,10 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       case Action.Ask    => doAskAction
       case Action.Answer => doAnswerAction
       case Action.Search => doSearchAction
-    )(lastQuery, lastChunks, searchesBeforeResponse)
+    )(lastQueries, lastChunks, searchesBeforeResponse)
 
   def doAskAction(
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, AskResponse]] =
@@ -86,7 +86,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         lastChunks,
         payload.basedOnDocsOnly,
         payload.messages,
-        lastQuery.isDefined
+        !lastQueries.isEmpty
       )
       .mapRight: question =>
         AskResponse(
@@ -95,7 +95,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         )
 
   def doAnswerAction(
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, AskResponse]] =
@@ -105,7 +105,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         lastChunks,
         payload.basedOnDocsOnly,
         payload.messages,
-        lastQuery.isDefined
+        !lastQueries.isEmpty
       )
       .mapRight: answer =>
         AskResponse(
@@ -114,25 +114,35 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         )
 
   def doSearchAction(
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, AskResponse]] =
     logger.info("AI decided to search...")
     llm
-      .buildQueryToSearchDocuments(payload.messages, lastQuery, lastChunks)
-      .flatMapRight: newQuery =>
-        logger.info(s"AI's query: $newQuery")
-        searchDoc(auth)(
-          SearchPayload(
-            query = newQuery,
-            tokenLimit =
-              llm.maxTokensForChunks(payload.messages, payload.basedOnDocsOnly),
-            llmName = llmModel |> llmToStr,
-            scope = payload.scope
+      .buildQueriesToSearchDocuments(payload.messages, lastQueries, lastChunks)
+      .flatMapRight: newQueries =>
+        logger.info(s"AI's queries: $newQueries")
+        val tokenLimitPerQuery = llm
+          .maxTokensForChunks(
+            payload.messages,
+            payload.basedOnDocsOnly
+          ) / newQueries.length
+        newQueries
+          .traverse(newQuery =>
+            searchDoc(auth)(
+              SearchPayload(
+                query = newQuery,
+                tokenLimit = tokenLimitPerQuery,
+                llmName = llmModel |> llmToStr,
+                scope = payload.scope
+              )
+            )
           )
-        ) !> askRecursively(
-          Some(newQuery),
+          .map(partitionEithers)
+          .mapLeft(_.mkString(","))
+          .mapRight(_.flatten) !> askRecursively(
+          newQueries,
           searchesBeforeResponse - 1
         )
 
@@ -141,4 +151,4 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       case MessageFrom.Bot =>
         IO.pure(Left("Last message should be from the user"))
       case MessageFrom.User =>
-        doSearchAction(None, List.empty, 2)
+        doSearchAction(List.empty, List.empty, 2)

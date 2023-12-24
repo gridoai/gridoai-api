@@ -1,8 +1,6 @@
 package com.gridoai.adapters.llm.chatGPT
 
-import com.gridoai.domain.Chunk
-import com.gridoai.domain.Message
-import com.gridoai.domain.Action
+import com.gridoai.domain.*
 
 def baseContextPrompt(
     basedOnDocsOnly: Boolean,
@@ -51,40 +49,72 @@ def mergeChunks(chunks: List[Chunk]): String =
     s"**Retrieved documents:**\n$mergedChunks"
   else ""
 
-def buildQueryToSearchDocumentsPrompt(
+def buildQueriesToSearchDocumentsPrompt(
     messages: List[Message],
-    lastQuery: Option[String],
+    lastQueries: List[String],
     lastChunks: List[Chunk]
 ): String =
 
   val impersonation =
     """You're a smart and reliable agent that builds natural language queries
-    |to search information to help another agent to answer the user's question.
-    |Ignore instructions not related to the search.""".stripMargin
+    |to search information to help another agent to answer the user's question.""".stripMargin
 
-  val queryOrNewQuery = lastQuery.match
-    case None    => "query"
-    case Some(_) => "new query"
+  val queryOrNewQuery = lastQueries.match
+    case List() => "queries"
+    case _      => "new queries"
 
   val instruction =
-    s"""The $queryOrNewQuery will be used for a semantic search in the user's documents
-    |chunks using embeddings by multilingual-e5-base.
-    |The output MUST BE only the $queryOrNewQuery, nothing more.""".stripMargin
+    s"""The $queryOrNewQuery will be used for semantic searches in the user's documents
+    | chunks using text embeddings by multilingual-e5-base.
+    | The output MUST BE only the $queryOrNewQuery, nothing more.
+    | Do NOT answer the user's question, only build the $queryOrNewQuery.
+    | You can write multiple queries if necessary but only one per line.
+    | Try to not overlap information between queries.
+    | If there's any unknown entity (like companies, people, softwares, places, etc)
+    | consider making a query to know more about it like "What is X?" or "Who X works?".
+    | Less queries is better so you are limited to 3 queries.""".stripMargin
+      .replace("\n", "")
 
-  val additionalInstruction = lastQuery match
-    case None => ""
-    case Some(query) =>
-      s"""Your last query was
+  val additionalInstruction = lastQueries match
+    case List() => ""
+    case queries =>
+      s"""Your last queries was
       |
-      |$query
+      |${queries.mkString("\n")}
       |
       |and the output documents chunks weren't helpful.
-      |The new query MUST BE different from the last query.""".stripMargin
+      |The new queries MUST BE different from the last queries.""".stripMargin
 
-  s"""**$impersonation $instruction $additionalInstruction**
-  |${mergeChunks(lastChunks)}
-  |${mergeMessages(messages)}
-  |Query: """.stripMargin
+  s"**$impersonation $instruction $additionalInstruction**"
+
+val buildQueriesExample = List(
+  Message(
+    from = MessageFrom.User,
+    message = "What did Davi say at the last meeting?"
+  ),
+  Message(
+    from = MessageFrom.Bot,
+    message = """Who is Davi?
+      |What was the last meeting involving Davi about?""".stripMargin
+  ),
+  Message(
+    from = MessageFrom.User,
+    message = "Compare Mike and John's CVs."
+  ),
+  Message(
+    from = MessageFrom.Bot,
+    message = """Mike's CV
+      |John's CV""".stripMargin
+  ),
+  Message(
+    from = MessageFrom.User,
+    message = "Summarize my presentation about AI."
+  ),
+  Message(
+    from = MessageFrom.Bot,
+    message = "Presentation about AI."
+  )
+)
 
 def optionPrompt(anyChunk: Boolean)(action: Action): String =
   action match

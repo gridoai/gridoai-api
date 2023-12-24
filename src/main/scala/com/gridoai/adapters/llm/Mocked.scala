@@ -15,7 +15,7 @@ class MockLLM[F[_]: Applicative] extends LLM[F]:
 
   def chooseAction(
       messages: List[Message],
-      query: Option[String],
+      queries: List[String],
       chunks: List[Chunk],
       options: List[Action]
   ): F[Either[String, Action]] =
@@ -37,9 +37,9 @@ class MockLLM[F[_]: Applicative] extends LLM[F]:
   ): F[Either[String, String]] =
     Applicative[F].pure(Right("The response message."))
 
-  def buildQueryToSearchDocuments(
+  def buildQueriesToSearchDocuments(
       messages: List[Message],
-      lastQuery: Option[String],
+      lastQueries: List[String],
       lastChunks: List[Chunk]
-  ): F[Either[String, String]] =
-    Applicative[F].pure(Right("The response message."))
+  ): F[Either[String, List[String]]] =
+    Applicative[F].pure(Right(List("The response message.")))
