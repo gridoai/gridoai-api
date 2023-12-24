@@ -4,18 +4,16 @@ import com.gridoai.adapters.notifications.UploadNotificationService
 import cats.effect.IO
 import com.gridoai.adapters.notifications.UploadStatus
 
-def notifyIOProgress[L, R](
-    id: String,
-    notificationService: UploadNotificationService[IO]
-)(
+def notifyUploadProgress[L, R](id: String)(
     io: => IO[Either[L, R]]
+)(implicit
+    notificationService: UploadNotificationService[IO]
 ) =
   notificationService
     .notifyUpload(
       UploadStatus.Processing,
       id
-    )
-    .start >>
+    ) >>
     io
       .flatMapRight(_ =>
         notificationService
@@ -24,13 +22,12 @@ def notifyIOProgress[L, R](
             id
           )
       )
-      .flatMapLeft(e => {
+      .flatMapLeft(e =>
         notificationService
           .notifyUpload(
             UploadStatus.Failure,
             id
           )
-
-      })
+      )
       .start
     >> IO.pure(Right(()))
