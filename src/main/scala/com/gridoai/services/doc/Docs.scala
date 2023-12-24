@@ -160,12 +160,7 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
   ):
     logger.info(s"Uploading files... ${source.files.length}")
 
-    notificationService
-      .notifyUpload(
-        UploadStatus.Processing,
-        auth.userId
-      )
-      .start >>
+    notifyIOProgress(auth.userId, notificationService):
       source.files
         .map(parseFileForPersistence)
         .parSequence
@@ -173,24 +168,6 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
           val (errors, payloads) = eithers.partitionMap(identity)
           if (errors.nonEmpty) Left(eithers.map(_.map(_.name))).pure[IO]
           else saveUploadedDocs(auth)(payloads)
-        .flatMapRight(_ =>
-          notificationService
-            .notifyUpload(
-              UploadStatus.Success,
-              auth.userId
-            )
-        )
-        .flatMapLeft(e => {
-          logger.error(s"Error uploading files: ${e}")
-          notificationService
-            .notifyUpload(
-              UploadStatus.Failure,
-              auth.userId
-            )
-
-        })
-        .start
-      >> Right(()).pure[IO]
 
 def listDocuments(auth: AuthData)(
     start: Int,

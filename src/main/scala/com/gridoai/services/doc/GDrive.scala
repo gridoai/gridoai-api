@@ -14,6 +14,8 @@ import com.gridoai.parsers.FileFormat
 import java.util.UUID
 import org.slf4j.LoggerFactory
 import com.gridoai.endpoints.RefreshTokenPayload
+import com.gridoai.adapters.notifications.UploadNotificationService
+import com.gridoai.adapters.notifications.UploadStatus
 
 val SCOPES = List("https://www.googleapis.com/auth/drive.readonly")
 object GDrive:
@@ -111,16 +113,19 @@ object GDrive:
 
   def importDocs(auth: AuthData)(
       fileIds: List[String]
-  )(using db: DocDB[IO]): IO[Either[String, List[String]]] =
+  )(implicit
+      db: DocDB[IO],
+      ns: UploadNotificationService[IO]
+  ): IO[Either[String, Unit]] =
     limitRole(
       auth.role,
       Left(authErrorMsg(Some(auth.role))).pure[IO]
     ):
       logger.info("importing data from gdrive...")
-
-      fetchUserTokens(auth)
-        !> getClient(auth.userId)
-        !> getAndAddDocs(auth, fileIds)
+      notifyIOProgress(auth.userId, ns):
+        fetchUserTokens(auth)
+          !> getClient(auth.userId)
+          !> getAndAddDocs(auth, fileIds)
 
   def refreshAndSetToken(refreshToken: String, userId: String) = GoogleClient
     .refreshToken(refreshToken)

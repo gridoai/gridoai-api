@@ -118,8 +118,7 @@ val authGDriveEndpoint
     .in(query[String]("redirectUri"))
     .out(jsonBody[(String, String)])
 
-val importGDriveEndpoint
-    : SecuredEndpoint[List[String], String, List[String], Any] =
+val importGDriveEndpoint: SecuredEndpoint[List[String], String, Unit, Any] =
   auth.securedWithBearer
     .name("Import data from Google Drive")
     .description("Import google drive documents in the knowledge base")
@@ -127,7 +126,7 @@ val importGDriveEndpoint
     .in("gdrive")
     .in("import")
     .in(jsonBody[List[String]])
-    .out(jsonBody[List[String]])
+    .out(jsonBody[Unit])
 
 val askEndpoint: SecuredEndpoint[AskPayload, String, AskResponse, Any] =
   auth.securedWithBearer
