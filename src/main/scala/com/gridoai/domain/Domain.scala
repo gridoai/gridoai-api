@@ -125,3 +125,6 @@ case class SearchPayload(
 case class AskResponse(message: String, sources: List[String])
 
 case class PaginatedResponse[T](data: T, total: Int)
+
+enum UploadStatus:
+  case Failure, Success, Scheduled, Processing

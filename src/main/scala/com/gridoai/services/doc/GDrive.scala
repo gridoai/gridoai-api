@@ -14,8 +14,8 @@ import com.gridoai.parsers.FileFormat
 import java.util.UUID
 import org.slf4j.LoggerFactory
 import com.gridoai.endpoints.RefreshTokenPayload
-import com.gridoai.adapters.notifications.UploadNotificationService
-import com.gridoai.adapters.notifications.UploadStatus
+import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.services.notifications.notifyUploadProgress
 
 val SCOPES = List("https://www.googleapis.com/auth/drive.readonly")
 object GDrive:
@@ -115,7 +115,7 @@ object GDrive:
       fileIds: List[String]
   )(implicit
       db: DocDB[IO],
-      ns: UploadNotificationService[IO]
+      ns: NotificationService[IO]
   ): IO[Either[String, Unit]] =
     limitRole(
       auth.role,

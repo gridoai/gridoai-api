@@ -14,20 +14,8 @@ import io.ably.lib.realtime.CompletionListener
 import io.ably.lib.types.ErrorInfo
 val ablyClient = AblyRest(sys.env("ABLY_KEY"))
 
-class AblyNotificationService[F[_]: Async]()
-    extends NotificationService[F]
-    with UploadNotificationService[F]:
-  val logger = org.slf4j.LoggerFactory.getLogger(
-    getClass()
-  )
-  def notifyUpload(
-      status: UploadStatus,
-      user: String
-  ): F[Either[String, Unit]] =
-    val topic = s"$user:upload"
-    val channel = s"$user:upload-status"
-    val content = status.toString()
-    sendNotification(topic, channel, content)
+class AblyNotificationService[F[_]: Async]() extends NotificationService[F]:
+  val logger = org.slf4j.LoggerFactory.getLogger(getClass)
 
   def sendNotification(
       topic: String,

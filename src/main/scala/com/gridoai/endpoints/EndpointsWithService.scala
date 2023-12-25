@@ -7,10 +7,11 @@ import cats.effect.IO
 import sttp.tapir.server.ServerEndpoint
 import com.gridoai.services.payments.createBillingSession
 import com.gridoai.adapters.stripe
-import com.gridoai.services.createNotificationServiceToken
+import com.gridoai.services.notifications.createNotificationServiceToken
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
-import com.gridoai.adapters.notifications.UploadNotificationService
-class withService(implicit db: DocDB[IO], ns: UploadNotificationService[IO]):
+import com.gridoai.adapters.notifications.NotificationService
+
+class withService(implicit db: DocDB[IO], ns: NotificationService[IO]):
 
   def searchDocs =
     searchEndpoint.serverLogic(searchDoc _)

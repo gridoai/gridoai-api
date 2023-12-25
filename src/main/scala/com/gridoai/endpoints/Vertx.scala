@@ -20,7 +20,7 @@ import sttp.tapir.server.interceptor.cors.CORSConfig.ExposedHeaders
 import sttp.model.StatusCode
 import io.vertx.core.http.HttpServerOptions
 import sttp.model.Method
-import com.gridoai.adapters.notifications.UploadNotificationService
+import com.gridoai.adapters.notifications.NotificationService
 
 def runVertxWithEndpoint(
     endpoints: List[ServerEndpoint[Fs2Streams[IO], cats.effect.IO]]
@@ -84,5 +84,5 @@ def runVertxWithEndpoint(
     .use(_ => IO.never)
     .as(ExitCode.Success)
 
-def runVertex(implicit db: DocDB[IO], ns: UploadNotificationService[IO]) =
+def runVertex(implicit db: DocDB[IO], ns: NotificationService[IO]) =
   runVertxWithEndpoint(withService().allEndpoints)
