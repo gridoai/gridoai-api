@@ -28,9 +28,10 @@ import sttp.model.Part
 
 import java.io.File
 
-import com.gridoai.adapters.notifications.UploadStatus
+import com.gridoai.domain.UploadStatus
 import com.gridoai.adapters.notifications.NotificationService
-import com.gridoai.adapters.notifications.UploadNotificationService
+import com.gridoai.services.notifications.notifyUploadProgress
+
 val pageSize = sys.env.getOrElse("PAGE_SIZE", "2000").toInt
 val logger = org.slf4j.LoggerFactory.getLogger("com.gridoai.services.doc")
 
@@ -151,7 +152,7 @@ def saveUploadedDocs(auth: AuthData)(
 
 def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     db: DocDB[IO],
-    notificationService: UploadNotificationService[IO]
+    ns: NotificationService[IO]
 ): IO[Either[FileUpErr, Unit]] =
   limitRole(
     auth.role,
