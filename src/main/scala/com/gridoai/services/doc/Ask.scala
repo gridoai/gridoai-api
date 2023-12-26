@@ -1,17 +1,18 @@
 package com.gridoai.services.doc
 
 import cats.effect.IO
-import cats.implicits.*
-import com.gridoai.adapters.llm.*
-import com.gridoai.domain.*
+import cats.implicits._
+import cats.effect.implicits.concurrentParTraverseOps
+import com.gridoai.adapters.llm._
+import com.gridoai.domain._
 import com.gridoai.models.DocDB
-import com.gridoai.utils.*
+import com.gridoai.utils._
 
-import com.gridoai.adapters.*
+import com.gridoai.adapters._
 import com.gridoai.auth.AuthData
 import org.slf4j.LoggerFactory
 
-import com.gridoai.services.notifications.notifySearchQuery
+import com.gridoai.services.notifications.notifySearchProgress
 import com.gridoai.adapters.notifications.NotificationService
 
 def ask(auth: AuthData)(payload: AskPayload)(implicit
@@ -133,18 +134,16 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
             payload.basedOnDocsOnly
           ) / newQueries.length
         newQueries
-          .traverse: newQuery =>
-            notifySearchQuery(
-              newQuery,
-              auth.userId
-            ).start >> searchDoc(auth)(
-              SearchPayload(
-                query = newQuery,
-                tokenLimit = tokenLimitPerQuery,
-                llmName = llmModel |> llmToStr,
-                scope = payload.scope
+          .parTraverseN(5): newQuery =>
+            notifySearchProgress(newQuery, auth.userId):
+              searchDoc(auth)(
+                SearchPayload(
+                  query = newQuery,
+                  tokenLimit = tokenLimitPerQuery,
+                  llmName = llmModel |> llmToStr,
+                  scope = payload.scope
+                )
               )
-            )
           .map(partitionEithers)
           .mapLeft(_.mkString(","))
           .mapRight(_.flatten) !> askRecursively(
