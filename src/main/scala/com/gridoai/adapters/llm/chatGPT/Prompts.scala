@@ -70,7 +70,7 @@ def buildQueriesToSearchDocumentsPrompt(
     | Do NOT answer the user's question, only build the $queryOrNewQuery.
     | You can write multiple queries if necessary but only one per line.
     | All queries MUST BE about different subjects.
-    | Identify entities (like names of people, companies, things, places, etc)
+    | Identify ALL unknown entities (like names of people, companies, things, places, etc)
     | and make a query like "What is X?", "How X works?", or "Who is X?"
     | for each of them to know more about.
     | Less queries is better so you are limited to 3 queries.""".stripMargin
