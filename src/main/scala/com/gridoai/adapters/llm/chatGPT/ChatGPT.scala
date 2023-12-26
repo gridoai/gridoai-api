@@ -175,7 +175,7 @@ object ChatGPTClient:
         |> client.createChatCompletion
         |> getAnswerFromChat
         |> (_.mapRight(
-          _.trace.split("\n").map(_.trim).filter(!_.isEmpty).take(3).toList
+          _.split("\n").map(_.trim).filter(!_.isEmpty).take(3).toList
         ))
 
     def strToAction(options: List[Action])(
