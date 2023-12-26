@@ -1,25 +1,27 @@
 package com.gridoai.services.notifications
 
 import com.gridoai.auth.AuthData
-import com.gridoai.domain.UploadStatus
+import com.gridoai.domain._
 import com.gridoai.utils._
 import com.gridoai.adapters.notifications.generateToken
 import cats.effect.IO
+import cats.implicits._
+import cats.effect.implicits._
 import com.gridoai.adapters.notifications.NotificationService
 
 def createNotificationServiceToken(authData: AuthData) =
   generateToken[IO](authData.userId)
 
-def notifySearchQuery(
-    query: String,
+def notifySearch(
+    report: SearchReport,
     user: String
 )(implicit
     ns: NotificationService[IO]
 ): IO[Either[String, Unit]] =
   ns.sendNotification(
     topic = s"$user:chat",
-    channel = s"$user:chat-search-query",
-    content = query
+    channel = s"$user:chat-search",
+    content = report.toString()
   )
 
 def notifyUpload(
@@ -33,6 +35,27 @@ def notifyUpload(
     channel = s"$user:upload-status",
     content = status.toString()
   )
+
+def notifySearchProgress[L, R](query: String, userId: String)(
+    io: => IO[Either[L, R]]
+)(implicit
+    ns: NotificationService[IO]
+) =
+  notifySearch(
+    SearchReport(query = query, status = SearchStatus.Started),
+    userId
+  ).start >>
+    io
+      .flatMapRight: res =>
+        notifySearch(
+          SearchReport(query = query, status = SearchStatus.Success),
+          userId
+        ).start >> IO.pure(res.asRight)
+      .flatMapLeft: e =>
+        notifySearch(
+          SearchReport(query = query, status = SearchStatus.Failure),
+          userId
+        ).start >> IO.pure(e.asLeft)
 
 def notifyUploadProgress[L, R](id: String)(
     io: => IO[Either[L, R]]

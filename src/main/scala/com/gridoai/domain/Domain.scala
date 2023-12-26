@@ -122,6 +122,14 @@ case class SearchPayload(
     scope: Option[List[UID]]
 )
 
+enum SearchStatus:
+  case Started, Success, Failure
+
+case class SearchReport(
+  query: String,
+  status: SearchStatus
+)
+
 case class AskResponse(message: String, sources: List[String])
 
 case class PaginatedResponse[T](data: T, total: Int)
