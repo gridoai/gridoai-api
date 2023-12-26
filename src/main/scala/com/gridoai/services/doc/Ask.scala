@@ -11,8 +11,12 @@ import com.gridoai.adapters.*
 import com.gridoai.auth.AuthData
 import org.slf4j.LoggerFactory
 
+import com.gridoai.services.notifications.notifySearchQuery
+import com.gridoai.adapters.notifications.NotificationService
+
 def ask(auth: AuthData)(payload: AskPayload)(implicit
-    db: DocDB[IO]
+    db: DocDB[IO],
+    ns: NotificationService[IO]
 ): IO[Either[String, AskResponse]] =
   val llmModel = LLMModel.Gpt35Turbo
   val llm = getLLM(llmModel)
@@ -129,8 +133,11 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
             payload.basedOnDocsOnly
           ) / newQueries.length
         newQueries
-          .traverse(newQuery =>
-            searchDoc(auth)(
+          .traverse: newQuery =>
+            notifySearchQuery(
+              newQuery,
+              auth.userId
+            ).start >> searchDoc(auth)(
               SearchPayload(
                 query = newQuery,
                 tokenLimit = tokenLimitPerQuery,
@@ -138,7 +145,6 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
                 scope = payload.scope
               )
             )
-          )
           .map(partitionEithers)
           .mapLeft(_.mkString(","))
           .mapRight(_.flatten) !> askRecursively(

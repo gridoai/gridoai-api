@@ -10,16 +10,29 @@ import com.gridoai.adapters.notifications.NotificationService
 def createNotificationServiceToken(authData: AuthData) =
   generateToken[IO](authData.userId)
 
+def notifySearchQuery(
+    query: String,
+    user: String
+)(implicit
+    ns: NotificationService[IO]
+): IO[Either[String, Unit]] =
+  ns.sendNotification(
+    topic = s"$user:chat",
+    channel = s"$user:chat-search-query",
+    content = query
+  )
+
 def notifyUpload(
     status: UploadStatus,
     user: String
 )(implicit
     ns: NotificationService[IO]
 ): IO[Either[String, Unit]] =
-  val topic = s"$user:upload"
-  val channel = s"$user:upload-status"
-  val content = status.toString()
-  ns.sendNotification(topic, channel, content)
+  ns.sendNotification(
+    topic = s"$user:upload",
+    channel = s"$user:upload-status",
+    content = status.toString()
+  )
 
 def notifyUploadProgress[L, R](id: String)(
     io: => IO[Either[L, R]]
