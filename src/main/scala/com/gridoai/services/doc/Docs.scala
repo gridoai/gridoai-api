@@ -61,7 +61,7 @@ def searchDoc(
             mergeNewChunksToList(
               List.empty,
               getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
-              payload.tokenLimit,
+              tokenLimitPerQuery,
               chunks
             )
           .traceRight: chunks =>
