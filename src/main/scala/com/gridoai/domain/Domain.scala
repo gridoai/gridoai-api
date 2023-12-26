@@ -116,7 +116,7 @@ case class AskPayload(
 )
 
 case class SearchPayload(
-    query: String,
+    queries: List[String],
     tokenLimit: Int,
     llmName: String,
     scope: Option[List[UID]]
@@ -126,8 +126,8 @@ enum SearchStatus:
   case Started, Success, Failure
 
 case class SearchReport(
-  query: String,
-  status: SearchStatus
+    query: String,
+    status: SearchStatus
 )
 
 case class AskResponse(message: String, sources: List[String])
