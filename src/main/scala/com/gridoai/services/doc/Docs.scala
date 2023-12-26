@@ -3,6 +3,7 @@ package com.gridoai.services.doc
 import cats.Monad
 import cats.effect.IO
 import cats.implicits.*
+import cats.effect.implicits.concurrentParTraverseOps
 import com.gridoai.adapters.llm.*
 import com.gridoai.adapters.embeddingApi.*
 import com.gridoai.adapters.rerankApi.*
@@ -31,6 +32,7 @@ import java.io.File
 import com.gridoai.domain.UploadStatus
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.services.notifications.notifyUploadProgress
+import com.gridoai.services.notifications.notifySearchProgress
 
 val pageSize = sys.env.getOrElse("PAGE_SIZE", "2000").toInt
 val logger = org.slf4j.LoggerFactory.getLogger("com.gridoai.services.doc")
@@ -38,33 +40,41 @@ val logger = org.slf4j.LoggerFactory.getLogger("com.gridoai.services.doc")
 def searchDoc(
     auth: AuthData
 )(payload: SearchPayload)(using
-    db: DocDB[IO]
+    db: DocDB[IO],
+    ns: NotificationService[IO]
 ): IO[Either[String, List[Chunk]]] =
-  getEmbeddingAPI("embaas")
-    .embedChat(payload.query)
-    .flatMapRight: vec =>
-      db.getNearChunks(vec, payload.scope, 0, 1000, auth.orgId, auth.role)
-    .traceRight: chunks =>
-      s"db retrieval result chunks: ${chunks.length} chunks"
-    .mapRight(_.map(_.chunk))
-    .flatMapRight: chunks =>
-      getRerankAPI("cohere")
-        .rerank(RerankPayload(query = payload.query, chunks = chunks))
-    .mapRight: chunks =>
-      mergeNewChunksToList(
-        List.empty,
-        getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
-        payload.tokenLimit,
-        chunks
-      )
-    .traceRight: chunks =>
-      val chunksInfo = chunks
-        .map(chunk =>
-          s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.relevance})"
-        )
-        .mkString("\n")
-      s"rerank result chunks: $chunksInfo"
-    .mapRight(_.map(_.chunk))
+  val tokenLimitPerQuery = payload.tokenLimit / payload.queries.length
+  payload.queries
+    .parTraverseN(5): query =>
+      notifySearchProgress(query, auth.userId):
+        getEmbeddingAPI("embaas")
+          .embedChat(query)
+          .flatMapRight: vec =>
+            db.getNearChunks(vec, payload.scope, 0, 1000, auth.orgId, auth.role)
+          .traceRight: chunks =>
+            s"db retrieval result chunks: ${chunks.length} chunks"
+          .mapRight(_.map(_.chunk))
+          .flatMapRight: chunks =>
+            getRerankAPI("cohere")
+              .rerank(RerankPayload(query = query, chunks = chunks))
+          .mapRight: chunks =>
+            mergeNewChunksToList(
+              List.empty,
+              getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
+              payload.tokenLimit,
+              chunks
+            )
+          .traceRight: chunks =>
+            val chunksInfo = chunks
+              .map(chunk =>
+                s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.relevance})"
+              )
+              .mkString("\n")
+            s"rerank result chunks: $chunksInfo"
+          .mapRight(_.map(_.chunk))
+    .map(partitionEithers)
+    .mapLeft(_.mkString(","))
+    .mapRight(_.flatten)
 
 def mapExtractToUploadError(e: ExtractTextError) =
   (FileParseError(e.format, e.message))

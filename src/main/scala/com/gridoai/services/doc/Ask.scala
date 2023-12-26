@@ -2,7 +2,6 @@ package com.gridoai.services.doc
 
 import cats.effect.IO
 import cats.implicits._
-import cats.effect.implicits.concurrentParTraverseOps
 import com.gridoai.adapters.llm._
 import com.gridoai.domain._
 import com.gridoai.models.DocDB
@@ -12,7 +11,6 @@ import com.gridoai.adapters._
 import com.gridoai.auth.AuthData
 import org.slf4j.LoggerFactory
 
-import com.gridoai.services.notifications.notifySearchProgress
 import com.gridoai.adapters.notifications.NotificationService
 
 def ask(auth: AuthData)(payload: AskPayload)(implicit
@@ -128,25 +126,18 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       .buildQueriesToSearchDocuments(payload.messages, lastQueries, lastChunks)
       .flatMapRight: newQueries =>
         logger.info(s"AI's queries: $newQueries")
-        val tokenLimitPerQuery = llm
-          .maxTokensForChunks(
-            payload.messages,
-            payload.basedOnDocsOnly
-          ) / newQueries.length
-        newQueries
-          .parTraverseN(5): newQuery =>
-            notifySearchProgress(newQuery, auth.userId):
-              searchDoc(auth)(
-                SearchPayload(
-                  query = newQuery,
-                  tokenLimit = tokenLimitPerQuery,
-                  llmName = llmModel |> llmToStr,
-                  scope = payload.scope
-                )
-              )
-          .map(partitionEithers)
-          .mapLeft(_.mkString(","))
-          .mapRight(_.flatten) !> askRecursively(
+        searchDoc(auth)(
+          SearchPayload(
+            queries = newQueries,
+            tokenLimit = llm
+              .maxTokensForChunks(
+                payload.messages,
+                payload.basedOnDocsOnly
+              ),
+            llmName = llmModel |> llmToStr,
+            scope = payload.scope
+          )
+        ) !> askRecursively(
           newQueries,
           searchesBeforeResponse - 1
         )
