@@ -8,6 +8,9 @@ import cats.effect.IO
 import cats.implicits._
 import cats.effect.implicits._
 import com.gridoai.adapters.notifications.NotificationService
+import io.circe.generic.auto._
+import io.circe.parser._
+import io.circe.syntax._
 
 def createNotificationServiceToken(authData: AuthData) =
   generateToken[IO](authData.userId)
@@ -21,7 +24,7 @@ def notifySearch(
   ns.sendNotification(
     topic = s"$user:chat",
     channel = s"$user:chat-search",
-    content = report.toString()
+    content = report.asJson.noSpaces
   )
 
 def notifyUpload(
@@ -36,24 +39,24 @@ def notifyUpload(
     content = status.toString()
   )
 
-def notifySearchProgress[L, R](query: String, userId: String)(
+def notifySearchProgress[L, R](queries: List[String], userId: String)(
     io: => IO[Either[L, R]]
 )(implicit
     ns: NotificationService[IO]
 ) =
   notifySearch(
-    SearchReport(query = query, status = SearchStatus.Started),
+    SearchReport(queries = queries, status = SearchStatus.Started),
     userId
   ).start >>
     io
       .flatMapRight: res =>
         notifySearch(
-          SearchReport(query = query, status = SearchStatus.Success),
+          SearchReport(queries = queries, status = SearchStatus.Success),
           userId
         ).start >> IO.pure(res.asRight)
       .flatMapLeft: e =>
         notifySearch(
-          SearchReport(query = query, status = SearchStatus.Failure),
+          SearchReport(queries = queries, status = SearchStatus.Failure),
           userId
         ).start >> IO.pure(e.asLeft)
 

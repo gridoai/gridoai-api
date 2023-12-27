@@ -44,25 +44,27 @@ def searchDoc(
     ns: NotificationService[IO]
 ): IO[Either[String, List[Chunk]]] =
   val tokenLimitPerQuery = payload.tokenLimit / payload.queries.length
-  getEmbeddingAPI("embaas")
-    .embedChats(payload.queries)
-    .flatMapRight: vecs =>
-      db.getNearChunks(vecs, payload.scope, 0, 1000, auth.orgId, auth.role)
-    .mapRight(_.map(_.map(_.chunk)) zip payload.queries)
-    .flatMapRight(
-      _.parTraverseN(5)(
-        rerankChunks(
-          getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
-          tokenLimitPerQuery
+  notifySearchProgress(payload.queries, auth.userId):
+    getEmbeddingAPI("embaas")
+      .embedChats(payload.queries)
+      .flatMapRight: vecs =>
+        db.getNearChunks(vecs, payload.scope, 0, 1000, auth.orgId, auth.role)
+      .mapRight(_.map(_.map(_.chunk)) zip payload.queries)
+      .flatMapRight(
+        _.parTraverseN(5)(
+          rerankChunks(
+            getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
+            tokenLimitPerQuery
+          )
         )
+          .map(partitionEithers)
+          .mapLeft(_.mkString(","))
+          .mapRight(_.flatten)
       )
-        .map(partitionEithers)
-        .mapLeft(_.mkString(","))
-        .mapRight(_.flatten)
-    )
 
 def rerankChunks(
-    calculateChunkTokenQuantity: Chunk => Int, tokenLimit: Int
+    calculateChunkTokenQuantity: Chunk => Int,
+    tokenLimit: Int
 )(chunks: List[Chunk], query: String): IO[Either[String, List[Chunk]]] =
   getRerankAPI("cohere")
     .rerank(RerankPayload(query = query, chunks = chunks))
