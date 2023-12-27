@@ -9,6 +9,7 @@ import doobie.postgres.*
 import doobie.postgres.implicits.*
 import com.pgvector.PGvector
 import cats.implicits._
+import cats.effect.implicits.concurrentParTraverseOps
 
 import com.gridoai.domain.*
 import com.gridoai.utils.*
@@ -269,49 +270,53 @@ object PostgresClient {
         case None => Right(List()).pure[F]
 
     def getNearChunks(
-        embedding: Embedding,
+        embeddings: List[Embedding],
         scope: Option[List[UID]],
         offset: Int,
         limit: Int,
         orgId: String,
         role: String
-    ): F[Either[String, List[SimilarChunk]]] =
+    ): F[Either[String, List[List[SimilarChunk]]]] =
       traceMappable("getNearDocuments"):
         println("Getting near docs ")
-        val vector = PGvector(embedding.vector.toArray)
+        embeddings
+          .parTraverseN(5): embedding =>
+            val vector = PGvector(embedding.vector.toArray)
 
-        val BaseQuery =
-          sql"""select
-            uid,
-            document_uid,
-            document_name,
-            document_source,
-            content,
-            start_pos,
-            end_pos,
-            token_quantity,
-            embedding <=> $vector::vector as distance
-          from $chunksTable
-          where
-            document_organization = $orgId and
-            embedding_model = ${embedding.model}::$EmbeddingModelEnum"""
+            val BaseQuery =
+              sql"""select
+              uid,
+              document_uid,
+              document_name,
+              document_source,
+              content,
+              start_pos,
+              end_pos,
+              token_quantity,
+              embedding <=> $vector::vector as distance
+            from $chunksTable
+            where
+              document_organization = $orgId and
+              embedding_model = ${embedding.model}::$EmbeddingModelEnum"""
 
-        val scopeFilter = scope.flatMap(_.toNel) match
-          case Some(uids) =>
-            fr"and ${Fragments.in(fr"document_uid", uids)}"
-          case _ => fr""
+            val scopeFilter = scope.flatMap(_.toNel) match
+              case Some(uids) =>
+                fr"and ${Fragments.in(fr"document_uid", uids)}"
+              case _ => fr""
 
-        val queryPagination = fr"""
-          order by distance asc
-          offset $offset
-          limit $limit"""
+            val queryPagination = fr"""
+            order by distance asc
+            offset $offset
+            limit $limit"""
 
-        (BaseQuery ++ scopeFilter ++ queryPagination)
-          .query[NearChunkOutput]
-          .to[List]
-          .transact[F](xa)
-          .map(_.traverse(_.toChunk))
-          |> attempt
+            (BaseQuery ++ scopeFilter ++ queryPagination)
+              .query[NearChunkOutput]
+              .to[List]
+              .transact[F](xa)
+              .map(_.traverse(_.toChunk))
+              |> attempt
+          .map(partitionEithers)
+          .mapLeft(_.mkString(","))
 
   }
 }

@@ -109,13 +109,13 @@ object MockDocDB extends DocDB[IO]:
       )
     )
   def getNearChunks(
-      embedding: Embedding,
+      embeddings: List[Embedding],
       scope: Option[List[UID]],
       offset: Int,
       limit: Int,
       orgId: String,
       role: String
-  ): IO[Either[String, List[SimilarChunk]]] =
+  ): IO[Either[String, List[List[SimilarChunk]]]] =
     val scopeFilter = scope match
       case Some(uids) => (uid => uids.contains(uid))
       case None =>
@@ -124,19 +124,20 @@ object MockDocDB extends DocDB[IO]:
 
     IO.pure(
       Right(
-        allChunks.toList
-          .filter(row =>
-            row.orgId == orgId && row.role == role && scopeFilter(
-              row.chunk.chunk.uid
+        embeddings.map: embedding =>
+          allChunks.toList
+            .filter(row =>
+              row.orgId == orgId && row.role == role && scopeFilter(
+                row.chunk.chunk.uid
+              )
             )
-          )
-          .drop(offset)
-          .take(limit)
-          .map(x =>
-            SimilarChunk(
-              chunk = x.chunk.chunk,
-              distance = 1
+            .drop(offset)
+            .take(limit)
+            .map(x =>
+              SimilarChunk(
+                chunk = x.chunk.chunk,
+                distance = 1
+              )
             )
-          )
       )
     )
