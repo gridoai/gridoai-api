@@ -126,7 +126,7 @@ enum SearchStatus:
   case Started, Success, Failure
 
 case class SearchReport(
-    query: String,
+    queries: List[String],
     status: SearchStatus
 )
 
