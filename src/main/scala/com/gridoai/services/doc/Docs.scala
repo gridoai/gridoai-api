@@ -44,37 +44,43 @@ def searchDoc(
     ns: NotificationService[IO]
 ): IO[Either[String, List[Chunk]]] =
   val tokenLimitPerQuery = payload.tokenLimit / payload.queries.length
-  payload.queries
-    .parTraverseN(5): query =>
-      notifySearchProgress(query, auth.userId):
-        getEmbeddingAPI("embaas")
-          .embedChat(query)
-          .flatMapRight: vec =>
-            db.getNearChunks(vec, payload.scope, 0, 1000, auth.orgId, auth.role)
-          .traceRight: chunks =>
-            s"db retrieval result chunks: ${chunks.length} chunks"
-          .mapRight(_.map(_.chunk))
-          .flatMapRight: chunks =>
-            getRerankAPI("cohere")
-              .rerank(RerankPayload(query = query, chunks = chunks))
-          .mapRight: chunks =>
-            mergeNewChunksToList(
-              List.empty,
-              getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
-              tokenLimitPerQuery,
-              chunks
-            )
-          .traceRight: chunks =>
-            val chunksInfo = chunks
-              .map(chunk =>
-                s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.relevance})"
-              )
-              .mkString("\n")
-            s"rerank result chunks: $chunksInfo"
-          .mapRight(_.map(_.chunk))
-    .map(partitionEithers)
-    .mapLeft(_.mkString(","))
-    .mapRight(_.flatten)
+  getEmbeddingAPI("embaas")
+    .embedChats(payload.queries)
+    .flatMapRight: vecs =>
+      db.getNearChunks(vecs, payload.scope, 0, 1000, auth.orgId, auth.role)
+    .mapRight(_.map(_.map(_.chunk)) zip payload.queries)
+    .flatMapRight(
+      _.parTraverseN(5)(
+        rerankChunks(
+          getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
+          tokenLimitPerQuery
+        )
+      )
+        .map(partitionEithers)
+        .mapLeft(_.mkString(","))
+        .mapRight(_.flatten)
+    )
+
+def rerankChunks(
+    calculateChunkTokenQuantity: Chunk => Int, tokenLimit: Int
+)(chunks: List[Chunk], query: String): IO[Either[String, List[Chunk]]] =
+  getRerankAPI("cohere")
+    .rerank(RerankPayload(query = query, chunks = chunks))
+    .mapRight: chunks =>
+      mergeNewChunksToList(
+        List.empty,
+        calculateChunkTokenQuantity,
+        tokenLimit,
+        chunks
+      )
+    .traceRight: chunks =>
+      val chunksInfo = chunks
+        .map(chunk =>
+          s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.relevance})"
+        )
+        .mkString("\n")
+      s"query: $query\nresult chunks: $chunksInfo"
+    .mapRight(_.map(_.chunk))
 
 def mapExtractToUploadError(e: ExtractTextError) =
   (FileParseError(e.format, e.message))
