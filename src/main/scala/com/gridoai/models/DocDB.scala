@@ -46,10 +46,10 @@ trait DocDB[F[_]]:
   ): F[Either[String, List[Document]]]
 
   def getNearChunks(
-      embedding: Embedding,
+      embeddings: List[Embedding],
       scope: Option[List[UID]],
       offset: Int,
       limit: Int,
       orgId: String,
       role: String
-  ): F[Either[String, List[SimilarChunk]]]
+  ): F[Either[String, List[List[SimilarChunk]]]]
