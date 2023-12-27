@@ -44,9 +44,9 @@ object GridoAIML extends EmbeddingAPI[IO]:
   val HttpSingle = HttpClient(embeddingApiEndpointSingle)
   val HttpBatch = HttpClient(embeddingApiEndpointBatch)
 
-  def embedChat(text: String): IO[Either[String, Embedding]] =
+  def embedChats(texts: List[String]): IO[Either[String, List[Embedding]]] =
     embed(
-      text,
+      texts,
       "query"
     )
   def embedChunks(chunks: List[Chunk]): IO[Either[String, List[Embedding]]] =
@@ -94,11 +94,11 @@ object GridoAIML extends EmbeddingAPI[IO]:
       ) |> attempt
 
   def embed(
-      text: String,
+      texts: List[String],
       instruction: String
-  ): IO[Either[String, Embedding]] = traceMappable("embed"):
+  ): IO[Either[String, List[Embedding]]] = traceMappable("embed"):
     val body =
-      GridoAIMLEmbeddingRequest(List(text), instruction).asJson.noSpaces
+      GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     HttpSingle
       .post("")
       .headers(Map("Content-Type" -> "application/json"))
@@ -108,9 +108,11 @@ object GridoAIML extends EmbeddingAPI[IO]:
         response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
-      .mapRight(r =>
-        Embedding(
-          vector = r.message.head,
-          model = EmbeddingModel.MultilingualE5Base
+      .mapRight(
+        _.message.map(v =>
+          Embedding(
+            vector = v,
+            model = EmbeddingModel.MultilingualE5Base
+          )
         )
       ) |> attempt
