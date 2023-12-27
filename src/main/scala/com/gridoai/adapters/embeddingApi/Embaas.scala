@@ -29,9 +29,9 @@ case class EmbeddingResponse(
 object EmbaasClient:
   def apply(httpClient: HttpClient, apiKey: String) = new EmbeddingAPI[IO]:
 
-    def embedChat(text: String): IO[Either[String, Embedding]] =
+    def embedChats(texts: List[String]): IO[Either[String, List[Embedding]]] =
       embed(
-        text,
+        texts,
         "query"
       )
     def embedChunks(chunks: List[Chunk]): IO[Either[String, List[Embedding]]] =
@@ -41,12 +41,10 @@ object EmbaasClient:
       )
 
     def embed(
-        text: String,
+        texts: List[String],
         instruction: String
-    ): IO[Either[String, Embedding]] =
-      embedMany(List(text), instruction).map(
-        _.flatMap(_.headOption.toRight("Got no embedding from api"))
-      )
+    ): IO[Either[String, List[Embedding]]] =
+      embedMany(texts, instruction)
 
     private val authHeader = Header("Authorization", s"Bearer $apiKey")
 

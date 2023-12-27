@@ -10,15 +10,15 @@ import cats.Monad
 import com.gridoai.utils.|>
 
 trait EmbeddingAPI[F[_]]:
-  def embedChat(text: String): F[Either[String, Embedding]]
+  def embedChats(texts: List[String]): F[Either[String, List[Embedding]]]
   def embedChunks(chunks: List[Chunk]): F[Either[String, List[Embedding]]]
 
 extension [F[_]: Monad](e: EmbeddingAPI[F])
   def withFallback(fallback: EmbeddingAPI[F]): EmbeddingAPI[F] =
     new EmbeddingAPI[F]:
 
-      def embedChat(text: String) =
-        fallbackEitherM(e.embedChat, fallback.embedChat)(text)
+      def embedChats(texts: List[String]) =
+        fallbackEitherM(e.embedChats, fallback.embedChats)(texts)
 
       def embedChunks(chunks: List[Chunk]) =
         fallbackEitherM(e.embedChunks, fallback.embedChunks)(chunks)

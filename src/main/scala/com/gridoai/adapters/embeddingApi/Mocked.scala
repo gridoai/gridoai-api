@@ -9,9 +9,9 @@ object Mocked extends EmbeddingAPI[IO]:
     model = EmbeddingModel.Mocked
   )
 
-  def embedChat(
-      text: String
+  def embedChats(
+      texts: List[String]
   ) =
-    IO.pure(Right(mockResponse))
+    IO.pure(Right(texts.map(_ => mockResponse)))
   def embedChunks(chunks: List[Chunk]) =
     IO.pure(Right(chunks.map(_ => mockResponse)))
