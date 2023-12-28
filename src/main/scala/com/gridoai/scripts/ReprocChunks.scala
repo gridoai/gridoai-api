@@ -23,13 +23,8 @@ import java.util.UUID
 // for each doc
 //      upsert doc
 def reproc() =
-  val xa = Transactor.fromDriverManager[IO](
-    "org.postgresql.Driver",
-    s"jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DATABASE",
-    POSTGRES_USER,
-    POSTGRES_PASSWORD
-  )
-  val docDb = PostgresClient[IO]
+  val xa = PostgresClient.getSyncTransactor
+  val docDb = PostgresClient[IO](xa)
   val docs = sql"""
        select uid, name, source, content, organization, roles
        from $documentsTable
