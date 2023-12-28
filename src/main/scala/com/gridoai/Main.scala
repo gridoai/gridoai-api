@@ -21,10 +21,13 @@ object Main extends IOApp {
       endpoints.dumpSchema()
       IO.pure(ExitCode.Success)
     else
+      PostgresClient
+        .getTransactor[IO]
+        .use: transactor =>
+          given docDb: DocDB[IO] =
+            PostgresClient[IO](transactor)
+          given ns: NotificationService[IO] = AblyNotificationService[IO]
 
-      given docDb: DocDB[IO] = PostgresClient[IO]
-      given ns: NotificationService[IO] = AblyNotificationService[IO]
-
-      endpoints.http4s.runHttp4s
+          endpoints.http4s.runHttp4s
 
 }
