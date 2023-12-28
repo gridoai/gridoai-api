@@ -70,6 +70,7 @@
 
 //> using dep "org.tpolecat::doobie-core:1.0.0-RC4"
 //> using dep "org.tpolecat::doobie-hikari:1.0.0-RC4"
+//> using dep "com.zaxxer:HikariCP:5.1.0"
 //> using dep "org.tpolecat::doobie-postgres:1.0.0-RC4"
 
 //> using dep "dev.maxmelnyk::openai-scala:0.3.0"
