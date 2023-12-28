@@ -125,7 +125,7 @@ val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
 val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
 val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
 val jdbcUrl =
-  s"jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}?currentSchema=${POSTGRES_SCHEMA}&user=${POSTGRES_USER}&password=${POSTGRES_PASSWORD}"
+  s"jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}"
 
 def pgObj(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
 val documentsTable = pgObj("documents")
@@ -140,8 +140,10 @@ object PostgresClient {
   def getTransactor[F[_]: Async] =
     val config = {
       val configBase = new HikariConfig()
-      configBase.setDriverClassName("org.h2.Driver")
       configBase.setJdbcUrl(jdbcUrl)
+      configBase.setPassword(POSTGRES_PASSWORD)
+      configBase.setUsername(POSTGRES_USER)
+      configBase.setDriverClassName("org.postgresql.Driver")
       configBase
     }
     HikariTransactor
