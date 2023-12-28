@@ -12,6 +12,8 @@ import cats.implicits._
 
 import com.gridoai.domain.*
 import com.gridoai.utils.*
+import com.zaxxer.hikari.HikariConfig
+import doobie.hikari.HikariTransactor
 case class DocRow(
     uid: UID,
     name: String,
@@ -122,6 +124,8 @@ val POSTGRES_DATABASE =
 val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
 val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
 val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
+val jdbcUrl =
+  s"jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}?currentSchema=${POSTGRES_SCHEMA}&user=${POSTGRES_USER}&password=${POSTGRES_PASSWORD}"
 
 def pgObj(name: String) = Fragment.const(s"$POSTGRES_SCHEMA.${name}")
 val documentsTable = pgObj("documents")
@@ -129,14 +133,23 @@ val chunksTable = pgObj("chunks")
 val EmbeddingModelEnum = pgObj("embedding_model")
 
 object PostgresClient {
-  def apply[F[_]: Async]: DocDB[F] = new DocDB[F] {
+  def getSyncTransactor =
+    import cats.effect.unsafe.implicits.global
+    getTransactor[IO].use(IO.pure(_)).unsafeRunSync()
 
-    val xa = Transactor.fromDriverManager[F](
-      "org.postgresql.Driver",
-      s"jdbc:postgresql://$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DATABASE",
-      POSTGRES_USER,
-      POSTGRES_PASSWORD
-    )
+  def getTransactor[F[_]: Async] =
+    val config = {
+      val configBase = new HikariConfig()
+      configBase.setDriverClassName("org.h2.Driver")
+      configBase.setJdbcUrl(jdbcUrl)
+      configBase
+    }
+    HikariTransactor
+      .fromHikariConfig[F](config)
+
+  def apply[F[_]: Async](
+      xa: Transactor[F]
+  ): DocDB[F] = new DocDB[F] {
 
     def addDocument(
         doc: DocumentPersistencePayload,
