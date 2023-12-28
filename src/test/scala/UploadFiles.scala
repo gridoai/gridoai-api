@@ -54,7 +54,7 @@ object fileMock:
     )
 class UploadApi extends CatsEffectSuite {
   given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
-  given db: DocDB[IO] = PostgresClient[IO]
+  given db: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
 
   import fileMock._
   test("Uploads a file") {

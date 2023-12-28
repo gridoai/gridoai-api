@@ -26,7 +26,7 @@ import com.gridoai.utils.mapRight
 
 val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
 class API extends CatsEffectSuite {
-  given db: DocDB[IO] = PostgresClient[IO]
+  given db: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
   given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
 
   test("health check should return OK") {

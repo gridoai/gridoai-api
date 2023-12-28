@@ -16,7 +16,7 @@ class DocumentModel extends CatsEffectSuite {
   // Create a test transactor
   import com.gridoai.models.PostgresClient
   given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
-  val DocsDB: DocDB[IO] = PostgresClient[IO]
+  val DocsDB: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
 
   val doc1Id = UUID.randomUUID()
   val doc2Id = UUID.randomUUID()
