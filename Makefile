@@ -29,3 +29,5 @@ deploy: pkg pushpkg restart-remote-app
 	
 dev:
 	@scala-cli --revolver .
+repl:
+	@scala-cli repl .
