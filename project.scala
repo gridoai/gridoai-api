@@ -68,8 +68,9 @@
 //> using dep "com.github.jwt-scala::jwt-core:9.4.5"
 //> using dep "com.lihaoyi::sourcecode:0.3.1"
 
-//> using dep "org.tpolecat::doobie-core:1.0.0-RC1"
-//> using dep "org.tpolecat::doobie-postgres:1.0.0-RC1"
+//> using dep "org.tpolecat::doobie-core:1.0.0-RC4"
+//> using dep "org.tpolecat::doobie-hikari:1.0.0-RC4"
+//> using dep "org.tpolecat::doobie-postgres:1.0.0-RC4"
 
 //> using dep "dev.maxmelnyk::openai-scala:0.3.0"
 //> using dep "com.github.tototoshi::scala-csv:1.3.10"
@@ -80,4 +81,3 @@
 //> using resourceDir "src/main/resources"
 //> using dep io.ably:ably-java:1.2.33
 //> using dep com.softwaremill.sttp.tapir::tapir-swagger-ui-bundle:1.9.6
-
