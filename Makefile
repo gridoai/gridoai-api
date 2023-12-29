@@ -31,3 +31,6 @@ dev:
 	@scala-cli --revolver .
 repl:
 	@scala-cli repl .
+	
+loadtest-ask:
+	@artillery run loadtests/ask.yml
