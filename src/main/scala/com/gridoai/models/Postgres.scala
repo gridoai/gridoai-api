@@ -144,6 +144,7 @@ object PostgresClient {
       configBase.setPassword(POSTGRES_PASSWORD)
       configBase.setUsername(POSTGRES_USER)
       configBase.setDriverClassName("org.postgresql.Driver")
+      configBase.setMaximumPoolSize(20)
       configBase
     }
     HikariTransactor
