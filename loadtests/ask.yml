@@ -13,7 +13,7 @@ scenarios:
           url: "/ask"
           headers:
             Accept: "application/json, text/plain, */*"
-            Authorization: "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.ewogICJhenAiIDogImh0dHBzOi8vd3d3LmdyaWRvYWkuY29tIiwKICAiaXNzIiA6ICJodHRwczovL2FjdGl2ZS1hbmVtb25lLTUyLmNsZXJrLmFjY291bnRzLmRldiIsCiAgIm9yZ0lkIiA6IG51bGwsCiAgInJvbGUiIDogbnVsbCwKICAic2lkIiA6ICJzZXNzXzJadUZWWUs0NjJZeHk3dG1kTXN2bzN4T3ZiTSIsCiAgInN1YiIgOiAidXNlcl8yUkxXb1NtVHhXYzBmd0ZlQzZqRHdlUlR3UEkiLAogICJvcmdQbGFuIiA6IG51bGwsCiAgInVzZXJQbGFuIiA6ICJpbmRpdmlkdWFsIiwKICAiY3VzdG9tZXJJZCIgOiAiY3VzX09jVjV1ajNFS0VvSGFqIiwKICAib3JnQ3VzdG9tZXJJZCIgOiBudWxsCn0.LtLeAzC2b1amBDS_bI4EyxPbUqNIpyCm8qTl6apTh_4"
+            Authorization: "Bearer "
           json:
             messages:
               - message: "como fazer microagulhamento?"
