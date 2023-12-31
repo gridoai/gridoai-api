@@ -7,6 +7,8 @@ import cats.effect.IO
 import sttp.tapir.server.ServerEndpoint
 import com.gridoai.services.payments.createBillingSession
 import com.gridoai.adapters.stripe
+import com.gridoai.adapters.whatsapp.Whatsapp
+import com.gridoai.services.messageInterface.handleWebhook
 import com.gridoai.services.notifications.createNotificationServiceToken
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import com.gridoai.adapters.notifications.NotificationService
@@ -19,6 +21,16 @@ class withService(implicit db: DocDB[IO], ns: NotificationService[IO]):
   def webHooksStripeEndpoint =
     webhooksStripe.serverLogic(
       stripe.handleEvent _
+    )
+
+  def webHooksWhatsappChallengeEndpoint =
+    webhooksWhatsappChallenge.serverLogic(
+      Whatsapp.handleChallenge _
+    )
+
+  def webHooksWhatsappEndpoint =
+    webhooksWhatsapp.serverLogic(
+      handleWebhook _
     )
 
   def healthCheck =
@@ -67,6 +79,8 @@ class withService(implicit db: DocDB[IO], ns: NotificationService[IO]):
       deleteDoc,
       listDocs,
       webHooksStripeEndpoint,
+      webHooksWhatsappChallengeEndpoint,
+      webHooksWhatsappEndpoint,
       billingSessionEndpoint,
       refreshGDriveToken,
       authNotification

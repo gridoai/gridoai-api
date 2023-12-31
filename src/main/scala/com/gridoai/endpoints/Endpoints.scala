@@ -16,6 +16,7 @@ import java.io.File
 import java.util.UUID
 import com.gridoai.auth.AuthData
 import com.gridoai.adapters.*
+import com.gridoai.adapters.whatsapp.Whatsapp
 
 type PublicEndpoint[I, E, O, -R] = Endpoint[Unit, I, E, O, R]
 type SecuredEndpoint[I, E, O, -R] =
@@ -50,6 +51,23 @@ val webhooksStripe: PublicEndpoint[(String, String), String, String, Any] =
     .in(stringBody)
     .in(header[String]("Stripe-Signature"))
     .out(stringBody)
+    .errorOut(stringBody)
+
+val webhooksWhatsappChallenge
+    : PublicEndpoint[(String, String), String, String, Any] =
+  endpoint.get
+    .in("webhooks" / "whatsapp")
+    .in(query[String]("hub.verify_token"))
+    .in(query[String]("hub.challenge"))
+    .out(stringBody)
+    .errorOut(stringBody)
+
+val webhooksWhatsapp
+    : PublicEndpoint[Whatsapp.WebhookPayload, String, Unit, Any] =
+  endpoint.post
+    .in("webhooks" / "whatsapp")
+    .in(jsonBody[Whatsapp.WebhookPayload])
+    .out(emptyOutput)
     .errorOut(stringBody)
 
 val notificationAuthEndpoint: SecuredEndpoint[Unit, String, String, Any] =
@@ -164,6 +182,8 @@ val allEndpoints: List[AnyEndpoint] =
     importGDriveEndpoint.endpoint,
     askEndpoint.endpoint,
     webhooksStripe,
+    webhooksWhatsappChallenge,
+    webhooksWhatsapp,
     refreshGDriveTokenEndpoint.endpoint,
     billingSession.endpoint
   )

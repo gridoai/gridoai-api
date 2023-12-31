@@ -118,6 +118,8 @@ case class UserCreated(
     data: UserCreatedData
 )
 
+case class CreateUser(phone_number: List[String])
+
 case class Verification(
     status: String,
     strategy: String
@@ -169,7 +171,7 @@ object ClerkClient:
   val Http = HttpClient(CLERK_ENDPOINT)
   private val authHeader = Header("Authorization", s"Bearer $CLERK_SECRET_KEY")
   object user:
-    def get(uid: String) =
+    def get(uid: String): IO[Either[String, User]] =
       Http
         .get(s"/users/$uid")
         .header(authHeader)
@@ -179,8 +181,16 @@ object ClerkClient:
             decode[User](_).left.map(_.getMessage())
           )
         ) |> attempt
-    def byEmail(email: String) =
-      user.list(email).map(_.flatMap(_.headOption.toRight("No user found")))
+
+    def byEmail(email: String): IO[Either[String, User]] =
+      user
+        .listByEmail(email)
+        .map(_.flatMap(_.headOption.toRight("No user found")))
+
+    def byPhone(phoneNumber: String): IO[Either[String, User]] =
+      user
+        .listByPhone(phoneNumber)
+        .map(_.flatMap(_.headOption.toRight("No user found")))
 
     def getFirstOrgByUID(uid: String) =
       user
@@ -235,12 +245,27 @@ object ClerkClient:
           )
         )
 
-    def list(
-        email_address: String,
+    def listByEmail(
+        emailAddress: String,
         limit: Int = 1
-    ) =
+    ): IO[Either[String, List[User]]] =
       Http
-        .get(s"/users?email_address=$email_address&limit=$limit")
+        .get(s"/users?email_address=$emailAddress&limit=$limit")
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[List[User]](_).left.map(_.getMessage())
+          )
+        ) |> attempt
+
+    def listByPhone(
+        phoneNumber: String,
+        limit: Int = 1
+    ): IO[Either[String, List[User]]] =
+      Http
+        .get(s"/users?phone_number=$phoneNumber&limit=$limit")
         .header(authHeader)
         .contentType(MediaType.ApplicationJson)
         .sendReq()
@@ -262,6 +287,22 @@ object ClerkClient:
             decode[OrganizationMemberShipList](_).left.map(_.getMessage())
           )
         ) |> attempt
+
+    def createByPhone(phoneNumber: String): IO[Either[String, User]] =
+      val body = CreateUser(List(phoneNumber)).asJson.noSpaces
+      print("Creating user... ")
+      Http
+        .post(s"/users")
+        .body(body)
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[User](_).left.map(_.getMessage())
+          )
+        ) |> attempt
+
   object session:
 
     def list(
