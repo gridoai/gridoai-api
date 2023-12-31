@@ -12,6 +12,8 @@ import com.gridoai.models.DocDB
 import de.killaitis.http4s.*
 
 import org.http4s.ember.server.EmberServerBuilder
+import com.gridoai.adapters.notifications.AblyNotificationService
+import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.utils.LRUCache
 
 object Main extends IOApp {
@@ -24,6 +26,7 @@ object Main extends IOApp {
         .getTransactor[IO]
         .use: transactor =>
           given docDb: DocDB[IO] = PostgresClient[IO](transactor)
+          given ns: NotificationService[IO] = AblyNotificationService[IO]
           given lruCache: LRUCache[String, Unit] =
             LRUCache[String, Unit](10)
 
