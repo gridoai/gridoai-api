@@ -12,15 +12,17 @@ import com.gridoai.services.messageInterface.handleWebhook
 import com.gridoai.services.notifications.createNotificationServiceToken
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.adapters.notifications.WhatsAppNotificationService
+import com.gridoai.adapters.notifications.AblyNotificationService
 import com.gridoai.utils.LRUCache
 
 class withService(implicit
     db: DocDB[IO],
-    ns: NotificationService[IO],
     lruCache: LRUCache[String, Unit]
 ):
 
   def searchDocs =
+    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     searchEndpoint.serverLogic(searchDoc _)
 
   def webHooksStripeEndpoint =
@@ -34,6 +36,7 @@ class withService(implicit
     )
 
   def webHooksWhatsappEndpoint =
+    implicit val ns: NotificationService[IO] = WhatsAppNotificationService[IO]
     webhooksWhatsapp.serverLogic(
       handleWebhook _
     )
@@ -45,9 +48,11 @@ class withService(implicit
     createDocumentEndpoint.serverLogic(createDoc _)
 
   def uploadDocs =
+    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     fileUploadEndpoint.serverLogic(uploadDocuments _)
 
   def deleteDoc =
+    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     deleteEndpoint.serverLogic(deleteDocument _)
 
   def authNotification =
@@ -62,9 +67,11 @@ class withService(implicit
     authGDriveEndpoint.serverLogic(GDrive.auth _)
 
   def importGDriveDocs =
+    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     importGDriveEndpoint.serverLogic(GDrive.importDocs)
 
   def askLLM =
+    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     askEndpoint.serverLogic(ask _)
 
   def refreshGDriveToken =
