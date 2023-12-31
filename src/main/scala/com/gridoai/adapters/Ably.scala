@@ -40,16 +40,6 @@ class AblyNotificationService[F[_]: Async]() extends NotificationService[F]:
               callback(Left(new Exception(reason.message)))
         )
       catch case ex => Left(ex.getMessage)
-class MockedNotificationService[F[_]: Async]() extends NotificationService[F]:
-  val logger = org.slf4j.LoggerFactory.getLogger(getClass)
-
-  def sendNotification(
-      topic: String,
-      channelName: String,
-      content: String
-  ): F[Either[String, Unit]] =
-    Async[F].blocking:
-      Right(())
 
 def generateToken[F[_]: Sync](clientId: String) =
   Sync[F].blocking:

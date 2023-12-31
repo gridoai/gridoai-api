@@ -16,6 +16,7 @@ def handleWebhook(
     payload: Whatsapp.WebhookPayload
 )(implicit
     db: DocDB[IO],
+    ns: NotificationService[IO],
     lruCache: LRUCache[String, Unit]
 ): IO[Either[String, Unit]] =
   Whatsapp
@@ -29,11 +30,13 @@ def handleWebhook(
 def handleMessage(
     phoneNumber: String,
     message: String
-)(implicit db: DocDB[IO]): IO[Either[String, Unit]] =
+)(implicit
+    db: DocDB[IO],
+    ns: NotificationService[IO]
+): IO[Either[String, Unit]] =
   ClerkClient.user
     .byPhone(s"%2B$phoneNumber")
     .flatMapRight: user =>
-      implicit val ns: NotificationService[IO] = MockedNotificationService[IO]
       ask(
         AuthData(
           orgId = user.id,
