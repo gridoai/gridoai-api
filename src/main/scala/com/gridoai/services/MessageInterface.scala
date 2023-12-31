@@ -1,7 +1,9 @@
 package com.gridoai.services.messageInterface
 
 import com.gridoai.utils._
+import com.gridoai.utils.LRUCache
 import com.gridoai.adapters.whatsapp.Whatsapp
+import com.gridoai.adapters.notifications.MockedNotificationService
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.clerk.ClerkClient
 import com.gridoai.services.doc.ask
@@ -14,25 +16,24 @@ def handleWebhook(
     payload: Whatsapp.WebhookPayload
 )(implicit
     db: DocDB[IO],
-    ns: NotificationService[IO]
+    lruCache: LRUCache[String, Unit]
 ): IO[Either[String, Unit]] =
   Whatsapp
     .parseWebhook(payload)
     .flatMapRight:
-      case MessageInterfacePayload.StatusChanged => IO.pure(Right(()))
-      case MessageInterfacePayload.MessageReceived(phoneNumber, message) =>
-        handleMessage(phoneNumber, message)
+      case MessageInterfacePayload.StatusChanged => IO.pure(Right("Ignored"))
+      case MessageInterfacePayload.MessageReceived(id, phoneNumber, message) =>
+        useCacheToIgnore(lruCache, id):
+          handleMessage(phoneNumber, message)
 
 def handleMessage(
     phoneNumber: String,
     message: String
-)(implicit
-    db: DocDB[IO],
-    ns: NotificationService[IO]
-): IO[Either[String, Unit]] =
+)(implicit db: DocDB[IO]): IO[Either[String, Unit]] =
   ClerkClient.user
     .byPhone(s"%2B$phoneNumber")
     .flatMapRight: user =>
+      implicit val ns: NotificationService[IO] = MockedNotificationService[IO]
       ask(
         AuthData(
           orgId = user.id,

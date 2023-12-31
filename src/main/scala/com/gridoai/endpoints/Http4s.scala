@@ -21,16 +21,19 @@ import cats.effect.kernel.Sync
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.utils.LRUCache
 
 def routes(implicit
     db: DocDB[IO],
-    ns: NotificationService[IO]
+    ns: NotificationService[IO],
+    lruCache: LRUCache[String, Unit]
 ): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(endpoints.withService().allEndpoints)
 
 def httpApp(implicit
     db: DocDB[IO],
-    ns: NotificationService[IO]
+    ns: NotificationService[IO],
+    lruCache: LRUCache[String, Unit]
 ): HttpApp[IO] =
   Router(
     "/" -> CORS.policy.withAllowOriginAll(routes)
@@ -38,7 +41,8 @@ def httpApp(implicit
 
 def http4sAppBuilder(implicit
     db: DocDB[IO],
-    ns: NotificationService[IO]
+    ns: NotificationService[IO],
+    lruCache: LRUCache[String, Unit]
 ) =
   EmberServerBuilder
     .default[IO]
@@ -50,7 +54,11 @@ def http4sAppBuilder(implicit
     )
     .withHttpApp(httpApp)
 
-def runHttp4s(implicit db: DocDB[IO], ns: NotificationService[IO]) =
+def runHttp4s(implicit
+    db: DocDB[IO],
+    ns: NotificationService[IO],
+    lruCache: LRUCache[String, Unit]
+) =
   http4sAppBuilder.build
     .use(_ => IO.never)
     .as(ExitCode.Success)

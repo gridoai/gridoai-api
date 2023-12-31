@@ -12,8 +12,13 @@ import com.gridoai.services.messageInterface.handleWebhook
 import com.gridoai.services.notifications.createNotificationServiceToken
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.utils.LRUCache
 
-class withService(implicit db: DocDB[IO], ns: NotificationService[IO]):
+class withService(implicit
+    db: DocDB[IO],
+    ns: NotificationService[IO],
+    lruCache: LRUCache[String, Unit]
+):
 
   def searchDocs =
     searchEndpoint.serverLogic(searchDoc _)
