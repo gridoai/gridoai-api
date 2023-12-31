@@ -66,8 +66,9 @@ def rerankChunks(
     calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int
 )(chunks: List[Chunk], query: String): IO[Either[String, List[Chunk]]] =
-  getRerankAPI("cohere")
-    .rerank(RerankPayload(query = query, chunks = chunks))
+  if (chunks.isEmpty) chunks.asRight.pure[IO]
+  else getRerankAPI("cohere")
+    .rerank(RerankPayload(query, chunks))
     .mapRight: chunks =>
       mergeNewChunksToList(
         List.empty,
