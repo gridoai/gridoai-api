@@ -18,11 +18,11 @@ import com.gridoai.utils.LRUCache
 
 class withService(implicit
     db: DocDB[IO],
+    ns: NotificationService[IO],
     lruCache: LRUCache[String, Unit]
 ):
 
   def searchDocs =
-    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     searchEndpoint.serverLogic(searchDoc _)
 
   def webHooksStripeEndpoint =
@@ -48,11 +48,9 @@ class withService(implicit
     createDocumentEndpoint.serverLogic(createDoc _)
 
   def uploadDocs =
-    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     fileUploadEndpoint.serverLogic(uploadDocuments _)
 
   def deleteDoc =
-    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     deleteEndpoint.serverLogic(deleteDocument _)
 
   def authNotification =
@@ -67,11 +65,9 @@ class withService(implicit
     authGDriveEndpoint.serverLogic(GDrive.auth _)
 
   def importGDriveDocs =
-    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     importGDriveEndpoint.serverLogic(GDrive.importDocs)
 
   def askLLM =
-    implicit val ns: NotificationService[IO] = AblyNotificationService[IO]
     askEndpoint.serverLogic(ask _)
 
   def refreshGDriveToken =
