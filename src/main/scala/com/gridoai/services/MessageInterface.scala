@@ -51,12 +51,6 @@ def handleMessage(
       ).flatMapRight: res =>
         Whatsapp.sendMessage(phoneNumber, res.message)
     .flatMapLeft: err =>
-      if (err == "No user found") {
-        println("n achou o usuario n irmao")
-        println(phoneNumber)
-        IO.pure(Right(()))
-      } else {
-        println("o erro foi outro, wtff")
-        println(err)
-        IO.pure(Left(err))
-      }
+      if (err == "No user found")
+        Whatsapp.sendMessage(phoneNumber, "User not found")
+      else IO.pure(Left(err))
