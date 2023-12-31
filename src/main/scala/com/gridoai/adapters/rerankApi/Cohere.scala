@@ -47,17 +47,14 @@ object CohereClient:
         )
         .timeoutTo(20.seconds, IO.pure(Left("Cohere API Timeout")))
         |> attempt
-      response.map:
-        case Right(r) =>
-          r.results
-            .sortBy(_.relevance_score)
-            .reverse
-            .map: res =>
-              RelevantChunk(
-                chunk = payload.chunks.apply(res.index),
-                relevance = res.relevance_score
-              )
-            .traceFn: e =>
-              s"input batch size: ${payload.chunks.length}, output batch size: ${e.length}"
-            .asRight
-        case Left(e) => (Left(e.toString()))
+      response.mapRight: r =>
+        r.results
+          .sortBy(_.relevance_score)
+          .reverse
+          .map: res =>
+            RelevantChunk(
+              chunk = payload.chunks.apply(res.index),
+              relevance = res.relevance_score
+            )
+          .traceFn: e =>
+            s"input batch size: ${payload.chunks.length}, output batch size: ${e.length}"
