@@ -137,7 +137,11 @@ object Whatsapp:
               .toRight("No 'messages'")
               .map(m =>
                 MessageInterfacePayload
-                  .MessageReceived(phoneNumber = m.from, content = m.text.body)
+                  .MessageReceived(
+                    id = m.id,
+                    phoneNumber = m.from,
+                    content = m.text.body
+                  )
               )
           case Value.Status(_, _, _) =>
             MessageInterfacePayload.StatusChanged.asRight
