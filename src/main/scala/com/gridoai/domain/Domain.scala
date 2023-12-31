@@ -136,3 +136,7 @@ case class PaginatedResponse[T](data: T, total: Int)
 
 enum UploadStatus:
   case Failure, Success, Scheduled, Processing
+
+enum MessageInterfacePayload:
+  case MessageReceived(phoneNumber: String, content: String)
+  case StatusChanged
