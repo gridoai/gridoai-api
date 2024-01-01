@@ -17,23 +17,33 @@ def handleWebhook(
 )(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    lruCache: LRUCache[String, Unit]
+    lruCache: LRUCache[String, List[Message]]
 ): IO[Either[String, Unit]] =
   Whatsapp
     .parseWebhook(payload)
     .flatMapRight:
       case MessageInterfacePayload.StatusChanged => IO.pure(Right("Ignored"))
       case MessageInterfacePayload.MessageReceived(id, phoneNumber, message) =>
-        useCacheToIgnore(lruCache, id):
-          handleMessage(phoneNumber, message)
+        val oldMessages = lruCache.get(phoneNumber).getOrElse(List.empty)
+        oldMessages match
+          case _ :+ Message(MessageFrom.User, m) if (m == message) =>
+            IO.pure(Right(()))
+          case _ =>
+            val messages = (oldMessages :+ Message(MessageFrom.User, message))
+            lruCache.put(phoneNumber, messages)
+            handleChat(phoneNumber, messages).mapRight: newMessage =>
+              lruCache.put(
+                phoneNumber,
+                messages :+ Message(MessageFrom.Bot, newMessage)
+              )
 
-def handleMessage(
+def handleChat(
     phoneNumber: String,
-    message: String
+    messages: List[Message]
 )(implicit
     db: DocDB[IO],
     ns: NotificationService[IO]
-): IO[Either[String, Unit]] =
+): IO[Either[String, String]] =
   ClerkClient.user
     .byPhone(s"%2B$phoneNumber")
     .flatMapRight: user =>
@@ -47,13 +57,18 @@ def handleMessage(
         )
       )(
         AskPayload(
-          List(Message(MessageFrom.User, message)),
+          messages,
           true,
           None,
           false
         )
       ).flatMapRight: res =>
-        Whatsapp.sendMessage(phoneNumber, res.message)
+        Whatsapp
+          .sendMessage(
+            phoneNumber,
+            s"${res.message}\n\n📖: ${res.sources.mkString(", ")}"
+          )
+          .mapRight(_ => res.message)
     .flatMapLeft: err =>
       if (err == "No user found")
         Whatsapp.sendMessage(phoneNumber, "User not found")

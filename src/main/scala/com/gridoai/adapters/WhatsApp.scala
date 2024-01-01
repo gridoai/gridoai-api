@@ -78,17 +78,17 @@ object Whatsapp:
   given Decoder[Value] = Decoder.instance: c =>
     val keys = c.keys.getOrElse(Set.empty).toList
     if (keys contains "messages")
-      for {
+      for
         messaging_product <- c.downField("messaging_product").as[String]
         metadata <- c.downField("metadata").as[Metadata]
         messages <- c.downField("messages").as[List[MessageData]]
-      } yield Value.Message(messaging_product, metadata, messages)
+      yield Value.Message(messaging_product, metadata, messages)
     else if (keys contains "statuses")
-      for {
+      for
         messaging_product <- c.downField("messaging_product").as[String]
         metadata <- c.downField("metadata").as[Metadata]
         statuses <- c.downField("statuses").as[List[Statuse]]
-      } yield Value.Status(messaging_product, metadata, statuses)
+      yield Value.Status(messaging_product, metadata, statuses)
     else
       Left(DecodingFailure("Missing 'messages' or 'statuses' field", c.history))
 
@@ -101,7 +101,7 @@ object Whatsapp:
   def sendMessage(
       number: String,
       message: String
-  ): IO[Either[String, Unit]] =
+  ): IO[Either[String, String]] =
     val body = SendMessageRequest(number, Text(message)).asJson.noSpaces
     Http
       .post("")
@@ -113,7 +113,7 @@ object Whatsapp:
         response.body.flatMap(
           decode[SendMessageResponse](_).left.map(_.getMessage())
         )
-      .mapRight(_ => ()) |> attempt
+      .mapRight(_ => message) |> attempt
 
   def handleChallenge(
       verify_token: String,
