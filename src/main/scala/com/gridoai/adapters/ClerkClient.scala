@@ -290,7 +290,7 @@ object ClerkClient:
 
     def createByPhone(phoneNumber: String): IO[Either[String, User]] =
       val body = CreateUser(List(phoneNumber)).asJson.noSpaces
-      print("Creating user... ")
+      logger.info("Creating user... ")
       Http
         .post(s"/users")
         .body(body)
@@ -382,7 +382,7 @@ object ClerkClient:
         )),
         max_allowed_memberships = getMaxUsersByPlan(plan)
       ).asJson.noSpaces
-      print("Creating org... ")
+      logger.info("Creating org... ")
       logger.info(body)
       Http
         .post("/organizations")

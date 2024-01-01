@@ -15,11 +15,12 @@ import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.notifications.WhatsAppNotificationService
 import com.gridoai.adapters.notifications.AblyNotificationService
 import com.gridoai.utils.LRUCache
+import com.gridoai.domain.Message
 
 class withService(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    lruCache: LRUCache[String, Unit]
+    lruCache: LRUCache[String, List[Message]]
 ):
 
   def searchDocs =
