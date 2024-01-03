@@ -67,23 +67,24 @@ def rerankChunks(
     tokenLimit: Int
 )(chunks: List[Chunk], query: String): IO[Either[String, List[Chunk]]] =
   if (chunks.isEmpty) chunks.asRight.pure[IO]
-  else getRerankAPI("cohere")
-    .rerank(RerankPayload(query, chunks))
-    .mapRight: chunks =>
-      mergeNewChunksToList(
-        List.empty,
-        calculateChunkTokenQuantity,
-        tokenLimit,
-        chunks
-      )
-    .traceRight: chunks =>
-      val chunksInfo = chunks
-        .map(chunk =>
-          s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.relevance})"
+  else
+    getRerankAPI("cohere")
+      .rerank(RerankPayload(query, chunks))
+      .mapRight: chunks =>
+        mergeNewChunksToList(
+          List.empty,
+          calculateChunkTokenQuantity,
+          tokenLimit,
+          chunks
         )
-        .mkString("\n")
-      s"query: $query\nresult chunks: $chunksInfo"
-    .mapRight(_.map(_.chunk))
+      .traceRight: chunks =>
+        val chunksInfo = chunks
+          .map(chunk =>
+            s"${chunk.chunk.documentName} ${chunk.chunk.startPos}-${chunk.chunk.endPos} (${chunk.relevance})"
+          )
+          .mkString("\n")
+        s"query: $query\nresult chunks: $chunksInfo"
+      .mapRight(_.map(_.chunk))
 
 def mapExtractToUploadError(e: ExtractTextError) =
   (FileParseError(e.format, e.message))
@@ -261,6 +262,26 @@ def createDocs(
     db: DocDB[IO]
 ): IO[Either[String, List[Document]]] =
   upsertDocs(auth)(payload.map(_.toDocument(UUID.randomUUID(), source)))
+
+def createOrUpdateFiles(auth: AuthData)(
+    filesToUpload: List[Document]
+)(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
+  logger.info(s"Creating or updating ${filesToUpload.length} files...")
+  db.listDocumentsBySource(filesToUpload.map(_.source), auth.orgId, auth.role)
+    .mapRight(filesToUpdate =>
+      filesToUpload.map(fileToUpload =>
+        filesToUpdate.find(_.source == fileToUpload.source) match
+          case Some(fileToUpdate) =>
+            Document(
+              uid = fileToUpdate.uid,
+              name = fileToUpload.name,
+              source = fileToUpload.source,
+              content = fileToUpload.content
+            )
+          case None => fileToUpload
+      )
+    )
+    .flatMapRight(upsertDocs(auth))
 
 def upsertDocs(auth: AuthData)(
     documents: List[Document]

@@ -82,26 +82,6 @@ object GDrive:
       .flatMapRight(createOrUpdateFiles(auth))
       .mapRight(_.map(_.name))
 
-  def createOrUpdateFiles(auth: AuthData)(
-      filesToUpload: List[Document]
-  )(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
-    logger.info(s"Creating or updating ${filesToUpload.length} files...")
-    db.listDocumentsBySource(filesToUpload.map(_.source), auth.orgId, auth.role)
-      .mapRight(filesToUpdate =>
-        filesToUpload.map(fileToUpload =>
-          filesToUpdate.find(_.source == fileToUpload.source) match
-            case Some(fileToUpdate) =>
-              Document(
-                uid = fileToUpdate.uid,
-                name = fileToUpload.name,
-                source = fileToUpload.source,
-                content = fileToUpload.content
-              )
-            case None => fileToUpload
-        )
-      )
-      .flatMapRight(upsertDocs(auth))
-
   def getAndAddDocs(auth: AuthData, fileIds: List[String])(
       gdriveClient: FileStorage[IO]
   )(using db: DocDB[IO]) =

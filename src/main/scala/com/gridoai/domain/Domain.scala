@@ -47,6 +47,7 @@ def llmToStr(model: LLMModel): String =
 enum Source:
   case Upload, CreateButton
   case GDrive(fileId: String)
+  case WhatsApp(mediaId: String)
 
 def strToSource(source: String): Either[String, Source] =
   source match
@@ -106,7 +107,17 @@ case class DocumentCreationPayload(
       content
     )
 
-case class Message(from: MessageFrom, message: String)
+case class Message(
+    from: MessageFrom,
+    message: String
+)
+
+case class WhatsAppMessage(
+    from: MessageFrom,
+    message: String,
+    ids: List[String]
+):
+  def toMessage = Message(from, message)
 
 case class AskPayload(
     messages: List[Message],
@@ -139,4 +150,10 @@ enum UploadStatus:
 
 enum MessageInterfacePayload:
   case MessageReceived(id: String, phoneNumber: String, content: String)
+  case FileUpload(
+      phoneNumber: String,
+      mediaId: String,
+      filename: String,
+      mimeType: String
+  )
   case StatusChanged
