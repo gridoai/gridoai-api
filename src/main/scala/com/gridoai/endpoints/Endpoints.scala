@@ -60,15 +60,17 @@ val notificationAuthEndpoint: SecuredEndpoint[Unit, String, String, Any] =
     .in("auth")
     .out(stringBody)
 
-val listEndpoint: SecuredEndpoint[(Int, Int), String, PaginatedResponse[
-  List[Document]
-], Any] =
+val listEndpoint
+    : SecuredEndpoint[(Int, Int, Boolean), String, PaginatedResponse[
+      List[Document]
+    ], Any] =
   auth.securedWithBearer
     .name("List")
     .description("List all documents in the knowledge base")
     .in("documents")
     .in(query[Option[Int]]("start").map(_.getOrElse(0))(Some(_)))
     .in(query[Option[Int]]("end").map(_.getOrElse(10))(Some(_)))
+    .in(query[Option[Boolean]]("truncate").map(_.getOrElse(true))(Some(_)))
     .out(jsonBody[PaginatedResponse[List[Document]]])
 
 val deleteEndpoint: SecuredEndpoint[String, String, Unit, Any] =

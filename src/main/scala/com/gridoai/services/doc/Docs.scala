@@ -185,11 +185,20 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
 
 def listDocuments(auth: AuthData)(
     start: Int,
-    end: Int
+    end: Int,
+    truncate: Boolean
 )(using db: DocDB[IO]): IO[Either[String, PaginatedResponse[List[Document]]]] =
   traceMappable("listDocuments"):
-    logger.info("Listing docs... ")
-    db.listDocuments(auth.orgId, auth.role, start, end)
+    logger.info(s"Listing docs... truncate: ${truncate}")
+    val docs = db.listDocuments(auth.orgId, auth.role, start, end)
+    if truncate then
+      docs
+        .mapRight(r =>
+          r.copy(data =
+            r.data.map(doc => doc.copy(content = doc.content.slice(0, 100)))
+          )
+        )
+    else docs
 
 def deleteDocument(auth: AuthData)(id: String)(using
     db: DocDB[IO]
