@@ -58,7 +58,8 @@ def generateToken[F[_]: Sync](clientId: String) =
     try
       val tokenParams = TokenParams()
       tokenParams.clientId = clientId
-      tokenParams.capability = s"""{"$clientId:*":["publish","subscribe"]}"""
+      tokenParams.ttl = 86400000 // 1 dqy
+      tokenParams.capability = s"""{"$clientId:*":["subscribe"]}"""
       val authOptions = AuthOptions()
       val tokenRequest =
         ablyClient.auth.requestToken(tokenParams, null)
