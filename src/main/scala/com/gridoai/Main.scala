@@ -15,7 +15,7 @@ import org.http4s.ember.server.EmberServerBuilder
 import com.gridoai.adapters.notifications.AblyNotificationService
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.utils.LRUCache
-import com.gridoai.domain.Message
+import com.gridoai.domain.WhatsAppMessage
 
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
@@ -28,8 +28,8 @@ object Main extends IOApp {
         .use: transactor =>
           given docDb: DocDB[IO] = PostgresClient[IO](transactor)
           given ns: NotificationService[IO] = AblyNotificationService[IO]
-          given lruCache: LRUCache[String, List[Message]] =
-            LRUCache[String, List[Message]](50)
+          given lruCache: LRUCache[String, List[WhatsAppMessage]] =
+            LRUCache[String, List[WhatsAppMessage]](50)
 
           endpoints.http4s.runHttp4s
 
