@@ -17,6 +17,7 @@ import java.net.URL
 import scala.util.Using
 import java.net.HttpURLConnection
 import cats.effect.kernel.Sync
+import sttp.client3._
 
 val WHATSAPP_PHONE_ID = sys.env.getOrElse("WHATSAPP_PHONE_ID", "")
 val WHATSAPP_ACCESS_TOKEN =
@@ -171,31 +172,20 @@ object Whatsapp:
       .mapRight(_.url) |> attempt
 
   def downloadMedia(url: String): IO[Either[String, Array[Byte]]] =
-    (Sync[IO].blocking:
-      val conn = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
-      conn.setRequestMethod("GET")
-      conn.setRequestProperty(
-        "Authorization",
-        s"Bearer $WHATSAPP_ACCESS_TOKEN"
+    HttpClient(url)
+      .get("")
+      .headers(
+        Map(
+          "Authorization" -> s"Bearer $WHATSAPP_ACCESS_TOKEN",
+          "Accept" -> "*/*",
+          "Accept-Language" -> "*",
+          "Accept-Encoding" -> "gzip, deflate, br",
+          "User-Agent" -> "WhatsApp/2.19.81 A"
+        )
       )
-      conn.setRequestProperty("Accept", "*/*")
-      conn.setRequestProperty("Accept-Language", "*")
-      conn.setRequestProperty("Accept-Encoding", "gzip, deflate, br")
-      conn.setRequestProperty("User-Agent", "WhatsApp/2.19.81 A")
-      try
-        conn.connect()
-        val input = conn.getInputStream
-        LazyList
-          .continually(input.read)
-          .takeWhile(_ != -1)
-          .map(_.toByte)
-          .toArray
-          .asRight
-      catch
-        case e: java.lang.Exception =>
-          s"Failed to download media: $e".asLeft
-      finally conn.disconnect()
-    ) |> attempt
+      .response(asByteArray)
+      .sendReq()
+      .map(_.body) |> attempt
 
   def handleChallenge(
       verify_token: String,

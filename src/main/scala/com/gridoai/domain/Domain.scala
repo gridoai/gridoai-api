@@ -51,11 +51,11 @@ enum Source:
 
 def strToSource(source: String): Either[String, Source] =
   source match
-    case "Upload"       => Right(Source.Upload)
-    case "CreateButton" => Right(Source.CreateButton)
-    case s if s.startsWith("GDrive(") =>
-      Right(Source.GDrive(s.substring(7, s.length - 1)))
-    case _ => Left("Source out of pattern.")
+    case "Upload"        => Right(Source.Upload)
+    case "CreateButton"  => Right(Source.CreateButton)
+    case s"GDrive($s)"   => Right(Source.GDrive(s))
+    case s"WhatsApp($s)" => Right(Source.WhatsApp(s))
+    case _               => Left("Source out of pattern.")
 
 enum Action:
   case Ask, Answer, Search
