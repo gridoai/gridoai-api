@@ -124,6 +124,8 @@ val POSTGRES_DATABASE =
   sys.env.getOrElse("POSTGRES_DATABASE", "gridoai")
 val POSTGRES_USER = sys.env.getOrElse("POSTGRES_USER", "postgres")
 val POSTGRES_PASSWORD = sys.env.getOrElse("POSTGRES_PASSWORD", "")
+val POSTGRES_POOL_SIZE =
+  sys.env.get("POSTGRES_POOL_SIZE").flatMap(_.toIntOption).getOrElse(20)
 val POSTGRES_SCHEMA = sys.env.getOrElse("POSTGRES_SCHEMA", "public")
 val jdbcUrl =
   s"jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}"
@@ -145,7 +147,7 @@ object PostgresClient {
       configBase.setPassword(POSTGRES_PASSWORD)
       configBase.setUsername(POSTGRES_USER)
       configBase.setDriverClassName("org.postgresql.Driver")
-      configBase.setMaximumPoolSize(20)
+      configBase.setMaximumPoolSize(POSTGRES_POOL_SIZE)
       configBase
     }
     HikariTransactor
@@ -215,7 +217,7 @@ object PostgresClient {
        select uid, name, source, content, organization, roles, count(*) over() as total_count 
        from $documentsTable 
        where organization = ${orgId} 
-       order by uid asc 
+       order by created_at desc 
        limit ${(end - start).abs} 
        offset ${start}
      """
