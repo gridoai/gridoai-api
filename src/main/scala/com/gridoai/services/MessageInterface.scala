@@ -29,6 +29,7 @@ def handleWebhook(
 ): IO[Either[String, Unit]] =
   Whatsapp
     .parseWebhook(payload)
+    .pure[IO]
     .flatMapRight:
       case MessageInterfacePayload.StatusChanged => IO.pure(Right("Ignored"))
       case MessageInterfacePayload.FileUpload(
@@ -89,12 +90,13 @@ def handleWebhook(
                   checkOutOfSyncResult(phoneNumber, messages, response) match
                     case None => ().asRight.pure[IO]
                     case Some(res) =>
-                      val formattedMessage =
-                        if (res.sources.isEmpty) res.message
-                        else
-                          s"${res.message}\n\n📖: ${res.sources.mkString(", ")}"
-                      Whatsapp.sendMessage(phoneNumber, formattedMessage)
+                      Whatsapp.sendMessage(phoneNumber, res |> formatMessage)
           .flatMapLeft(_ => ().asRight.pure[IO])
+
+def formatMessage(askResponse: AskResponse): String =
+  if (askResponse.sources.isEmpty) askResponse.message
+  else
+    s"${askResponse.message}\n\n📖: ${askResponse.sources.mkString(", ")}"
 
 def updateMessageCache(phoneNumber: String, message: String, id: String)(
     implicit lruCache: LRUCache[String, List[WhatsAppMessage]]

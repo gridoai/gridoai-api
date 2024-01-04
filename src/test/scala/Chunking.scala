@@ -39,7 +39,7 @@ class ChunkingTest extends FunSuite {
     val differentUid = UUID.randomUUID()
     val uidForComparison = UUID.randomUUID()
     val oldChunks = List(
-      SimilarChunk(
+      RelevantChunk(
         chunk = Chunk(
           documentUid = docUid,
           documentName = docUid.toString,
@@ -50,9 +50,9 @@ class ChunkingTest extends FunSuite {
           startPos = 2,
           endPos = 6
         ),
-        distance = 1
+        relevance = 1
       ),
-      SimilarChunk(
+      RelevantChunk(
         chunk = Chunk(
           documentUid = docUid,
           documentName = docUid.toString,
@@ -63,9 +63,9 @@ class ChunkingTest extends FunSuite {
           startPos = 8,
           endPos = 12
         ),
-        distance = 2
+        relevance = 0.5
       ),
-      SimilarChunk(
+      RelevantChunk(
         chunk = Chunk(
           documentUid = differentUid,
           documentName = differentUid.toString,
@@ -76,10 +76,10 @@ class ChunkingTest extends FunSuite {
           startPos = 8,
           endPos = 11
         ),
-        distance = 3
+        relevance = 0.3
       )
     )
-    val newChunk = SimilarChunk(
+    val newChunk = RelevantChunk(
       chunk = Chunk(
         documentUid = docUid,
         documentName = docUid.toString,
@@ -90,13 +90,13 @@ class ChunkingTest extends FunSuite {
         startPos = 4,
         endPos = 11
       ),
-      distance = 0
+      relevance = 100
     )
     val mergedChunks = mergeNewChunkToList(oldChunks, newChunk).map: c =>
       c.copy(chunk = c.chunk.copy(uid = uidForComparison))
 
     val expectedChunks = List(
-      SimilarChunk(
+      RelevantChunk(
         chunk = Chunk(
           documentUid = docUid,
           documentName = docUid.toString,
@@ -107,9 +107,9 @@ class ChunkingTest extends FunSuite {
           startPos = 2,
           endPos = 12
         ),
-        distance = 0
+        relevance = 100
       ),
-      SimilarChunk(
+      RelevantChunk(
         chunk = Chunk(
           documentUid = differentUid,
           documentName = differentUid.toString,
@@ -120,7 +120,7 @@ class ChunkingTest extends FunSuite {
           startPos = 8,
           endPos = 11
         ),
-        distance = 3
+        relevance = 0.3
       )
     )
     assertEquals(

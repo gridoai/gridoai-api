@@ -23,38 +23,44 @@ import sttp.tapir.server.ServerEndpoint
 import com.gridoai.models.PostgresClient
 import com.gridoai.utils.|>
 import com.gridoai.utils.mapRight
+import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.adapters.notifications.MockedNotificationService
+import com.gridoai.utils.LRUCache
 
 val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
 class API extends CatsEffectSuite {
+  given doobie.LogHandler[IO] = doobie.LogHandler.jdkLogHandler
   given db: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
-  given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
+  given ns: NotificationService[IO] = MockedNotificationService[IO]
+  given lruCache: LRUCache[String, List[WhatsAppMessage]] =
+    LRUCache[String, List[WhatsAppMessage]](50)
 
   test("health check should return OK") {
 
     val response = basicRequest
       .get(uri"http://test.com/health")
-      .send(serverStubOf(withService.healthCheck))
+      .send(serverStubOf(withService().healthCheck))
 
     assertIO(response.map(_.body), Right("OK"))
   }
   test("Can't get documents without auth") {
     val responseWithoutAuth = basicRequest
       .get(uri"http://test.com/documents")
-      .send(serverStubOf(withService.listDocs))
+      .send(serverStubOf(withService().listDocs))
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
   }
   test("Can't create documents without auth") {
     val responseWithoutAuth = basicRequest
       .post(uri"http://test.com/documents")
-      .send(serverStubOf(withService.createDocument))
+      .send(serverStubOf(withService().createDocument))
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
   }
   test("Can't delete documents without auth") {
     val responseWithoutAuth = basicRequest
       .delete(uri"http://test.com/documents/123")
-      .send(serverStubOf(withService.deleteDoc))
+      .send(serverStubOf(withService().deleteDoc))
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
   }
@@ -63,13 +69,13 @@ class API extends CatsEffectSuite {
       .post(uri"http://test.com/search")
       .body(
         SearchPayload(
-          query = "foo",
+          queries = List("foo"),
           tokenLimit = 1000,
           llmName = "Gpt35Turbo",
           scope = None
         ).asJson.toString
       )
-      .send(serverStubOf(withService.searchDocs))
+      .send(serverStubOf(withService().searchDocs))
 
     assertIO(responseWithoutAuth.map(_.code), StatusCode.Unauthorized)
   }
@@ -84,7 +90,7 @@ class API extends CatsEffectSuite {
           content = "The sky is blue"
         ).asJson.toString
       )
-      .send(serverStubOf(withService.createDocument))
+      .send(serverStubOf(withService().createDocument))
       .trace("create doc")
 
     assertIO(authenticatedRequest.map(_.code), StatusCode.Ok)
@@ -97,13 +103,13 @@ class API extends CatsEffectSuite {
       .headers(authHeader)
       .body(
         SearchPayload(
-          query = "foo",
+          queries = List("foo"),
           tokenLimit = 1000,
           llmName = "Gpt35Turbo",
           scope = None
         ).asJson.toString
       )
-      .send(serverStubOf(withService.searchDocs))
+      .send(serverStubOf(withService().searchDocs))
       .trace("Searches chunks")
       .map(_.body flatMap decode[List[Chunk]])
 
@@ -118,7 +124,7 @@ class API extends CatsEffectSuite {
   test("Ask LLM") {
     val backendStub =
       serverStubOf(
-        withService.askLLM
+        withService().askLLM
       )
 
     basicRequest

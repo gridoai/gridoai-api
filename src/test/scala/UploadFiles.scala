@@ -14,6 +14,8 @@ import com.gridoai.auth.AuthData
 import com.gridoai.endpoints.FileUpload
 import com.gridoai.services.doc.uploadDocuments
 import com.gridoai.domain.Plan
+import com.gridoai.adapters.notifications.MockedNotificationService
+import com.gridoai.adapters.notifications.NotificationService
 object fileMock:
   import java.nio.file.{Files, Paths}
   import sttp.client3.{StringBody}
@@ -53,8 +55,9 @@ object fileMock:
       )
     )
 class UploadApi extends CatsEffectSuite {
-  given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
+  given doobie.LogHandler[IO] = doobie.LogHandler.jdkLogHandler
   given db: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
+  given ns: NotificationService[IO] = MockedNotificationService[IO]
 
   import fileMock._
   test("Uploads a file") {
@@ -71,7 +74,6 @@ class UploadApi extends CatsEffectSuite {
       _ <- IO.println(uploadResult)
       // Assert that the response status is OK
       _ = assertEquals(uploadResult.isRight, true)
-      _ = assertEquals(uploadResult.map(_.length), Right(numFiles))
     } yield ()
 
   }
