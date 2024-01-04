@@ -197,32 +197,31 @@ object Whatsapp:
 
   def parseWebhook(
       payload: WebhookPayload
-  ): IO[Either[String, MessageInterfacePayload]] =
-    IO.pure:
-      logger.info(s"Received webhook from WhatsApp: $payload")
-      payload.entry.headOption
-        .toRight("No 'entry'")
-        .flatMap(_.changes.headOption.toRight("No 'changes'"))
-        .flatMap(_.value match
-          case Value.Message(_, metadata, messages) =>
-            messages.headOption
-              .toRight("No 'messages'")
-              .map:
-                case MessageData.TextMessage(from, id, _, text, _) =>
-                  MessageInterfacePayload
-                    .MessageReceived(
-                      id = id,
-                      phoneNumber = from,
-                      content = text.body
-                    )
-                case MessageData.DocumentMessage(from, id, _, document, _) =>
-                  MessageInterfacePayload
-                    .FileUpload(
-                      phoneNumber = from,
-                      mediaId = document.id,
-                      filename = document.filename,
-                      mimeType = document.mime_type
-                    )
-          case Value.StatusValue(_, _, _) =>
-            MessageInterfacePayload.StatusChanged.asRight
-        )
+  ): Either[String, MessageInterfacePayload] =
+    logger.info(s"Received webhook from WhatsApp: $payload")
+    payload.entry.headOption
+      .toRight("No 'entry'")
+      .flatMap(_.changes.headOption.toRight("No 'changes'"))
+      .flatMap(_.value match
+        case Value.Message(_, metadata, messages) =>
+          messages.headOption
+            .toRight("No 'messages'")
+            .map:
+              case MessageData.TextMessage(from, id, _, text, _) =>
+                MessageInterfacePayload
+                  .MessageReceived(
+                    id = id,
+                    phoneNumber = from,
+                    content = text.body
+                  )
+              case MessageData.DocumentMessage(from, id, _, document, _) =>
+                MessageInterfacePayload
+                  .FileUpload(
+                    phoneNumber = from,
+                    mediaId = document.id,
+                    filename = document.filename,
+                    mimeType = document.mime_type
+                  )
+        case Value.StatusValue(_, _, _) =>
+          MessageInterfacePayload.StatusChanged.asRight
+      )

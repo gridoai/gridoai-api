@@ -15,7 +15,7 @@ import com.gridoai.mock
 class DocumentModel extends CatsEffectSuite {
   // Create a test transactor
   import com.gridoai.models.PostgresClient
-  given doobie.LogHandler = doobie.LogHandler.jdkLogHandler
+  given doobie.LogHandler[IO] = doobie.LogHandler.jdkLogHandler
   val DocsDB: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
 
   val doc1Id = UUID.randomUUID()
@@ -116,13 +116,12 @@ class DocumentModel extends CatsEffectSuite {
   test("Get near chunks") {
     for
       maybeChunks <-
-        DocsDB.getNearChunks(mockEmbedding, None, 0, 10, "org1", "member")
+        DocsDB.getNearChunks(List(mockEmbedding), None, 0, 10, "org1", "member")
       _ <- IO.println(maybeChunks)
       _ = assert(maybeChunks.isRight)
       chunks = maybeChunks.getOrElse(List.empty)
       _ = assert(
-        chunks
-          .forall(_.chunk.uid.toString() != doc2Id.toString())
+        chunks.head.forall(_.chunk.uid.toString() != doc2Id.toString())
       )
       _ = assert(chunks.length > 0)
     yield ()
@@ -131,7 +130,7 @@ class DocumentModel extends CatsEffectSuite {
     for
       maybeChunks <-
         DocsDB.getNearChunks(
-          mockEmbedding,
+          List(mockEmbedding),
           Some(List(doc3Id)),
           0,
           10,
@@ -142,8 +141,7 @@ class DocumentModel extends CatsEffectSuite {
       _ = assert(maybeChunks.isRight)
       chunks = maybeChunks.getOrElse(List.empty)
       _ = assert(
-        chunks
-          .forall(_.chunk.uid.toString() != doc2Id.toString())
+        chunks.head.forall(_.chunk.uid.toString() != doc2Id.toString())
       )
       _ = assert(chunks.length > 0)
     yield ()
