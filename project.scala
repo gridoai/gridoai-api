@@ -82,3 +82,5 @@
 //> using resourceDir "src/main/resources"
 //> using dep io.ably:ably-java:1.2.33
 //> using dep com.softwaremill.sttp.tapir::tapir-swagger-ui-bundle:1.9.6
+
+//> using dep "dev.profunktor:redis4cats-effects_3:1.5.2"

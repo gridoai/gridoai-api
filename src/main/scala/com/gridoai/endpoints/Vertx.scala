@@ -1,6 +1,7 @@
 package com.gridoai.endpoints
 
 import com.gridoai.models.DocDB
+import com.gridoai.models.MessageDB
 import sttp.tapir._
 import sttp.tapir.server.vertx.cats.VertxCatsServerOptions
 import cats.effect._
@@ -21,8 +22,6 @@ import sttp.model.StatusCode
 import io.vertx.core.http.HttpServerOptions
 import sttp.model.Method
 import com.gridoai.adapters.notifications.NotificationService
-import com.gridoai.utils.LRUCache
-import com.gridoai.domain.WhatsAppMessage
 
 def runVertxWithEndpoint(
     endpoints: List[ServerEndpoint[Fs2Streams[IO], cats.effect.IO]]
@@ -89,6 +88,6 @@ def runVertxWithEndpoint(
 def runVertex(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    lruCache: LRUCache[String, List[WhatsAppMessage]]
+    messageDb: MessageDB[IO]
 ) =
   runVertxWithEndpoint(withService().allEndpoints)
