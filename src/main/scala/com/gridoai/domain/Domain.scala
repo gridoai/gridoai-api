@@ -55,7 +55,10 @@ def strToSource(source: String): Either[String, Source] =
     case "CreateButton"  => Right(Source.CreateButton)
     case s"GDrive($s)"   => Right(Source.GDrive(s))
     case s"WhatsApp($s)" => Right(Source.WhatsApp(s))
-    case _               => Left("Source out of pattern.")
+    case s =>
+      Left(
+        s"Failed to parse source type: $s (Supported patterns are: Upload, CreateButton, GDrive(fileId), WhatsApp(mediaId))"
+      )
 
 enum Action:
   case Ask, Answer, Search
