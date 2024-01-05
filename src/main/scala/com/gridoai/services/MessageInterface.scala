@@ -1,7 +1,6 @@
 package com.gridoai.services.messageInterface
 
 import com.gridoai.utils._
-import com.gridoai.utils.LRUCache
 import com.gridoai.adapters.whatsapp.Whatsapp
 import com.gridoai.adapters.notifications.MockedNotificationService
 import com.gridoai.adapters.notifications.NotificationService
@@ -14,6 +13,9 @@ import cats.implicits._
 import com.gridoai.auth.AuthData
 import com.gridoai.domain._
 import com.gridoai.models.DocDB
+import com.gridoai.models.MessageDB
+import com.gridoai.models.checkOutOfSyncResult
+import com.gridoai.models.updateMessageCache
 import org.slf4j.LoggerFactory
 import com.gridoai.parsers.FileFormat
 import java.util.UUID
@@ -23,9 +25,9 @@ val logger = LoggerFactory.getLogger(getClass.getName)
 def handleWebhook(
     payload: Whatsapp.WebhookPayload
 )(implicit
-    db: DocDB[IO],
-    ns: NotificationService[IO],
-    lruCache: LRUCache[String, List[WhatsAppMessage]]
+    docDb: DocDB[IO],
+    messageDb: MessageDB[IO],
+    ns: NotificationService[IO]
 ): IO[Either[String, Unit]] =
   Whatsapp
     .parseWebhook(payload)
@@ -81,79 +83,26 @@ def handleWebhook(
         logger.info("Message received via WhatsApp...")
         getAuthData(phoneNumber)
           .flatMapRight: auth =>
-            updateMessageCache(phoneNumber, message, id) match
-              case None => ().asRight.pure[IO]
-              case Some(messages) =>
+            updateMessageCache[IO](auth.orgId, auth.userId, message, id)
+              .flatMapRight: (messages, ids) =>
                 ask(auth)(
-                  AskPayload(messages.map(_.toMessage), true, None, false)
-                ).flatMapRight: response =>
-                  checkOutOfSyncResult(phoneNumber, messages, response) match
-                    case None => ().asRight.pure[IO]
-                    case Some(res) =>
-                      Whatsapp.sendMessage(phoneNumber, res |> formatMessage)
+                  AskPayload(messages, true, None, false)
+                )
+                  .flatMapRight(
+                    checkOutOfSyncResult[IO](
+                      auth.orgId,
+                      auth.userId,
+                      ids
+                    )
+                  )
+              .flatMapRight: response =>
+                Whatsapp.sendMessage(phoneNumber, response |> formatMessage)
           .flatMapLeft(_ => ().asRight.pure[IO])
 
 def formatMessage(askResponse: AskResponse): String =
   if (askResponse.sources.isEmpty) askResponse.message
   else
     s"${askResponse.message}\n\n📖: ${askResponse.sources.mkString(", ")}"
-
-def updateMessageCache(phoneNumber: String, message: String, id: String)(
-    implicit lruCache: LRUCache[String, List[WhatsAppMessage]]
-): Option[List[WhatsAppMessage]] = synchronized:
-  val oldMessages = lruCache.get(phoneNumber).getOrElse(List.empty)
-  if (oldMessages.flatMap(_.ids) contains id)
-    logger.info(
-      "The message was already received, so it will be ignored."
-    )
-    None
-  else
-    logger.info("The message is new.")
-    val messages = oldMessages match
-      case restOfOldMessages :+ WhatsAppMessage(
-            MessageFrom.User,
-            lastMessage,
-            ids
-          ) =>
-        logger.info("Appending new message to last user message...")
-        restOfOldMessages :+ WhatsAppMessage(
-          MessageFrom.User,
-          s"$lastMessage\n\n$message",
-          ids :+ id
-        )
-      case _ =>
-        logger.info("Processing new message...")
-
-        oldMessages :+ WhatsAppMessage(
-          MessageFrom.User,
-          message,
-          List(id)
-        )
-    lruCache.put(phoneNumber, messages)
-    Some(messages)
-
-def checkOutOfSyncResult(
-    phoneNumber: String,
-    messages: List[WhatsAppMessage],
-    response: AskResponse
-)(implicit
-    lruCache: LRUCache[String, List[WhatsAppMessage]]
-): Option[AskResponse] = synchronized:
-  val initialIds = messages.flatMap(_.ids)
-  val newMessages = lruCache.get(phoneNumber).getOrElse(List.empty)
-  val newIds = newMessages.flatMap(_.ids)
-  if (newIds == initialIds)
-    logger.info(
-      "No new message identified. Registering and sending the answer."
-    )
-    lruCache.put(
-      phoneNumber,
-      messages :+ WhatsAppMessage(MessageFrom.Bot, response.message, List.empty)
-    )
-    Some(response)
-  else
-    logger.info("New message identified. Ignoring results...")
-    None
 
 def calcPhoneVariants(phoneNumber: String): List[String] =
   val brazilianNumbers = if (phoneNumber.startsWith("55"))

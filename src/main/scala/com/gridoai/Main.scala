@@ -9,12 +9,13 @@ import com.google.cloud.functions.HttpRequest
 import com.google.cloud.functions.HttpResponse
 import com.gridoai.models.PostgresClient
 import com.gridoai.models.DocDB
+import com.gridoai.models.MessageDB
+import com.gridoai.models.RedisClient
 import de.killaitis.http4s.*
 
 import org.http4s.ember.server.EmberServerBuilder
 import com.gridoai.adapters.notifications.AblyNotificationService
 import com.gridoai.adapters.notifications.NotificationService
-import com.gridoai.utils.LRUCache
 import com.gridoai.domain.WhatsAppMessage
 
 object Main extends IOApp {
@@ -27,9 +28,8 @@ object Main extends IOApp {
         .getTransactor[IO]
         .use: transactor =>
           given docDb: DocDB[IO] = PostgresClient[IO](transactor)
+          given messageDb: MessageDB[IO] = RedisClient[IO]()
           given ns: NotificationService[IO] = AblyNotificationService[IO]
-          given lruCache: LRUCache[String, List[WhatsAppMessage]] =
-            LRUCache[String, List[WhatsAppMessage]](50)
 
           endpoints.http4s.runHttp4s
 
