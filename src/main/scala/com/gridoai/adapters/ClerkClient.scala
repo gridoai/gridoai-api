@@ -187,9 +187,9 @@ object ClerkClient:
         .listByEmail(email)
         .map(_.flatMap(_.headOption.toRight("No user found")))
 
-    def byPhone(phoneNumber: String): IO[Either[String, User]] =
+    def byPhones(phoneNumbers: List[String]): IO[Either[String, User]] =
       user
-        .listByPhone(phoneNumber)
+        .listByPhones(phoneNumbers)
         .map(_.flatMap(_.headOption.toRight("No user found")))
 
     def getFirstOrgByUID(uid: String) =
@@ -260,12 +260,14 @@ object ClerkClient:
           )
         ) |> attempt
 
-    def listByPhone(
-        phoneNumber: String,
+    def listByPhones(
+        phoneNumbers: List[String],
         limit: Int = 1
     ): IO[Either[String, List[User]]] =
       Http
-        .get(s"/users?phone_number=$phoneNumber&limit=$limit")
+        .get(
+          s"/users?limit=$limit&phone_number=${phoneNumbers.mkString("&phone_number=")}"
+        )
         .header(authHeader)
         .contentType(MediaType.ApplicationJson)
         .sendReq()

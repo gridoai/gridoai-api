@@ -155,9 +155,20 @@ def checkOutOfSyncResult(
     logger.info("New message identified. Ignoring results...")
     None
 
+def calcPhoneVariants(phoneNumber: String): List[String] =
+  val brazilianNumbers = if (phoneNumber.startsWith("55"))
+    val number = phoneNumber.takeRight(8)
+    val ddd = phoneNumber.drop(2).take(2)
+    List(s"55$ddd$number", s"55${ddd}9$number", phoneNumber)
+  else List(phoneNumber)
+  brazilianNumbers
+    .flatMap(p => List(s"%2B$p", p))
+    .distinct
+    .traceFn(l => s"All phone variants: $l")
+
 def getAuthData(phoneNumber: String): IO[Either[String, AuthData]] =
   ClerkClient.user
-    .byPhone(s"%2B$phoneNumber")
+    .byPhones(phoneNumber |> calcPhoneVariants)
     .mapRight: user =>
       AuthData(
         orgId = user.id,
