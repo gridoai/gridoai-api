@@ -79,11 +79,21 @@ def handleWebhook(
                 )
           .flatMapLeft(_ => ().asRight.pure[IO])
 
-      case MessageInterfacePayload.MessageReceived(id, phoneNumber, message) =>
+      case MessageInterfacePayload.MessageReceived(
+            id,
+            phoneNumber,
+            message,
+            timestamp
+          ) =>
         logger.info("Message received via WhatsApp...")
         getAuthData(phoneNumber)
           .flatMapRight: auth =>
-            updateMessageCache[IO](auth.orgId, auth.userId, message, id)
+            updateMessageCache[IO](
+              auth.orgId,
+              auth.userId,
+              Message(MessageFrom.User, message, id, timestamp),
+              id
+            )
               .flatMapRight: (messages, ids) =>
                 ask(auth)(
                   AskPayload(messages, true, None, false)

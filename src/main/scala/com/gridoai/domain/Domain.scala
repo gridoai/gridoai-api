@@ -112,7 +112,9 @@ case class DocumentCreationPayload(
 
 case class Message(
     from: MessageFrom,
-    message: String
+    message: String,
+    id: String = "",
+    timestamp: Long = 0
 )
 
 case class WhatsAppMessage(
@@ -152,7 +154,12 @@ enum UploadStatus:
   case Failure, Success, Scheduled, Processing
 
 enum MessageInterfacePayload:
-  case MessageReceived(id: String, phoneNumber: String, content: String)
+  case MessageReceived(
+      id: String,
+      phoneNumber: String,
+      content: String,
+      timestamp: Long
+  )
   case FileUpload(
       phoneNumber: String,
       mediaId: String,
