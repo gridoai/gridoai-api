@@ -55,7 +55,7 @@ object Whatsapp:
     case TextMessage(
         from: String,
         id: String,
-        timestamp: String,
+        timestamp: Long,
         text: Text,
         `type`: String
     )
@@ -73,7 +73,7 @@ object Whatsapp:
       for
         from <- c.downField("from").as[String]
         id <- c.downField("id").as[String]
-        timestamp <- c.downField("timestamp").as[String]
+        timestamp <- c.downField("timestamp").as[Long]
         text <- c.downField("text").as[Text]
         _type <- c.downField("type").as[String]
       yield MessageData.TextMessage(from, id, timestamp, text, _type)
@@ -207,12 +207,13 @@ object Whatsapp:
           messages.headOption
             .toRight("No 'messages'")
             .map:
-              case MessageData.TextMessage(from, id, _, text, _) =>
+              case MessageData.TextMessage(from, id, timestamp, text, _) =>
                 MessageInterfacePayload
                   .MessageReceived(
                     id = id,
                     phoneNumber = from,
-                    content = text.body
+                    content = text.body,
+                    timestamp = timestamp
                   )
               case MessageData.DocumentMessage(from, id, _, document, _) =>
                 MessageInterfacePayload

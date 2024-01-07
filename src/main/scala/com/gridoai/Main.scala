@@ -27,10 +27,13 @@ object Main extends IOApp {
       PostgresClient
         .getTransactor[IO]
         .use: transactor =>
-          given docDb: DocDB[IO] = PostgresClient[IO](transactor)
-          given messageDb: MessageDB[IO] = RedisClient[IO]()
-          given ns: NotificationService[IO] = AblyNotificationService[IO]
+          RedisClient
+            .getRedis[IO]
+            .use: redis =>
+              given docDb: DocDB[IO] = PostgresClient[IO](transactor)
+              given messageDb: MessageDB[IO] = RedisClient[IO](redis)
+              given ns: NotificationService[IO] = AblyNotificationService[IO]
 
-          endpoints.http4s.runHttp4s
+              endpoints.http4s.runHttp4s
 
 }
