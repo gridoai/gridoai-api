@@ -124,13 +124,6 @@ case class Message(
 ):
   def removeMetadata = CreateMessage(from, message)
 
-case class WhatsAppMessage(
-    from: MessageFrom,
-    message: String,
-    ids: List[String]
-):
-  def toMessage = Message(from, message)
-
 case class AskPayload(
     messages: List[CreateMessage],
     basedOnDocsOnly: Boolean,
@@ -176,3 +169,6 @@ enum MessageInterfacePayload:
       mimeType: String
   )
   case StatusChanged
+
+enum WhatsAppState:
+  case NotAuthenticated, WaitingEmail, Authenticated

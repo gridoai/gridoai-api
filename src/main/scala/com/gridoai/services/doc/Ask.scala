@@ -13,23 +13,35 @@ import org.slf4j.LoggerFactory
 
 import com.gridoai.adapters.notifications.NotificationService
 
-def truncateMessages(
-    messages: List[Message],
-    wordLimit: Int = 1000,
-    messageLimit: Int = 20
+def truncateMessages(wordLimit: Int, messageLimit: Int)(
+    messages: List[Message]
 ): List[Message] =
   if (messageLimit <= 0 || messages.isEmpty) List.empty
   else
     val newWordLimit = wordLimit - messages.last.message.split(" ").length
     if (newWordLimit < 0) List.empty
     else
-      truncateMessages(
-        messages.dropRight(1),
-        newWordLimit,
-        messageLimit - 1
+      truncateMessages(newWordLimit, messageLimit - 1)(
+        messages.dropRight(1)
       ) :+ messages.last
 
 def ask(auth: AuthData)(payload: AskPayload)(implicit
+    db: DocDB[IO],
+    ns: NotificationService[IO]
+): IO[Either[String, AskResponse]] =
+  buildAnswer(auth)(
+    payload.messages.map(_.toMessage) |> truncateMessages(1000, 20),
+    payload.basedOnDocsOnly,
+    payload.scope,
+    payload.useActions
+  )
+
+def buildAnswer(auth: AuthData)(
+    messages: List[Message],
+    basedOnDocsOnly: Boolean,
+    scope: Option[List[UID]],
+    useActions: Boolean = false
+)(implicit
     db: DocDB[IO],
     ns: NotificationService[IO]
 ): IO[Either[String, AskResponse]] =
@@ -37,13 +49,11 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   val llm = getLLM(llmModel)
   val logger = LoggerFactory.getLogger(getClass.getName)
 
-  val messages = truncateMessages(payload.messages.map(_.toMessage))
-
   logger.info(s"messages: ${messages}")
   logger.info(s"llm: ${llm.toString}")
-  logger.info(s"basedOnDocsOnly: ${payload.basedOnDocsOnly}")
-  logger.info(s"useActions: ${payload.useActions}")
-  logger.info(s"scope: ${payload.scope}")
+  logger.info(s"basedOnDocsOnly: ${basedOnDocsOnly}")
+  logger.info(s"useActions: ${useActions}")
+  logger.info(s"scope: ${scope}")
 
   def askRecursively(
       lastQueries: List[String],
@@ -63,7 +73,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
   ): IO[Either[String, Action]] =
-    if payload.useActions then
+    if useActions then
       val options =
         if searchesBeforeResponse > 0 then
           List(Action.Search, Action.Answer, Action.Ask)
@@ -81,7 +91,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         case 1 => Action.Answer.asRight
         case _ =>
           Left(
-            s"Invalid state. searchesBeforeResponse = $searchesBeforeResponse and payload.useActions = $payload.useActions"
+            s"Invalid state. searchesBeforeResponse = $searchesBeforeResponse and useActions = $useActions"
           )
       )
 
@@ -105,7 +115,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
     llm
       .ask(
         lastChunks,
-        payload.basedOnDocsOnly,
+        basedOnDocsOnly,
         messages,
         !lastQueries.isEmpty
       )
@@ -124,7 +134,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
     llm
       .answer(
         lastChunks,
-        payload.basedOnDocsOnly,
+        basedOnDocsOnly,
         messages,
         !lastQueries.isEmpty
       )
@@ -150,10 +160,10 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
             tokenLimit = llm
               .maxTokensForChunks(
                 messages,
-                payload.basedOnDocsOnly
+                basedOnDocsOnly
               ),
             llmName = llmModel |> llmToStr,
-            scope = payload.scope
+            scope = scope
           )
         ) !> askRecursively(
           newQueries,
