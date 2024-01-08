@@ -27,6 +27,17 @@ object RedisClient {
   def getRedis[F[_]: Async] =
     Redis[F].utf8(s"redis://default:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT")
 
+  def messageKey(
+      orgId: String,
+      userId: String,
+      conversationId: String
+  ): String = s"messages:$orgId:$userId:$conversationId"
+
+  def whatsappIdKey(
+      orgId: String,
+      userId: String
+  ): String = s"whatsAppIds:$orgId:$userId"
+
   def apply[F[_]: Async](redis: RedisCommands[F, String, String]) =
     new MessageDB[F] {
       def getMessages(
@@ -34,7 +45,7 @@ object RedisClient {
           userId: String,
           conversationId: String
       ): F[Either[String, List[Message]]] =
-        val key = s"messages:$orgId:$userId:$conversationId"
+        val key = messageKey(orgId, userId, conversationId)
         redis
           .zRange(key, 0, -1)
           .map(
@@ -46,7 +57,7 @@ object RedisClient {
       def appendMessage(orgId: String, userId: String, conversationId: String)(
           message: Message
       ): F[Either[String, Message]] =
-        val key = s"messages:$orgId:$userId:$conversationId"
+        val key = messageKey(orgId, userId, conversationId)
         redis
           .zAdd(
             key,
@@ -62,7 +73,7 @@ object RedisClient {
       )(
           message: Message
       ): F[Either[String, Message]] =
-        val key = s"messages:$orgId:$userId:$conversationId"
+        val key = messageKey(orgId, userId, conversationId)
         redis
           .zPopMax(key, 1)
           .map(_.headOption.toRight("No last element to update"))
@@ -74,7 +85,7 @@ object RedisClient {
           orgId: String,
           userId: String
       ): F[Either[String, List[String]]] =
-        val key = s"whatsAppIds:$orgId:$userId"
+        val key = whatsappIdKey(orgId, userId)
         redis
           .zRange(key, 0, -1)
           .map(_.asRight) |> attempt
@@ -85,7 +96,7 @@ object RedisClient {
           timestamp: Long,
           id: String
       ): F[Either[String, String]] =
-        val key = s"whatsAppIds:$orgId:$userId"
+        val key = whatsappIdKey(orgId, userId)
         redis
           .zAdd(
             key,

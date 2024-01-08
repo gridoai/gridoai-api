@@ -35,17 +35,19 @@ def handleWebhook(
     .flatMapRight:
       case MessageInterfacePayload.StatusChanged => IO.pure(Right("Ignored"))
       case MessageInterfacePayload.FileUpload(
-            phoneNumber,
+            from,
+            to,
             mediaId,
             filename,
             mimeType
           ) =>
         logger.info("File received via WhatsApp...")
-        getAuthData(phoneNumber)
+        getAuthData(to, from)
           .flatMapRight: auth =>
             Whatsapp
               .sendMessage(
-                phoneNumber,
+                to,
+                from,
                 "Recebi seu arquivo, vou tentar processá-lo... ⌛"
               )
               .flatMapRight(_ => Whatsapp.retrieveMediaUrl(mediaId))
@@ -68,25 +70,25 @@ def handleWebhook(
                   )
                 )
               .flatMapRight(createOrUpdateFiles(auth))
-              .flatMapRight(_ =>
-                Whatsapp.sendMessage(phoneNumber, "Consegui! 🥳")
-              )
+              .flatMapRight(_ => Whatsapp.sendMessage(to, from, "Consegui! 🥳"))
               .flatMapLeft: e =>
                 logger.info(e)
                 Whatsapp.sendMessage(
-                  phoneNumber,
+                  to,
+                  from,
                   "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
                 )
           .flatMapLeft(_ => ().asRight.pure[IO])
 
       case MessageInterfacePayload.MessageReceived(
             id,
-            phoneNumber,
+            from,
+            to,
             message,
             timestamp
           ) =>
         logger.info("Message received via WhatsApp...")
-        getAuthData(phoneNumber)
+        getAuthData(to, from)
           .flatMapRight: auth =>
             updateMessageCache[IO](
               auth.orgId,
@@ -106,7 +108,7 @@ def handleWebhook(
                     )
                   )
               .flatMapRight: response =>
-                Whatsapp.sendMessage(phoneNumber, response |> formatMessage)
+                Whatsapp.sendMessage(to, from, response |> formatMessage)
           .flatMapLeft(_ => ().asRight.pure[IO])
 
 def formatMessage(askResponse: AskResponse): String =
@@ -125,9 +127,9 @@ def calcPhoneVariants(phoneNumber: String): List[String] =
     .distinct
     .traceFn(l => s"All phone variants: $l")
 
-def getAuthData(phoneNumber: String): IO[Either[String, AuthData]] =
+def getAuthData(from: String, to: String): IO[Either[String, AuthData]] =
   ClerkClient.user
-    .byPhones(phoneNumber |> calcPhoneVariants)
+    .byPhones(to |> calcPhoneVariants)
     .mapRight: user =>
       AuthData(
         orgId = user.id,
@@ -140,7 +142,8 @@ def getAuthData(phoneNumber: String): IO[Either[String, AuthData]] =
       logger.info(s"Failed to find the user: $err")
       Whatsapp
         .sendMessage(
-          phoneNumber,
+          from,
+          to,
           "Não encontrei seu usuário 😔\nRegistre-se em https://gridoai.com"
         )
         .map(_ => Left(err))

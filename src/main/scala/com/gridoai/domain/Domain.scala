@@ -113,8 +113,8 @@ case class DocumentCreationPayload(
 case class Message(
     from: MessageFrom,
     message: String,
-    id: String = "",
-    timestamp: Long = 0
+    id: String = UUID.randomUUID.toString,
+    timestamp: Long = System.currentTimeMillis / 1000
 )
 
 case class WhatsAppMessage(
@@ -156,12 +156,14 @@ enum UploadStatus:
 enum MessageInterfacePayload:
   case MessageReceived(
       id: String,
-      phoneNumber: String,
+      from: String,
+      to: String,
       content: String,
       timestamp: Long
   )
   case FileUpload(
-      phoneNumber: String,
+      from: String,
+      to: String,
       mediaId: String,
       filename: String,
       mimeType: String

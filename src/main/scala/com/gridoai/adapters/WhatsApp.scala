@@ -19,7 +19,6 @@ import java.net.HttpURLConnection
 import cats.effect.kernel.Sync
 import sttp.client3._
 
-val WHATSAPP_PHONE_ID = sys.env.getOrElse("WHATSAPP_PHONE_ID", "")
 val WHATSAPP_ACCESS_TOKEN =
   sys.env.getOrElse("WHATSAPP_ACCESS_TOKEN", "")
 val WHATSAPP_VERIFY_TOKEN =
@@ -139,17 +138,18 @@ object Whatsapp:
   case class WebhookPayload(`object`: String, entry: List[Entry])
 
   def sendMessage(
-      number: String,
+      from: String,
+      to: String,
       message: String
   ): IO[Either[String, Unit]] =
-    val body = SendMessageRequest(number, Text(message)).asJson.noSpaces
+    val body = SendMessageRequest(to, Text(message)).asJson.noSpaces
     Http
-      .post(s"$WHATSAPP_PHONE_ID/messages?access_token=$WHATSAPP_ACCESS_TOKEN")
+      .post(s"$from/messages?access_token=$WHATSAPP_ACCESS_TOKEN")
       .headers(Map("Content-Type" -> "application/json"))
       .body(body)
       .sendReq()
       .map: response =>
-        logger.info(s"Message sent to $number via Whatsapp")
+        logger.info(s"Message sent from $from to $to via Whatsapp")
         response.body.flatMap(
           decode[SendMessageResponse](_).left.map(_.getMessage())
         )
@@ -211,14 +211,16 @@ object Whatsapp:
                 MessageInterfacePayload
                   .MessageReceived(
                     id = id,
-                    phoneNumber = from,
+                    from = from,
+                    to = metadata.phone_number_id,
                     content = text.body,
                     timestamp = timestamp
                   )
               case MessageData.DocumentMessage(from, id, _, document, _) =>
                 MessageInterfacePayload
                   .FileUpload(
-                    phoneNumber = from,
+                    from = from,
+                    to = metadata.phone_number_id,
                     mediaId = document.id,
                     filename = document.filename,
                     mimeType = document.mime_type
