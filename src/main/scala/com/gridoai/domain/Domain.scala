@@ -110,12 +110,19 @@ case class DocumentCreationPayload(
       content
     )
 
+case class CreateMessage(
+    from: MessageFrom,
+    message: String
+):
+  def toMessage = Message(from, message)
+
 case class Message(
     from: MessageFrom,
     message: String,
     id: String = UUID.randomUUID.toString,
     timestamp: Long = System.currentTimeMillis / 1000
-)
+):
+  def removeMetadata = CreateMessage(from, message)
 
 case class WhatsAppMessage(
     from: MessageFrom,
@@ -125,7 +132,7 @@ case class WhatsAppMessage(
   def toMessage = Message(from, message)
 
 case class AskPayload(
-    messages: List[Message],
+    messages: List[CreateMessage],
     basedOnDocsOnly: Boolean,
     scope: Option[List[UID]],
     useActions: Boolean = false

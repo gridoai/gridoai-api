@@ -98,7 +98,7 @@ def handleWebhook(
             )
               .flatMapRight: (messages, ids) =>
                 ask(auth)(
-                  AskPayload(messages, true, None, false)
+                  AskPayload(messages.map(_.removeMetadata), true, None, false)
                 )
                   .flatMapRight(
                     checkOutOfSyncResult[IO](
