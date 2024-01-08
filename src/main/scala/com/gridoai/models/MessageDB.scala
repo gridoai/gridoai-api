@@ -4,6 +4,7 @@ import com.gridoai.domain.Message
 import com.gridoai.utils._
 import com.gridoai.domain.AskResponse
 import com.gridoai.domain.MessageFrom
+import com.gridoai.domain.WhatsAppState
 
 import cats.implicits._
 import cats.Monad
@@ -38,6 +39,15 @@ trait MessageDB[F[_]]:
       timestamp: Long,
       id: String
   ): F[Either[String, String]]
+
+  def getWhatsAppState(
+      phoneNumber: String
+  ): F[Either[String, WhatsAppState]]
+
+  def setWhatsAppState(
+      phoneNumber: String,
+      state: WhatsAppState
+  ): F[Either[String, Unit]]
 
 val logger = LoggerFactory.getLogger(getClass.getName)
 

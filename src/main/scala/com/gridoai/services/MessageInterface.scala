@@ -5,7 +5,7 @@ import com.gridoai.adapters.whatsapp.Whatsapp
 import com.gridoai.adapters.notifications.MockedNotificationService
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.clerk.ClerkClient
-import com.gridoai.services.doc.ask
+import com.gridoai.services.doc.buildAnswer
 import com.gridoai.services.doc.extractAndCleanText
 import com.gridoai.services.doc.createOrUpdateFiles
 import cats.effect.IO
@@ -21,6 +21,9 @@ import com.gridoai.parsers.FileFormat
 import java.util.UUID
 
 val logger = LoggerFactory.getLogger(getClass.getName)
+
+val deletedUserMessage = """Parece que seu usuário foi deletado 😔
+|Para continuar utilizando, entre em contato com o suporte.""".stripMargin
 
 def handleWebhook(
     payload: Whatsapp.WebhookPayload
@@ -42,43 +45,12 @@ def handleWebhook(
             mimeType
           ) =>
         logger.info("File received via WhatsApp...")
-        getAuthData(to, from)
-          .flatMapRight: auth =>
-            Whatsapp
-              .sendMessage(
-                to,
-                from,
-                "Recebi seu arquivo, vou tentar processá-lo... ⌛"
-              )
-              .flatMapRight(_ => Whatsapp.retrieveMediaUrl(mediaId))
-              .traceRight(url => s"download url: $url")
-              .flatMapRight(Whatsapp.downloadMedia)
-              .flatMapRight: body =>
-                extractAndCleanText(
-                  filename,
-                  body,
-                  Some(FileFormat.fromString(mimeType))
-                )
-              .mapLeft(_.toString)
-              .mapRight: content =>
-                List(
-                  Document(
-                    uid = UUID.randomUUID(),
-                    name = filename,
-                    source = Source.WhatsApp(mediaId),
-                    content = content
-                  )
-                )
-              .flatMapRight(createOrUpdateFiles(auth))
-              .flatMapRight(_ => Whatsapp.sendMessage(to, from, "Consegui! 🥳"))
-              .flatMapLeft: e =>
-                logger.info(e)
-                Whatsapp.sendMessage(
-                  to,
-                  from,
-                  "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
-                )
-          .flatMapLeft(_ => ().asRight.pure[IO])
+        messageDb
+          .getWhatsAppState(from)
+          .flatMapRight: state =>
+            handleUpload(from, to, mediaId, filename, mimeType).flatMapLeft(_ =>
+              messageDb.setWhatsAppState(from, WhatsAppState.WaitingEmail)
+            )
 
       case MessageInterfacePayload.MessageReceived(
             id,
@@ -97,9 +69,7 @@ def handleWebhook(
               id
             )
               .flatMapRight: (messages, ids) =>
-                ask(auth)(
-                  AskPayload(messages.map(_.removeMetadata), true, None, false)
-                )
+                buildAnswer(auth)(messages, true, None, false)
                   .flatMapRight(
                     checkOutOfSyncResult[IO](
                       auth.orgId,
@@ -110,6 +80,58 @@ def handleWebhook(
               .flatMapRight: response =>
                 Whatsapp.sendMessage(to, from, response |> formatMessage)
           .flatMapLeft(_ => ().asRight.pure[IO])
+
+def handleUpload(
+    from: String,
+    to: String,
+    mediaId: String,
+    filename: String,
+    mimeType: String
+)(implicit
+    docDb: DocDB[IO],
+    messageDb: MessageDB[IO]
+) =
+  getAuthData(to, from)
+    .flatMapRight: auth =>
+      Whatsapp
+        .sendMessage(
+          to,
+          from,
+          "Recebi seu arquivo, vou tentar processá-lo... ⌛"
+        )
+        .flatMapRight(_ => Whatsapp.retrieveMediaUrl(mediaId))
+        .traceRight(url => s"download url: $url")
+        .flatMapRight(Whatsapp.downloadMedia)
+        .flatMapRight: body =>
+          extractAndCleanText(
+            filename,
+            body,
+            Some(FileFormat.fromString(mimeType))
+          )
+        .mapLeft(_.toString)
+        .mapRight: content =>
+          List(
+            Document(
+              uid = UUID.randomUUID(),
+              name = filename,
+              source = Source.WhatsApp(mediaId),
+              content = content
+            )
+          )
+        .flatMapRight(createOrUpdateFiles(auth))
+        .flatMapRight(_ => Whatsapp.sendMessage(to, from, "Consegui! 🥳"))
+        .flatMapLeft: e =>
+          logger.info(e)
+          Whatsapp.sendMessage(
+            to,
+            from,
+            "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
+          )
+    .flatMapLeft: err =>
+      logger.info(s"Failed to find the user: $err")
+      Whatsapp
+        .sendMessage(from, to, deletedUserMessage)
+        .map(_ => Left(err))
 
 def formatMessage(askResponse: AskResponse): String =
   if (askResponse.sources.isEmpty) askResponse.message
@@ -138,12 +160,3 @@ def getAuthData(from: String, to: String): IO[Either[String, AuthData]] =
         plan = Plan.Individual,
         customerId = None
       )
-    .flatMapLeft: err =>
-      logger.info(s"Failed to find the user: $err")
-      Whatsapp
-        .sendMessage(
-          from,
-          to,
-          "Não encontrei seu usuário 😔\nRegistre-se em https://gridoai.com"
-        )
-        .map(_ => Left(err))
