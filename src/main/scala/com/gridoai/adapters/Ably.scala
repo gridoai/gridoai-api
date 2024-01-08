@@ -46,7 +46,7 @@ def generateToken[F[_]: Sync](clientId: String) =
     try
       val tokenParams = TokenParams()
       tokenParams.clientId = clientId
-      tokenParams.ttl = 86400000 // 1 dqy
+      tokenParams.ttl = 86400000 // 1 day
       tokenParams.capability = s"""{"$clientId:*":["subscribe"]}"""
       val authOptions = AuthOptions()
       val tokenRequest =
