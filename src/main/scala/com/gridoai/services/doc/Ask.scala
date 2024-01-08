@@ -37,7 +37,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   val llm = getLLM(llmModel)
   val logger = LoggerFactory.getLogger(getClass.getName)
 
-  val messages = truncateMessages(payload.messages)
+  val messages = truncateMessages(payload.messages.map(_.toMessage))
 
   logger.info(s"messages: ${messages}")
   logger.info(s"llm: ${llm.toString}")
