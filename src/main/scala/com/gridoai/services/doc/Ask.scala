@@ -13,6 +13,22 @@ import org.slf4j.LoggerFactory
 
 import com.gridoai.adapters.notifications.NotificationService
 
+def truncateMessages(
+    messages: List[Message],
+    wordLimit: Int = 1000,
+    messageLimit: Int = 20
+): List[Message] =
+  if (messageLimit <= 0 || messages.isEmpty) List.empty
+  else
+    val newWordLimit = wordLimit - messages.last.message.split(" ").length
+    if (newWordLimit < 0) List.empty
+    else
+      truncateMessages(
+        messages.dropRight(1),
+        newWordLimit,
+        messageLimit - 1
+      ) :+ messages.last
+
 def ask(auth: AuthData)(payload: AskPayload)(implicit
     db: DocDB[IO],
     ns: NotificationService[IO]
@@ -21,7 +37,9 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   val llm = getLLM(llmModel)
   val logger = LoggerFactory.getLogger(getClass.getName)
 
-  logger.info(s"messages: ${payload.messages}")
+  val messages = truncateMessages(payload.messages)
+
+  logger.info(s"messages: ${messages}")
   logger.info(s"llm: ${llm.toString}")
   logger.info(s"basedOnDocsOnly: ${payload.basedOnDocsOnly}")
   logger.info(s"useActions: ${payload.useActions}")
@@ -52,7 +70,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         else List(Action.Answer, Action.Ask)
 
       llm.chooseAction(
-        payload.messages,
+        messages,
         lastQueries,
         lastChunks,
         options
@@ -88,7 +106,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       .ask(
         lastChunks,
         payload.basedOnDocsOnly,
-        payload.messages,
+        messages,
         !lastQueries.isEmpty
       )
       .mapRight: question =>
@@ -107,7 +125,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
       .answer(
         lastChunks,
         payload.basedOnDocsOnly,
-        payload.messages,
+        messages,
         !lastQueries.isEmpty
       )
       .mapRight: answer =>
@@ -123,7 +141,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
   ): IO[Either[String, AskResponse]] =
     logger.info("AI decided to search...")
     llm
-      .buildQueriesToSearchDocuments(payload.messages, lastQueries, lastChunks)
+      .buildQueriesToSearchDocuments(messages, lastQueries, lastChunks)
       .flatMapRight: newQueries =>
         logger.info(s"AI's queries: $newQueries")
         searchDoc(auth)(
@@ -131,7 +149,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
             queries = newQueries,
             tokenLimit = llm
               .maxTokensForChunks(
-                payload.messages,
+                messages,
                 payload.basedOnDocsOnly
               ),
             llmName = llmModel |> llmToStr,
@@ -143,7 +161,7 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
         )
 
   traceMappable("ask"):
-    payload.messages.last.from match
+    messages.last.from match
       case MessageFrom.Bot =>
         IO.pure(Left("Last message should be from the user"))
       case MessageFrom.User =>

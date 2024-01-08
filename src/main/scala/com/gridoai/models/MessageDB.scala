@@ -3,14 +3,16 @@ package com.gridoai.models
 import com.gridoai.domain.Message
 import com.gridoai.utils._
 import com.gridoai.domain.AskResponse
+import com.gridoai.domain.MessageFrom
 
 import cats.implicits._
 import cats.Monad
 import org.slf4j.LoggerFactory
-import com.gridoai.domain.MessageFrom
+import java.util.UUID
 
-trait MessageDB[F[_]: Monad]:
+trait MessageDB[F[_]]:
 
+  // TODO: [GRI-200] Implement chat pagination in Redis
   def getMessages(
       orgId: String,
       userId: String,
