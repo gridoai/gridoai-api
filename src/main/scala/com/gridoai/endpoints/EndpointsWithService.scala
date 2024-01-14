@@ -14,12 +14,13 @@ import com.gridoai.services.notifications.createNotificationServiceToken
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.notifications.WhatsAppNotificationService
-import com.gridoai.adapters.notifications.AblyNotificationService
+import com.gridoai.adapters.emailApi.EmailAPI
 
 class withService(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    messageDb: MessageDB[IO]
+    messageDb: MessageDB[IO],
+    emailApi: EmailAPI[IO]
 ):
 
   def searchDocs =

@@ -22,18 +22,21 @@ import cats.effect.kernel.Sync
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.adapters.emailApi.EmailAPI
 
 def routes(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    messageDb: MessageDB[IO]
+    messageDb: MessageDB[IO],
+    emailApi: EmailAPI[IO]
 ): HttpRoutes[IO] =
   Http4sServerInterpreter[IO]().toRoutes(endpoints.withService().allEndpoints)
 
 def httpApp(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    messageDb: MessageDB[IO]
+    messageDb: MessageDB[IO],
+    emailApi: EmailAPI[IO]
 ): HttpApp[IO] =
   Router(
     "/" -> CORS.policy.withAllowOriginAll(routes)
@@ -42,7 +45,8 @@ def httpApp(implicit
 def http4sAppBuilder(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    messageDb: MessageDB[IO]
+    messageDb: MessageDB[IO],
+    emailApi: EmailAPI[IO]
 ) =
   EmberServerBuilder
     .default[IO]
@@ -57,7 +61,8 @@ def http4sAppBuilder(implicit
 def runHttp4s(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    messageDb: MessageDB[IO]
+    messageDb: MessageDB[IO],
+    emailApi: EmailAPI[IO]
 ) =
   http4sAppBuilder.build
     .use(_ => IO.never)

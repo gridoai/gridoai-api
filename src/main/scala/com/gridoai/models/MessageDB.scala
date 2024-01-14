@@ -29,13 +29,11 @@ trait MessageDB[F[_]]:
   ): F[Either[String, Message]]
 
   def getWhatsAppMessageIds(
-      orgId: String,
-      userId: String
+      phoneNumber: String
   ): F[Either[String, List[String]]]
 
   def appendWhatsAppMessageId(
-      orgId: String,
-      userId: String,
+      phoneNumber: String,
       timestamp: Long,
       id: String
   ): F[Either[String, String]]
@@ -51,55 +49,63 @@ trait MessageDB[F[_]]:
 
 val logger = LoggerFactory.getLogger(getClass.getName)
 
-def updateMessageCache[F[_]: Monad](
-    orgId: String,
-    userId: String,
-    message: Message,
+def ignoreMessageByCache[F[_]: Monad](
+    phoneNumber: String,
+    timestamp: Long,
     id: String
 )(implicit
     messageDb: MessageDB[F]
-): F[Either[String, (List[Message], List[String])]] = synchronized:
+): F[Either[String, Option[List[String]]]] = synchronized:
   messageDb
-    .getWhatsAppMessageIds(orgId, userId)
+    .getWhatsAppMessageIds(phoneNumber)
     .flatMapRight: receivedIds =>
       if (receivedIds contains id)
         logger.info(
           "The message was already received, so it will be ignored."
         )
-        Left("Repeated id").pure[F]
+        None.asRight.pure[F]
       else
-        val newIds = receivedIds :+ id
         logger.info("The message is new.")
         messageDb
-          .appendWhatsAppMessageId(orgId, userId, message.timestamp, id)
-          .flatMapRight(_ => messageDb.getMessages(orgId, userId, "whatsapp"))
-          .flatMapRight:
-            case oldMessages :+ Message(
-                  MessageFrom.User,
-                  lastMessage,
-                  id,
-                  timestamp
-                ) =>
-              logger.info("Concatenating new message to last user message...")
-              val updatedMessage = Message(
-                MessageFrom.User,
-                s"$lastMessage\n\n${message.message}",
-                message.id,
-                message.timestamp
-              )
-              messageDb
-                .updateLastMessage(orgId, userId, "whatsapp")(updatedMessage)
-                .mapRight(_ => oldMessages :+ updatedMessage)
-            case oldMessages =>
-              logger.info("Appending new message...")
-              messageDb
-                .appendMessage(orgId, userId, "whatsapp")(message)
-                .mapRight(_ => oldMessages :+ message)
-          .mapRight(_ -> newIds)
+          .appendWhatsAppMessageId(phoneNumber, timestamp, id)
+          .mapRight(_ => Some(receivedIds :+ id))
+
+def storeMessage[F[_]: Monad](
+    orgId: String,
+    userId: String,
+    message: Message
+)(implicit
+    messageDb: MessageDB[F]
+): F[Either[String, List[Message]]] = synchronized:
+  messageDb
+    .getMessages(orgId, userId, "whatsapp")
+    .flatMapRight:
+      case oldMessages :+ Message(
+            MessageFrom.User,
+            lastMessage,
+            id,
+            timestamp
+          ) =>
+        logger.info("Concatenating new message to last user message...")
+        val updatedMessage = Message(
+          MessageFrom.User,
+          s"$lastMessage\n\n${message.message}",
+          message.id,
+          message.timestamp
+        )
+        messageDb
+          .updateLastMessage(orgId, userId, "whatsapp")(updatedMessage)
+          .mapRight(_ => oldMessages :+ updatedMessage)
+      case oldMessages =>
+        logger.info("Appending new message...")
+        messageDb
+          .appendMessage(orgId, userId, "whatsapp")(message)
+          .mapRight(_ => oldMessages :+ message)
 
 def checkOutOfSyncResult[F[_]: Monad](
     orgId: String,
     userId: String,
+    phoneNumber: String,
     initialIds: List[String]
 )(
     response: AskResponse
@@ -107,7 +113,7 @@ def checkOutOfSyncResult[F[_]: Monad](
     messageDb: MessageDB[F]
 ): F[Either[String, AskResponse]] = synchronized:
   messageDb
-    .getWhatsAppMessageIds(orgId, userId)
+    .getWhatsAppMessageIds(phoneNumber)
     .flatMapRight: newIds =>
       if (newIds == initialIds)
         logger.info(

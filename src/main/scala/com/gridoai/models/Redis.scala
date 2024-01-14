@@ -6,14 +6,17 @@ import dev.profunktor.redis4cats.Redis
 import dev.profunktor.redis4cats.effect.Log.Stdout._
 import dev.profunktor.redis4cats.RedisCommands
 import dev.profunktor.redis4cats.codecs.splits.SplitEpi
-import dev.profunktor.redis4cats.effect.Log.NoOp._
 import dev.profunktor.redis4cats.effects.{Score, ScoreWithValue, ZRange}
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe._
 import io.circe.syntax._
 
 import com.gridoai.domain.Message
+import com.gridoai.domain.WhatsAppState
+import com.gridoai.domain.strToWhatsAppState
 import com.gridoai.utils._
 
 val REDIS_HOST =
@@ -33,12 +36,13 @@ object RedisClient {
       conversationId: String
   ): String = s"messages:$orgId:$userId:$conversationId"
 
-  def whatsappIdKey(
-      orgId: String,
-      userId: String
-  ): String = s"whatsAppIds:$orgId:$userId"
+  def whatsappIdKey(phoneNumber: String): String =
+    s"whatsAppIds:$phoneNumber"
+
+  def whatsappStateKey(phoneNumber: String) = s"whatsAppState:$phoneNumber"
 
   def apply[F[_]: Async](redis: RedisCommands[F, String, String]) =
+    implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
     new MessageDB[F] {
       def getMessages(
           orgId: String,
@@ -82,21 +86,19 @@ object RedisClient {
           ) |> attempt
 
       def getWhatsAppMessageIds(
-          orgId: String,
-          userId: String
+          phoneNumber: String
       ): F[Either[String, List[String]]] =
-        val key = whatsappIdKey(orgId, userId)
+        val key = whatsappIdKey(phoneNumber)
         redis
           .zRange(key, 0, -1)
           .map(_.asRight) |> attempt
 
       def appendWhatsAppMessageId(
-          orgId: String,
-          userId: String,
+          phoneNumber: String,
           timestamp: Long,
           id: String
       ): F[Either[String, String]] =
-        val key = whatsappIdKey(orgId, userId)
+        val key = whatsappIdKey(phoneNumber)
         redis
           .zAdd(
             key,
@@ -105,5 +107,24 @@ object RedisClient {
           )
           .map(_ => Right(id)) |> attempt
 
+      def getWhatsAppState(
+          phoneNumber: String
+      ): F[Either[String, WhatsAppState]] =
+        val key = whatsappStateKey(phoneNumber)
+        redis
+          .get(key)
+          .map:
+            case None    => WhatsAppState.NotAuthenticated.asRight
+            case Some(v) => strToWhatsAppState(v)
+          |> attempt
+
+      def setWhatsAppState(
+          phoneNumber: String,
+          state: WhatsAppState
+      ): F[Either[String, Unit]] =
+        val key = whatsappStateKey(phoneNumber)
+        redis
+          .set(key, state.toString)
+          .map(_.asRight) |> attempt
     }
 }
