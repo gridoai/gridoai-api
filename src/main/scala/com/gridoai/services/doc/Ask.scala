@@ -30,14 +30,14 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
     ns: NotificationService[IO]
 ): IO[Either[String, AskResponse]] =
   buildAnswer(auth)(
-    payload.messages.map(_.toMessage) |> truncateMessages(1000, 20),
+    payload.messages.map(_.toMessage),
     payload.basedOnDocsOnly,
     payload.scope,
     payload.useActions
   )
 
 def buildAnswer(auth: AuthData)(
-    messages: List[Message],
+    allMessages: List[Message],
     basedOnDocsOnly: Boolean,
     scope: Option[List[UID]],
     useActions: Boolean = false
@@ -48,6 +48,8 @@ def buildAnswer(auth: AuthData)(
   val llmModel = LLMModel.Gpt35Turbo
   val llm = getLLM(llmModel)
   val logger = LoggerFactory.getLogger(getClass.getName)
+
+  val messages = allMessages |> truncateMessages(1000, 20)
 
   logger.info(s"messages: ${messages}")
   logger.info(s"llm: ${llm.toString}")

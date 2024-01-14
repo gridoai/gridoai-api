@@ -172,3 +172,18 @@ enum MessageInterfacePayload:
 
 enum WhatsAppState:
   case NotAuthenticated, WaitingEmail, Authenticated
+  case WaitingVerificationCode(email: String, code: String, expiration: Long)
+
+def strToWhatsAppState(state: String): Either[String, WhatsAppState] =
+  state match
+    case "NotAuthenticated" => Right(WhatsAppState.NotAuthenticated)
+    case "WaitingEmail"     => Right(WhatsAppState.WaitingEmail)
+    case "Authenticated"    => Right(WhatsAppState.Authenticated)
+    case s"WaitingVerificationCode($em,$c,$exStr)" =>
+      exStr.toLongOption match
+        case None     => Left(s"Cannot parse expiration to long: $exStr")
+        case Some(ex) => Right(WhatsAppState.WaitingVerificationCode(em, c, ex))
+    case s =>
+      Left(
+        s"Failed to parse whatsapp state: $s (Supported patterns are: NotAuthenticated, Authenticated, WaitingVerificationCode(email,code,expiration)"
+      )

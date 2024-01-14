@@ -22,6 +22,7 @@ import sttp.model.StatusCode
 import io.vertx.core.http.HttpServerOptions
 import sttp.model.Method
 import com.gridoai.adapters.notifications.NotificationService
+import com.gridoai.adapters.emailApi.EmailAPI
 
 def runVertxWithEndpoint(
     endpoints: List[ServerEndpoint[Fs2Streams[IO], cats.effect.IO]]
@@ -88,6 +89,7 @@ def runVertxWithEndpoint(
 def runVertex(implicit
     db: DocDB[IO],
     ns: NotificationService[IO],
-    messageDb: MessageDB[IO]
+    messageDb: MessageDB[IO],
+    emailApi: EmailAPI[IO]
 ) =
   runVertxWithEndpoint(withService().allEndpoints)

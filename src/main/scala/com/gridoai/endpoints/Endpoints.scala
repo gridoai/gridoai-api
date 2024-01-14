@@ -34,6 +34,7 @@ val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
   Either[FileUploadError, String]
 ] | String, Unit, Any] =
   auth.securedWithBearer.post
+    .name("File Upload")
     .in("upload")
     .in(multipartBody[FileUpload])
     .out(jsonBody[Unit])
@@ -41,12 +42,14 @@ val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
 
 val billingSession: SecuredEndpoint[Option[String], String, String, Any] =
   auth.securedWithBearer.post
+    .name("Billing session")
     .in("billing" / "session")
     .in(header[Option[String]]("Origin"))
     .out(stringBody)
 
 val webhooksStripe: PublicEndpoint[(String, String), String, String, Any] =
   endpoint
+    .name("Stripe Webhook")
     .in("webhooks" / "stripe")
     .in(stringBody)
     .in(header[String]("Stripe-Signature"))
@@ -56,6 +59,7 @@ val webhooksStripe: PublicEndpoint[(String, String), String, String, Any] =
 val webhooksWhatsappChallenge
     : PublicEndpoint[(String, String), String, String, Any] =
   endpoint.get
+    .name("WhatsApp Challenge")
     .in("webhooks" / "whatsapp")
     .in(query[String]("hub.verify_token"))
     .in(query[String]("hub.challenge"))
@@ -65,6 +69,7 @@ val webhooksWhatsappChallenge
 val webhooksWhatsapp
     : PublicEndpoint[Whatsapp.WebhookPayload, String, Unit, Any] =
   endpoint.post
+    .name("WhatsApp Webhook")
     .in("webhooks" / "whatsapp")
     .in(jsonBody[Whatsapp.WebhookPayload])
     .out(emptyOutput)

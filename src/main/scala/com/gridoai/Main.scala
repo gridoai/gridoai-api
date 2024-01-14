@@ -16,7 +16,8 @@ import de.killaitis.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import com.gridoai.adapters.notifications.AblyNotificationService
 import com.gridoai.adapters.notifications.NotificationService
-import com.gridoai.domain.WhatsAppMessage
+import com.gridoai.adapters.emailApi.EmailAPI
+import com.gridoai.adapters.emailApi.ResendClient
 
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
@@ -33,6 +34,7 @@ object Main extends IOApp {
               given docDb: DocDB[IO] = PostgresClient[IO](transactor)
               given messageDb: MessageDB[IO] = RedisClient[IO](redis)
               given ns: NotificationService[IO] = AblyNotificationService[IO]
+              given emailApi: EmailAPI[IO] = ResendClient[IO]
 
               endpoints.http4s.runHttp4s
 

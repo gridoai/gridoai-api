@@ -5,7 +5,7 @@ import com.gridoai.domain.Embedding
 import com.gridoai.domain.Chunk
 import com.gridoai.adapters.HttpClient
 import com.gridoai.utils.fallbackEitherM
-import cats.implicits.*
+import cats.implicits._
 import cats.Monad
 import com.gridoai.utils.|>
 

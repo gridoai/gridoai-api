@@ -67,7 +67,7 @@ case class UserCreatedData(
     // created_at: Int,
     email_addresses: List[EmailAddress],
     // external_id: String,
-    first_name: String,
+    first_name: Option[String],
     // gender: String,
     id: String,
     // image_url: String,
@@ -83,10 +83,12 @@ case class UserCreatedData(
     // username: String
 )
 
+case class UpdateEmailAddress(verified: Boolean, primary: Boolean)
+
 case class EmailAddress(
-    email_address: String
-    // id: String,
-    // verification: Verification
+    email_address: String,
+    id: String,
+    verification: Verification
 )
 
 case class OrganizationMemberShipListData(
@@ -118,7 +120,11 @@ case class UserCreated(
     data: UserCreatedData
 )
 
-case class CreateUser(phone_number: List[String])
+case class CreateUser(
+    phone_number: List[String],
+    email_address: List[String],
+    password: String
+)
 
 case class Verification(
     status: String,
@@ -245,6 +251,24 @@ object ClerkClient:
           )
         )
 
+    def updateEmailAddress(
+        emailId: String,
+        verified: Boolean,
+        primary: Boolean
+    ): IO[Either[String, UpdateEmailAddress]] =
+      val body = UpdateEmailAddress(verified, primary).asJson.noSpaces
+      Http
+        .patch(s"/email_addresses/$emailId")
+        .body(body)
+        .header(authHeader)
+        .contentType(MediaType.ApplicationJson)
+        .sendReq()
+        .map(
+          _.body.flatMap(
+            decode[UpdateEmailAddress](_).left.map(_.getMessage())
+          )
+        )
+
     def listByEmail(
         emailAddress: String,
         limit: Int = 1
@@ -290,8 +314,13 @@ object ClerkClient:
           )
         ) |> attempt
 
-    def createByPhone(phoneNumber: String): IO[Either[String, User]] =
-      val body = CreateUser(List(phoneNumber)).asJson.noSpaces
+    def create(
+        phoneNumber: String,
+        email: String,
+        password: String
+    ): IO[Either[String, UserCreatedData]] =
+      val body =
+        CreateUser(List(phoneNumber), List(email), password).asJson.noSpaces
       logger.info("Creating user... ")
       Http
         .post(s"/users")
@@ -301,7 +330,7 @@ object ClerkClient:
         .sendReq()
         .map(
           _.body.flatMap(
-            decode[User](_).left.map(_.getMessage())
+            decode[UserCreatedData](_).left.map(_.getMessage())
           )
         ) |> attempt
 
