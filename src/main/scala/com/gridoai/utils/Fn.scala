@@ -5,6 +5,7 @@ import cats.implicits.toFunctorOps
 import cats.ApplicativeError
 import cats.implicits._
 import cats.effect.implicits._
+import cats.data.EitherT
 
 import cats.Monad
 extension [A](a: A) {
@@ -26,6 +27,8 @@ extension [E, T, F[_]: Monad](x: F[Either[E, T]])
 
   def !>[V](f: T => F[Either[E, V]]): F[Either[E, V]] = flatMapRight[V](f)
 
+  def asEitherT = EitherT(x)
+
 def attempt[T, F[_], E <: Either[Any, T]](
     x: F[E]
 )(using
@@ -34,6 +37,28 @@ def attempt[T, F[_], E <: Either[Any, T]](
     file: sourcecode.File
 ): F[Either[String, T]] =
   ae.attempt(x).map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
+
+extension [E, T, F[_]](x: EitherT[F, E, T])
+  def attempt(using
+      ae: ApplicativeError[F, Throwable],
+      line: sourcecode.Line,
+      file: sourcecode.File
+  ): EitherT[F, String, T] = EitherT:
+    ae.attempt(x.value)
+      .map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
+
+  def !>[V](f: T => EitherT[F, E, V])(implicit F: Monad[F]): EitherT[F, E, V] =
+    x.flatMap(f)
+
+  def flatMapEither[V](f: T => Either[E, V])(implicit
+      F: Monad[F]
+  ): EitherT[F, E, V] =
+    x.value.map(_.flatMap(f)).asEitherT
+
+  def mapEither[V](f: Either[E, T] => Either[E, V])(implicit
+      F: Monad[F]
+  ): EitherT[F, E, V] =
+    x.value.map(f).asEitherT
 
 def flattenIOEitherIOEither[E, T](
     x: IO[Either[E, IO[Either[E, T]]]]
@@ -119,33 +144,33 @@ def partitionEithers[E, T](list: List[Either[E, T]]): Either[List[E], List[T]] =
   if (lefts.isEmpty) Right(rights) else Left(lefts)
 
 def executeByParts[T, E, V](
-    f: List[T] => IO[Either[E, List[V]]],
+    f: List[T] => EitherT[IO, E, List[V]],
     partitionSize: Int
-)(elements: List[T]): IO[Either[E, List[V]]] =
+)(elements: List[T]): EitherT[IO, E, List[V]] =
   if elements.length <= partitionSize then f(elements)
   else
-    f(elements.slice(0, partitionSize)).flatMapRight(outputElements =>
-      executeByParts(f, partitionSize)(
+    for
+      outputElements <- f(elements.slice(0, partitionSize))
+      newOutputElements <- executeByParts(f, partitionSize)(
         elements.slice(partitionSize, elements.length)
-      ).mapRight(newOutputElements =>
-        println(s"last batch size: ${outputElements.length}")
-        println(s"current batch size: ${newOutputElements.length}")
-        outputElements ++ newOutputElements
       )
-    )
+      _ = println(s"last batch size: ${outputElements.length}")
+      _ = println(s"current batch size: ${newOutputElements.length}")
+    yield outputElements ++ newOutputElements
 
 def executeByPartsInParallel[T, E, V](
-    f: List[T] => IO[Either[E, List[V]]],
+    f: List[T] => EitherT[IO, E, List[V]],
     partitionSize: Int,
     parallelismLevel: Int = 4
-)(elements: List[T]) =
+)(elements: List[T]): EitherT[IO, E, List[V]] =
   elements
     .grouped(partitionSize)
     .grouped(parallelismLevel)
     .toList
-    .traverse(_.parTraverseN(parallelismLevel)(f))
+    .traverse(_.parTraverseN(parallelismLevel)(f(_).value))
     .map: results =>
       val (errors, successes) = results.flatten.separate
       errors.headOption match
         case Some(error) => (Left(error))
         case None        => (Right(successes.flatten))
+    .asEitherT

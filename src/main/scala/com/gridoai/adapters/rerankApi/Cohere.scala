@@ -1,18 +1,20 @@
 package com.gridoai.adapters.rerankApi
 
 import org.slf4j.LoggerFactory
-import com.gridoai.adapters.HttpClient
 import cats.effect._
+import cats.implicits._
+import cats.data.EitherT
 import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 import sttp.model.Header
 import sttp.model.MediaType
-import com.gridoai.adapters.HttpClient
-import com.gridoai.adapters.sendReq
 import concurrent.duration.DurationInt
-import com.gridoai.utils._
-import cats.implicits._
+
 import com.gridoai.domain.Chunk
 import com.gridoai.domain.RelevantChunk
+import com.gridoai.adapters.HttpClient
+import com.gridoai.utils._
+import com.gridoai.adapters.HttpClient
+import com.gridoai.adapters.sendReq
 
 object CohereClient:
 
@@ -31,7 +33,7 @@ object CohereClient:
     private val authHeader = Header("Authorization", s"Bearer $apiKey")
     def rerank(
         payload: RerankPayload
-    ): IO[Either[String, List[RelevantChunk]]] =
+    ): EitherT[IO, String, List[RelevantChunk]] =
       val request = RerankRequest(
         query = payload.query,
         documents = payload.chunks.map(c => s"${c.documentName}: ${c.content}")
@@ -46,8 +48,10 @@ object CohereClient:
           _.body.flatMap(decode[RerankResponse](_))
         )
         .timeoutTo(20.seconds, IO.pure(Left("Cohere API Timeout")))
-        |> attempt
-      response.mapRight: r =>
+        .asEitherT
+        .attempt
+
+      response.map: r =>
         r.results
           .sortBy(_.relevance_score)
           .reverse

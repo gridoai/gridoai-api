@@ -2,33 +2,30 @@ package com.gridoai.services.doc
 
 import cats.Monad
 import cats.effect.IO
-import cats.implicits.*
+import cats.implicits._
+import cats.syntax.all._
+import cats.data.EitherT
 import cats.effect.implicits.concurrentParTraverseOps
-import com.gridoai.adapters.llm.*
-import com.gridoai.adapters.embeddingApi.*
-import com.gridoai.adapters.rerankApi.*
-import com.gridoai.domain.*
-import com.gridoai.models.DocDB
-import com.gridoai.utils.*
-import com.gridoai.endpoints.*
-import FileUploadError.*
-
 import java.nio.file.Files
-import com.gridoai.adapters.extractTextFromDocx
-import com.gridoai.adapters.extractTextFromPptx
-
 import java.util.UUID
+import sttp.model.Part
+import java.io.File
+
+import com.gridoai.adapters.llm._
+import com.gridoai.adapters.embeddingApi._
+import com.gridoai.adapters.rerankApi._
+import com.gridoai.domain._
+import com.gridoai.models.DocDB
+import com.gridoai.utils._
+import com.gridoai.endpoints._
+import FileUploadError._
 import com.gridoai.parsers.ExtractTextError
-import com.gridoai.adapters.*
-import com.gridoai.parsers.*
+import com.gridoai.adapters._
+import com.gridoai.parsers._
 import com.gridoai.models.DocumentPersistencePayload
 import com.gridoai.auth.limitRole
 import com.gridoai.auth.authErrorMsg
 import com.gridoai.auth.AuthData
-import sttp.model.Part
-
-import java.io.File
-
 import com.gridoai.domain.UploadStatus
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.services.notifications.notifyUploadProgress
@@ -42,35 +39,34 @@ def searchDoc(
 )(payload: SearchPayload)(using
     db: DocDB[IO],
     ns: NotificationService[IO]
-): IO[Either[String, List[Chunk]]] =
+): EitherT[IO, String, List[Chunk]] =
   val tokenLimitPerQuery = payload.tokenLimit / payload.queries.length
   notifySearchProgress(payload.queries, auth.userId):
-    getEmbeddingAPI("embaas")
-      .embedChats(payload.queries)
-      .flatMapRight: vecs =>
-        db.getNearChunks(vecs, payload.scope, 0, 1000, auth.orgId, auth.role)
-      .mapRight(_.map(_.map(_.chunk)) zip payload.queries)
-      .flatMapRight(
-        _.parTraverseN(5)(
+    for
+      vecs <- getEmbeddingAPI("embaas").embedChats(payload.queries)
+      nearChunks <- db
+        .getNearChunks(vecs, payload.scope, 0, 1000, auth.orgId, auth.role)
+        .map(_.map(_.map(_.chunk)) zip payload.queries)
+      resChunks <- nearChunks
+        .parTraverseN(5)(
           rerankChunks(
             getLLM(payload.llmName |> strToLLM).calculateChunkTokenQuantity,
             tokenLimitPerQuery
           )
         )
-          .map(partitionEithers)
-          .mapLeft(_.mkString(","))
-          .mapRight(_.flatten)
-      )
+        .map(_.flatten)
+        .leftMap(_.mkString(","))
+    yield resChunks
 
 def rerankChunks(
     calculateChunkTokenQuantity: Chunk => Int,
     tokenLimit: Int
-)(chunks: List[Chunk], query: String): IO[Either[String, List[Chunk]]] =
-  if (chunks.isEmpty) chunks.asRight.pure[IO]
+)(chunks: List[Chunk], query: String): EitherT[IO, String, List[Chunk]] =
+  if (chunks.isEmpty) EitherT.rightT(chunks)
   else
     getRerankAPI("cohere")
       .rerank(RerankPayload(query, chunks))
-      .mapRight: chunks =>
+      .map: chunks =>
         mergeNewChunksToList(
           List.empty,
           calculateChunkTokenQuantity,
@@ -84,16 +80,16 @@ def rerankChunks(
           )
           .mkString("\n")
         s"query: $query\nresult chunks: $chunksInfo"
-      .mapRight(_.map(_.chunk))
+      .map(_.map(_.chunk))
 
-def mapExtractToUploadError(e: ExtractTextError) =
+def mapExtractToUploadError(e: ExtractTextError): FileUploadError =
   (FileParseError(e.format, e.message))
 
 def extractText(
     name: String,
     body: Array[Byte],
     format: Option[FileFormat] = None
-): IO[Either[ExtractTextError, String]] = traceMappable("extractText"):
+): EitherT[IO, ExtractTextError, String] = traceMappable("extractText"):
   logger.info(s"Extracting text ${name}, ${format}")
 
   val currentFormat = (format, FileFormat.ofFilename(name)) match
@@ -107,26 +103,24 @@ def extractText(
     case Some(
           FileFormat.DOCX
         ) =>
-      extractTextFromDocx(body).pure[IO]
+      extractTextFromDocx(body).pure[IO].asEitherT
     case Some(
           FileFormat.PPTX
         ) =>
-      extractTextFromPptx(body).pure[IO]
-    case Some(FileFormat.Plaintext) => IO.pure(Right(String(body)))
+      extractTextFromPptx(body).pure[IO].asEitherT
+    case Some(FileFormat.Plaintext) => EitherT.rightT(String(body))
     case Some(other) =>
-      Left(
+      EitherT.leftT(
         ExtractTextError(
           other,
           "Unknown file format"
         )
-      ).pure[IO]
+      )
     case None =>
-      IO.pure(
-        Left(
-          ExtractTextError(
-            FileFormat.Unknown(name),
-            "Unknown file format"
-          )
+      EitherT.leftT(
+        ExtractTextError(
+          FileFormat.Unknown(name),
+          "Unknown file format"
         )
       )
 
@@ -134,80 +128,75 @@ def extractAndCleanText(
     name: String,
     body: Array[Byte],
     format: Option[FileFormat] = None
-): IO[Either[ExtractTextError, String]] =
-  extractText(name, body, format).mapRight(filterNonUtf8)
+): EitherT[IO, ExtractTextError, String] =
+  extractText(name, body, format).map(filterNonUtf8)
 
 type FileUpErr = List[Either[FileUploadError, String]]
 type FileUpOutput = List[String]
 
 def parseFileForPersistence(
     fileRaw: Part[File]
-): IO[Either[FileUploadError, DocumentCreationPayload]] =
+): EitherT[IO, FileUploadError, DocumentCreationPayload] =
   val name = fileRaw.fileName.getOrElse("file")
   extractAndCleanText(
     name,
     Files.readAllBytes((fileRaw.body).toPath())
   )
-    .mapLeft(mapExtractToUploadError)
-    .mapRight(content =>
+    .map(content =>
       DocumentCreationPayload(
         name = name,
         content = content
       )
     )
+    .leftMap(mapExtractToUploadError)
 
 def saveUploadedDocs(auth: AuthData)(
     payloads: List[DocumentCreationPayload]
 )(using
     db: DocDB[IO]
-): IO[Either[FileUpErr, FileUpOutput]] =
+): EitherT[IO, FileUpErr, FileUpOutput] =
   createDocs(auth)(payloads, Source.Upload)
-    .mapRight(_.map(_.uid.toString()))
-    .mapLeft(e => List(FileUploadError.DocumentCreationError(e).asLeft))
+    .map(_.map(_.uid.toString))
+    .leftMap(e => List(FileUploadError.DocumentCreationError(e).asLeft))
 
 def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     db: DocDB[IO],
     ns: NotificationService[IO]
-): IO[Either[FileUpErr, Unit]] =
+): EitherT[IO, FileUpErr, Unit] =
   limitRole(
     auth.role,
     (Left(List(Left(UnauthorizedError(authErrorMsg(Some(auth.role))))))
       .pure[IO])
+      .asEitherT
   ):
     logger.info(s"Uploading files... ${source.files.length}")
 
     notifyUploadProgress(auth.userId):
       source.files
-        .map(parseFileForPersistence)
-        .parSequence
-        .flatMap: eithers =>
-          val (errors, payloads) = eithers.partitionMap(identity)
-          if (errors.nonEmpty) Left(eithers.map(_.map(_.name))).pure[IO]
-          else saveUploadedDocs(auth)(payloads)
+        .traverse(parseFileForPersistence)
+        .flatMap(saveUploadedDocs(auth))
 
 def listDocuments(auth: AuthData)(
     start: Int,
     end: Int,
     truncate: Boolean
-)(using db: DocDB[IO]): IO[Either[String, PaginatedResponse[List[Document]]]] =
+)(using db: DocDB[IO]): EitherT[IO, String, PaginatedResponse[List[Document]]] =
   traceMappable("listDocuments"):
     logger.info(s"Listing docs... truncate: ${truncate}")
     val docs = db.listDocuments(auth.orgId, auth.role, start, end)
     if truncate then
-      docs
-        .mapRight(r =>
-          r.copy(data =
-            r.data.map(doc => doc.copy(content = doc.content.slice(0, 100)))
-          )
+      docs.map: r =>
+        r.copy(data =
+          r.data.map(doc => doc.copy(content = doc.content.slice(0, 100)))
         )
     else docs
 
 def deleteDocument(auth: AuthData)(id: String)(using
     db: DocDB[IO]
-): IO[Either[String, Unit]] =
+): EitherT[IO, String, Unit] =
   limitRole(
     auth.role,
-    Left(authErrorMsg(Some(auth.role))).pure[IO]
+    Left(authErrorMsg(Some(auth.role))).pure[IO].asEitherT
   ):
     traceMappable("deleteDocument"):
       logger.info("Deleting doc... ")
@@ -215,18 +204,18 @@ def deleteDocument(auth: AuthData)(id: String)(using
 
 def createDoc(auth: AuthData)(
     payload: DocumentCreationPayload
-)(implicit db: DocDB[IO]): IO[Either[String, String]] =
+)(implicit db: DocDB[IO]): EitherT[IO, String, String] =
   limitRole(
     auth.role,
-    Left(authErrorMsg(Some(auth.role))).pure[IO]
+    Left(authErrorMsg(Some(auth.role))).pure[IO].asEitherT
   ):
     createDocs(auth)(
       List(payload),
       Source.CreateButton
     )
-      .mapRight(_.head.uid.toString())
+      .map(_.head.uid.toString())
 
-def validateSize[A, B](a: List[A])(b: List[B]) =
+def validateSize[A, B](a: List[A])(b: List[B]): Either[String, List[B]] =
   if a.length == b.length then Right(b)
   else
     Left(
@@ -236,15 +225,15 @@ def validateSize[A, B](a: List[A])(b: List[B]) =
 def mapDocumentsToDB[F[_]: Monad](
     documents: List[Document],
     embeddingApi: EmbeddingAPI[F]
-): F[Either[String, List[DocumentPersistencePayload]]] =
+): EitherT[F, String, List[DocumentPersistencePayload]] =
   logger.info("Mapping documents to db... " + documents.length)
 
   val chunks = documents.flatMap(makeChunks)
   logger.info("Got chunks, n: " + chunks.length)
   embeddingApi
     .embedChunks(chunks)
-    .map(_.flatMap(validateSize(chunks)))
-    .mapRight: embeddings =>
+    .flatMapEither(validateSize(chunks))
+    .map: embeddings =>
       logger.info("Got embeddings: " + embeddings.length)
       val embeddingChunk =
         chunks.zip(embeddings).map(ChunkWithEmbedding.apply.tupled)
@@ -260,15 +249,15 @@ def createDocs(
     auth: AuthData
 )(payload: List[DocumentCreationPayload], source: Source)(using
     db: DocDB[IO]
-): IO[Either[String, List[Document]]] =
+): EitherT[IO, String, List[Document]] =
   upsertDocs(auth)(payload.map(_.toDocument(UUID.randomUUID(), source)))
 
 def createOrUpdateFiles(auth: AuthData)(
     filesToUpload: List[Document]
-)(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
+)(using db: DocDB[IO]): EitherT[IO, String, List[Document]] =
   logger.info(s"Creating or updating ${filesToUpload.length} files...")
   db.listDocumentsBySource(filesToUpload.map(_.source), auth.orgId, auth.role)
-    .mapRight(filesToUpdate =>
+    .map: filesToUpdate =>
       filesToUpload.map(fileToUpload =>
         filesToUpdate.find(_.source == fileToUpload.source) match
           case Some(fileToUpdate) =>
@@ -280,21 +269,20 @@ def createOrUpdateFiles(auth: AuthData)(
             )
           case None => fileToUpload
       )
-    )
-    .flatMapRight(upsertDocs(auth))
+    .flatMap(upsertDocs(auth))
 
 def upsertDocs(auth: AuthData)(
     documents: List[Document]
-)(using db: DocDB[IO]): IO[Either[String, List[Document]]] =
+)(using db: DocDB[IO]): EitherT[IO, String, List[Document]] =
   limitRole(
     auth.role,
-    Left(authErrorMsg(Some(auth.role))).pure[IO]
+    Left(authErrorMsg(Some(auth.role))).pure[IO].asEitherT
   ):
     traceMappable("upsertDocs"):
       logger.info("Upserting docs... ")
       if documents.length > 0 then
         mapDocumentsToDB(documents, getEmbeddingAPI("embaas"))
-          .flatMapRight(persistencePayload =>
+          .flatMap(persistencePayload =>
             logger.info("Got persistencePayloads: " + persistencePayload.length)
             db.addDocuments(
               persistencePayload,
@@ -302,4 +290,4 @@ def upsertDocs(auth: AuthData)(
               auth.role
             )
           )
-      else Right(List()).pure[IO]
+      else EitherT.rightT(List.empty[Document])

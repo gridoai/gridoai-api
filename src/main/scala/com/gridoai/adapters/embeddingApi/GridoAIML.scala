@@ -1,15 +1,17 @@
 package com.gridoai.adapters.embeddingApi
 
 import cats.effect.IO
-import com.gridoai.adapters.*
-import com.gridoai.domain.*
-import io.circe.generic.auto.*
-import io.circe.parser.*
-import io.circe.*
-import io.circe.syntax.*
-import cats.implicits.*
-import com.gridoai.utils.*
+import cats.implicits._
+import cats.data.EitherT
+import io.circe.generic.auto._
+import io.circe.parser._
+import io.circe._
+import io.circe.syntax._
 import org.slf4j.LoggerFactory
+
+import com.gridoai.utils._
+import com.gridoai.adapters._
+import com.gridoai.domain._
 
 val embeddingApiEndpointSingle = sys.env.getOrElse(
   "EMBEDDING_API_ENDPOINT_SINGLE",
@@ -44,12 +46,12 @@ object GridoAIML extends EmbeddingAPI[IO]:
   val HttpSingle = HttpClient(embeddingApiEndpointSingle)
   val HttpBatch = HttpClient(embeddingApiEndpointBatch)
 
-  def embedChats(texts: List[String]): IO[Either[String, List[Embedding]]] =
+  def embedChats(texts: List[String]): EitherT[IO, String, List[Embedding]] =
     embed(
       texts,
       "query"
     )
-  def embedChunks(chunks: List[Chunk]): IO[Either[String, List[Embedding]]] =
+  def embedChunks(chunks: List[Chunk]): EitherT[IO, String, List[Embedding]] =
     embedBatch(
       chunks.map(_.content),
       "passage"
@@ -58,7 +60,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
   def embedBatch(
       texts: List[String],
       instruction: String
-  ): IO[Either[String, List[Embedding]]] =
+  ): EitherT[IO, String, List[Embedding]] =
     val partitionCount = texts.length / embedPartitionSize
     logger.info("Using GridoAIML")
     logger.info(
@@ -72,7 +74,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
 
   def embedPartitionOfTexts(instruction: String)(
       texts: List[String]
-  ): IO[Either[String, List[Embedding]]] =
+  ): EitherT[IO, String, List[Embedding]] =
     logger.info(
       s"Sending partition of ${texts.length} texts"
     )
@@ -87,16 +89,18 @@ object GridoAIML extends EmbeddingAPI[IO]:
         response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
-      .mapRight(
+      .asEitherT
+      .map(
         _.message.map(vec =>
           Embedding(vector = vec, model = EmbeddingModel.MultilingualE5Base)
         )
-      ) |> attempt
+      )
+      .attempt
 
   def embed(
       texts: List[String],
       instruction: String
-  ): IO[Either[String, List[Embedding]]] = traceMappable("embed"):
+  ): EitherT[IO, String, List[Embedding]] = traceMappable("embed"):
     val body =
       GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     HttpSingle
@@ -108,11 +112,13 @@ object GridoAIML extends EmbeddingAPI[IO]:
         response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
-      .mapRight(
+      .asEitherT
+      .map(
         _.message.map(v =>
           Embedding(
             vector = v,
             model = EmbeddingModel.MultilingualE5Base
           )
         )
-      ) |> attempt
+      )
+      .attempt

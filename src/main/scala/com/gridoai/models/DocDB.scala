@@ -1,5 +1,7 @@
 package com.gridoai.models
 
+import cats.data.EitherT
+
 import com.gridoai.domain.UID
 import com.gridoai.domain.ChunkWithEmbedding
 import com.gridoai.domain.Embedding
@@ -18,32 +20,32 @@ trait DocDB[F[_]]:
       doc: DocumentPersistencePayload,
       orgId: String,
       role: String
-  ): F[Either[String, Document]]
+  ): EitherT[F, String, Document]
 
   def addDocuments(
       docs: List[DocumentPersistencePayload],
       orgId: String,
       role: String
-  ): F[Either[String, List[Document]]]
+  ): EitherT[F, String, List[Document]]
 
   def listDocuments(
       orgId: String,
       role: String,
       start: Int,
       end: Int
-  ): F[Either[String, PaginatedResponse[List[Document]]]]
+  ): EitherT[F, String, PaginatedResponse[List[Document]]]
 
   def deleteDocument(
       uid: UID,
       orgId: String,
       role: String
-  ): F[Either[String, Unit]]
+  ): EitherT[F, String, Unit]
 
   def listDocumentsBySource(
       sources: List[Source],
       orgId: String,
       role: String
-  ): F[Either[String, List[Document]]]
+  ): EitherT[F, String, List[Document]]
 
   def getNearChunks(
       embeddings: List[Embedding],
@@ -52,4 +54,4 @@ trait DocDB[F[_]]:
       limit: Int,
       orgId: String,
       role: String
-  ): F[Either[String, List[List[SimilarChunk]]]]
+  ): EitherT[F, String, List[List[SimilarChunk]]]

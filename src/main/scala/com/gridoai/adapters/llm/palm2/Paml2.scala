@@ -1,15 +1,17 @@
 package com.gridoai.adapters.llm.palm2
 import cats.effect.IO
-import cats.implicits.*
+import cats.data.EitherT
+import cats.implicits._
 import com.google.auth.oauth2.GoogleCredentials
-import com.gridoai.adapters.*
-import com.gridoai.adapters.llm.*
-import com.gridoai.domain.*
+import io.circe._
+import io.circe.generic.auto._
+import io.circe.parser._
+import io.circe.syntax._
+
+import com.gridoai.adapters._
+import com.gridoai.adapters.llm._
+import com.gridoai.domain._
 import com.gridoai.utils._
-import io.circe.*
-import io.circe.generic.auto.*
-import io.circe.parser.*
-import io.circe.syntax.*
 import com.gridoai.utils._
 
 val apiEndpoint = "https://us-central1-aiplatform.googleapis.com"
@@ -45,7 +47,7 @@ object Paml2Client extends LLM[IO]:
     var token = credentials.getAccessToken()
     token.getTokenValue()
 
-  def call(data: Data): IO[Either[String, Palm2Response]] =
+  def call(data: Data): EitherT[IO, String, Palm2Response] =
     val token = getAccessToken()
 
     val headers = Map(
@@ -62,7 +64,9 @@ object Paml2Client extends LLM[IO]:
       .sendReq()
       .map(
         _.body.flatMap(decode[Palm2Response](_).left.map(_.getMessage()))
-      ) |> attempt
+      )
+      .asEitherT
+      .attempt
 
   def makePayloadWithContext(
       context: String,
@@ -93,9 +97,9 @@ object Paml2Client extends LLM[IO]:
     )
 
   def getAnswer(
-      llmOutput: IO[Either[String, Palm2Response]]
-  ): IO[Either[String, String]] =
-    llmOutput.mapRight(_.predictions.head.candidates.head.content)
+      llmOutput: Palm2Response
+  ): String =
+    llmOutput.predictions.head.candidates.head.content
 
   def calculateTokenQuantity(text: String): Int =
     text.filter(_ != ' ').length / 4
@@ -123,7 +127,7 @@ object Paml2Client extends LLM[IO]:
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): IO[Either[String, String]] =
+  ): EitherT[IO, String, String] =
 
     val mergedChunks = chunks
       .map(chunk =>
@@ -137,14 +141,14 @@ object Paml2Client extends LLM[IO]:
     println(
       s"Total tokens in messages: ${calculateMessagesTokenQuantity(messages)}"
     )
-    messages |> makePayloadWithContext(context) |> call |> getAnswer
+    (messages |> makePayloadWithContext(context) |> call).map(getAnswer)
 
   def answer(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): IO[Either[String, String]] =
+  ): EitherT[IO, String, String] =
 
     val mergedChunks = chunks
       .map(chunk =>
@@ -158,21 +162,21 @@ object Paml2Client extends LLM[IO]:
     println(
       s"Total tokens in messages: ${calculateMessagesTokenQuantity(messages)}"
     )
-    messages |> makePayloadWithContext(context) |> call |> getAnswer
+    (messages |> makePayloadWithContext(context) |> call).map(getAnswer)
 
   def chooseAction(
       messages: List[Message],
       queries: List[String],
       chunks: List[Chunk],
       options: List[Action]
-  ): IO[Either[String, Action]] =
-    Action.Search.asRight.pure[IO]
+  ): EitherT[IO, String, Action] =
+    EitherT.rightT(Action.Search)
 
   def buildQueriesToSearchDocuments(
       messages: List[Message],
       lastQueries: List[String],
       lastChunks: List[Chunk]
-  ): IO[Either[String, List[String]]] =
+  ): EitherT[IO, String, List[String]] =
 
     val mergedMessages =
       messages
@@ -187,5 +191,4 @@ object Paml2Client extends LLM[IO]:
     )
     (singleMessage
       |> makePayloadWithContext("", topP = 0.95, topK = 40)
-      |> call
-      |> getAnswer).mapRight(List(_))
+      |> call).map(getAnswer).map(List(_))

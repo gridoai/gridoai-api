@@ -1,16 +1,18 @@
 package com.gridoai.services.notifications
 
+import cats.effect.IO
+import cats.implicits._
+import cats.data.EitherT
+import cats.effect.implicits._
+import io.circe.generic.auto._
+import io.circe.parser._
+import io.circe.syntax._
+
 import com.gridoai.auth.AuthData
 import com.gridoai.domain._
 import com.gridoai.utils._
 import com.gridoai.adapters.notifications.generateToken
-import cats.effect.IO
-import cats.implicits._
-import cats.effect.implicits._
 import com.gridoai.adapters.notifications.NotificationService
-import io.circe.generic.auto._
-import io.circe.parser._
-import io.circe.syntax._
 
 def createNotificationServiceToken(authData: AuthData) =
   generateToken[IO](authData.userId)
@@ -20,7 +22,7 @@ def notifySearch(
     user: String
 )(implicit
     ns: NotificationService[IO]
-): IO[Either[String, Unit]] =
+): EitherT[IO, String, Unit] =
   ns.sendNotification(
     topic = s"$user:chat",
     channel = s"$user:chat-search",
@@ -32,7 +34,7 @@ def notifyUpload(
     user: String
 )(implicit
     ns: NotificationService[IO]
-): IO[Either[String, Unit]] =
+): EitherT[IO, String, Unit] =
   ns.sendNotification(
     topic = s"$user:upload",
     channel = s"$user:upload-status",
@@ -40,47 +42,50 @@ def notifyUpload(
   )
 
 def notifySearchProgress[L, R](queries: List[String], userId: String)(
-    io: => IO[Either[L, R]]
+    io: => EitherT[IO, L, R]
 )(implicit
     ns: NotificationService[IO]
-) =
-  notifySearch(
-    SearchReport(queries = queries, status = SearchStatus.Started),
-    userId
-  ).start >>
-    io
-      .flatMapRight: res =>
-        notifySearch(
-          SearchReport(queries = queries, status = SearchStatus.Success),
-          userId
-        ).start >> IO.pure(res.asRight)
-      .flatMapLeft: e =>
-        notifySearch(
-          SearchReport(queries = queries, status = SearchStatus.Failure),
-          userId
-        ).start >> IO.pure(e.asLeft)
+): EitherT[IO, L, R] =
+  (for
+    _ <- notifySearch(
+      SearchReport(queries = queries, status = SearchStatus.Started),
+      userId
+    ).start
+    res <- io
+    - <- notifySearch(
+      SearchReport(queries = queries, status = SearchStatus.Success),
+      userId
+    ).start
+  yield res).leftFlatMap: e =>
+    for
+      _ <- notifySearch(
+        SearchReport(queries = queries, status = SearchStatus.Failure),
+        userId
+      ).start
+      err = e
+    yield err
 
 def notifyUploadProgress[L, R](id: String)(
-    io: => IO[Either[L, R]]
+    io: => EitherT[IO, L, R]
 )(implicit
     ns: NotificationService[IO]
-) =
-  notifyUpload(
-    UploadStatus.Processing,
-    id
-  ) >>
-    io
-      .flatMapRight(_ =>
-        notifyUpload(
-          UploadStatus.Success,
-          id
-        )
+): EitherT[IO, String, Unit] =
+  (for
+    _ <- notifyUpload(
+      UploadStatus.Processing,
+      id
+    )
+    res <- io
+    _ <- notifyUpload(
+      UploadStatus.Success,
+      id
+    )
+  yield res)
+    .leftFlatMap(e =>
+      notifyUpload(
+        UploadStatus.Failure,
+        id
       )
-      .flatMapLeft(e =>
-        notifyUpload(
-          UploadStatus.Failure,
-          id
-        )
-      )
-      .start
-    >> IO.pure(Right(()))
+    )
+    .start
+    >> EitherT.rightT(())

@@ -1,17 +1,19 @@
 package com.gridoai.adapters.llm.chatGPT
 
-import com.gridoai.adapters.*
-import com.gridoai.adapters.llm.*
-import com.gridoai.domain.*
-import com.gridoai.utils.*
-import dev.maxmelnyk.openaiscala.models.text.completions.chat.*
+import dev.maxmelnyk.openaiscala.models.text.completions.chat._
 import dev.maxmelnyk.openaiscala.client.OpenAIClient
-import sttp.client3.*
+import sttp.client3._
 import cats.MonadError
-import cats.implicits.*
+import cats.implicits._
+import cats.data.EitherT
 import com.knuddels.jtokkit.Encodings
 import com.knuddels.jtokkit.api.ModelType
 import org.slf4j.LoggerFactory
+
+import com.gridoai.adapters._
+import com.gridoai.adapters.llm._
+import com.gridoai.domain._
+import com.gridoai.utils._
 
 val ENC_GPT35TURBO = Encodings
   .newDefaultEncodingRegistry()
@@ -69,8 +71,12 @@ object ChatGPTClient:
 
     def getAnswerFromChat(
         llmOutput: F[ChatCompletion]
-    ): F[Either[String, String]] =
-      llmOutput.map(_.choices.head.message.content).map(Right(_)) |> attempt
+    ): EitherT[F, String, String] =
+      llmOutput
+        .map(_.choices.head.message.content)
+        .map(Right(_))
+        .asEitherT
+        .attempt
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
       chunk |> chunkToStr |> calculateTokenQuantity
@@ -93,7 +99,7 @@ object ChatGPTClient:
         basedOnDocsOnly: Boolean,
         messages: List[Message],
         searchedBefore: Boolean
-    ): F[Either[String, String]] =
+    ): EitherT[F, String, String] =
       askOrAnswer(chunks, basedOnDocsOnly, messages, searchedBefore, false)
 
     def ask(
@@ -101,7 +107,7 @@ object ChatGPTClient:
         basedOnDocsOnly: Boolean,
         messages: List[Message],
         searchedBefore: Boolean
-    ): F[Either[String, String]] =
+    ): EitherT[F, String, String] =
       askOrAnswer(chunks, basedOnDocsOnly, messages, searchedBefore, true)
 
     def askOrAnswer(
@@ -110,7 +116,7 @@ object ChatGPTClient:
         messages: List[Message],
         searchedBefore: Boolean,
         askUser: Boolean
-    ): F[Either[String, String]] =
+    ): EitherT[F, String, String] =
 
       val mergedChunks = mergeChunks(chunks)
       val context =
@@ -132,7 +138,7 @@ object ChatGPTClient:
         queries: List[String],
         chunks: List[Chunk],
         options: List[Action]
-    ): F[Either[String, Action]] =
+    ): EitherT[F, String, Action] =
       val prompt = chooseActionPrompt(chunks, messages, options)
       (
         Seq(
@@ -145,13 +151,13 @@ object ChatGPTClient:
       )
         |> client.createChatCompletion
         |> getAnswerFromChat
-        |> (_.map(_.flatMap(strToAction(options))))
+        |> (_.value.map(_.flatMap(strToAction(options))).asEitherT)
 
     def buildQueriesToSearchDocuments(
         messages: List[Message],
         lastQueries: List[String],
         lastChunks: List[Chunk]
-    ): F[Either[String, List[String]]] =
+    ): EitherT[F, String, List[String]] =
       val prompt =
         buildQueriesToSearchDocumentsPrompt(
           messages.dropRight(1),
@@ -174,7 +180,7 @@ object ChatGPTClient:
       )
         |> client.createChatCompletion
         |> getAnswerFromChat
-        |> (_.mapRight(
+        |> (_.map(
           _.split("\n").map(_.trim).filter(!_.isEmpty).take(3).toList
         ))
 

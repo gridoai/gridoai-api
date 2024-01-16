@@ -1,25 +1,26 @@
 package com.gridoai.adapters
 
-import com.gridoai.utils.*
 import com.google.auth.http.HttpCredentialsAdapter
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.auth.oauth2.AccessToken
 import com.google.api.services.drive.Drive
-import com.google.api.client.googleapis.auth.oauth2.{
-  GoogleAuthorizationCodeFlow,
-  GoogleClientSecrets
-}
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse
-import cats.effect.{IO, Sync}
-import cats.implicits.*
+import cats.effect.IO
+import cats.effect.Sync
+import cats.implicits._
+import cats.data.EitherT
 import java.util.Date
 import scala.util.Try
 import scala.jdk.CollectionConverters.SeqHasAsJava
 import com.google.api.client.googleapis.auth.oauth2.GoogleRefreshTokenRequest
 import concurrent.duration.DurationInt
 import org.slf4j.LoggerFactory
+
+import com.gridoai.utils._
 
 val CLIENT_ID =
   sys.env.getOrElse("GOOGLE_CLIENT_ID", "")
@@ -33,14 +34,17 @@ object GoogleClient:
       flow: GoogleAuthorizationCodeFlow,
       code: String,
       redirectUri: String
-  ): IO[Either[String, GoogleTokenResponse]] =
-    Sync[IO].blocking(
-      flow
-        .newTokenRequest(code)
-        .setRedirectUri(redirectUri)
-        .execute()
-        .asRight
-    ) |> attempt
+  ): EitherT[IO, String, GoogleTokenResponse] =
+    Sync[IO]
+      .blocking(
+        flow
+          .newTokenRequest(code)
+          .setRedirectUri(redirectUri)
+          .execute()
+          .asRight
+      )
+      .asEitherT
+      .attempt
 
   private def buildGoogleAuthorizationCodeFlow(
       scopes: List[String]
@@ -71,7 +75,7 @@ object GoogleClient:
       code: String,
       redirectUri: String,
       scopes: List[String]
-  ): IO[Either[String, (String, String)]] =
+  ): EitherT[IO, String, (String, String)] =
 
     logger.info("Building google authorization code flow...")
 
@@ -80,27 +84,31 @@ object GoogleClient:
       .flatMapRight: flow =>
         logger.info("Google authorization code flow builded.")
         logger.info("Sending request to get token...")
-        flowAndCodeToTokens(flow, code, redirectUri).map(_.flatMap: t =>
+        flowAndCodeToTokens(flow, code, redirectUri).value.map(_.flatMap: t =>
           logger.info("Tokens got!")
           Option(t.getRefreshToken) match
             case Some(refreshToken) =>
               Right((t.getAccessToken, refreshToken))
             case None => Left("Missing refresh token")
         )
+      .asEitherT
 
   def refreshToken(
       refreshToken: String
-  ): IO[Either[String, (String, String)]] =
-    Sync[IO].blocking(
-      Right:
-        GoogleRefreshTokenRequest(
-          NetHttpTransport(),
-          GsonFactory.getDefaultInstance,
-          refreshToken,
-          CLIENT_ID,
-          CLIENT_SECRET
-        ).execute.getAccessToken -> refreshToken
-    ) |> attempt
+  ): EitherT[IO, String, (String, String)] =
+    Sync[IO]
+      .blocking(
+        Right:
+          GoogleRefreshTokenRequest(
+            NetHttpTransport(),
+            GsonFactory.getDefaultInstance,
+            refreshToken,
+            CLIENT_ID,
+            CLIENT_SECRET
+          ).execute.getAccessToken -> refreshToken
+      )
+      .asEitherT
+      .attempt
 
   def buildDriveService(token: String): Drive =
     val expiryTime =

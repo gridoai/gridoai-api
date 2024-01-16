@@ -1,18 +1,19 @@
 package com.gridoai.adapters.rerankApi
 
 import cats.effect.IO
-import com.gridoai.adapters.HttpClient
-import com.gridoai.utils.fallbackEitherM
-import cats.implicits.*
+import cats.implicits._
+import cats.data.EitherT
 import cats.Monad
-import com.gridoai.utils.|>
+
+import com.gridoai.adapters.HttpClient
+import com.gridoai.utils._
 import com.gridoai.domain.Chunk
 import com.gridoai.domain.RelevantChunk
 
 case class RerankPayload(query: String, chunks: List[Chunk])
 
 trait RerankAPI[F[_]]:
-  def rerank(payload: RerankPayload): F[Either[String, List[RelevantChunk]]]
+  def rerank(payload: RerankPayload): EitherT[F, String, List[RelevantChunk]]
 
 extension [F[_]: Monad](e: RerankAPI[F])
   def withFallback(fallback: RerankAPI[F]): RerankAPI[F] =

@@ -33,7 +33,7 @@ class withService(implicit
 
   def webHooksWhatsappChallengeEndpoint =
     webhooksWhatsappChallenge.serverLogic(
-      Whatsapp.handleChallenge _
+      Whatsapp.handleChallenge(_).value
     )
 
   def webHooksWhatsappEndpoint =

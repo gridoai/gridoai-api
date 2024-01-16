@@ -2,16 +2,18 @@ package com.gridoai.adapters.embeddingApi
 
 import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 import cats.effect.IO
+import sttp.model.Header
+import cats.implicits._
+import sttp.model.MediaType
+import concurrent.duration.DurationInt
+import cats.data.EitherT
+
 import com.gridoai.adapters.HttpClient
 import com.gridoai.domain.Embedding
 import com.gridoai.domain.Chunk
-import sttp.model.Header
 import com.gridoai.adapters.sendReq
 import com.gridoai.domain.EmbeddingModel
-import cats.implicits._
-import com.gridoai.utils.*
-import sttp.model.MediaType
-import concurrent.duration.DurationInt
+import com.gridoai.utils._
 
 case class EmbeddingRequest(
     texts: List[String],
@@ -29,12 +31,12 @@ case class EmbeddingResponse(
 object EmbaasClient:
   def apply(httpClient: HttpClient, apiKey: String) = new EmbeddingAPI[IO]:
 
-    def embedChats(texts: List[String]): IO[Either[String, List[Embedding]]] =
+    def embedChats(texts: List[String]): EitherT[IO, String, List[Embedding]] =
       embed(
         texts,
         "query"
       )
-    def embedChunks(chunks: List[Chunk]): IO[Either[String, List[Embedding]]] =
+    def embedChunks(chunks: List[Chunk]): EitherT[IO, String, List[Embedding]] =
       embedMany(
         chunks.map(_.content),
         "passage"
@@ -43,7 +45,7 @@ object EmbaasClient:
     def embed(
         texts: List[String],
         instruction: String
-    ): IO[Either[String, List[Embedding]]] =
+    ): EitherT[IO, String, List[Embedding]] =
       embedMany(texts, instruction)
 
     private val authHeader = Header("Authorization", s"Bearer $apiKey")
@@ -51,13 +53,13 @@ object EmbaasClient:
     def embedMany(
         texts: List[String],
         instruction: String
-    ): IO[Either[String, List[Embedding]]] =
+    ): EitherT[IO, String, List[Embedding]] =
       println(s"Trying to get ${texts.length} embeddings using Embaas")
       executeByParts(embedLessThan200(instruction), 200)(texts)
 
     def embedLessThan200(instruction: String)(
         texts: List[String]
-    ): IO[Either[String, List[Embedding]]] =
+    ): EitherT[IO, String, List[Embedding]] =
       val request = EmbeddingRequest(texts, instruction)
       val response = httpClient
         .post("/v1/embeddings/")
@@ -69,9 +71,9 @@ object EmbaasClient:
           _.body.flatMap(decode[EmbeddingResponse](_))
         )
         .timeoutTo(20.seconds, IO.pure(Left("Embaas API Timeout")))
-        |> attempt
-      response.map:
-        case Right(r) =>
+
+      response
+        .mapRight: r =>
           r.data
             .sortBy(_.index)
             .map(d =>
@@ -79,5 +81,6 @@ object EmbaasClient:
             )
             .traceFn: e =>
               s"input batch size: ${texts.length}, output batch size: ${e.length}"
-            .asRight
-        case Left(e) => (Left(e.toString()))
+        .mapLeft(_.toString)
+        .asEitherT
+        .attempt

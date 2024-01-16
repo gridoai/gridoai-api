@@ -1,18 +1,21 @@
 package com.gridoai.adapters.clerk
 
-import com.gridoai.utils.*
 import cats.effect.IO
 import cats.implicits._
-import com.gridoai.adapters.*
-import com.gridoai.domain.*
-import io.circe.generic.auto.*
-import io.circe.parser.*
-import io.circe.*
-import io.circe.syntax.*
-import sttp.model.{Header, MediaType}
+import cats.data.EitherT
+import io.circe.generic.auto._
+import io.circe.parser._
+import io.circe._
+import io.circe.syntax._
+import sttp.model.Header
+import sttp.model.MediaType
 import io.circe.derivation.Configuration
 import io.circe.derivation.ConfiguredEnumCodec
 import org.slf4j.LoggerFactory
+
+import com.gridoai.utils._
+import com.gridoai.domain._
+import com.gridoai.adapters._
 
 val CLERK_ENDPOINT = "https://api.clerk.com/v1"
 val CLERK_SECRET_KEY =
@@ -177,7 +180,7 @@ object ClerkClient:
   val Http = HttpClient(CLERK_ENDPOINT)
   private val authHeader = Header("Authorization", s"Bearer $CLERK_SECRET_KEY")
   object user:
-    def get(uid: String): IO[Either[String, User]] =
+    def get(uid: String): EitherT[IO, String, User] =
       Http
         .get(s"/users/$uid")
         .header(authHeader)
@@ -186,40 +189,45 @@ object ClerkClient:
           _.body.flatMap(
             decode[User](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
-    def byEmail(email: String): IO[Either[String, User]] =
+    def byEmail(email: String): EitherT[IO, String, User] =
       user
         .listByEmail(email)
-        .map(_.flatMap(_.headOption.toRight("No user found")))
+        .flatMapEither(_.headOption.toRight("No user found"))
 
-    def byPhones(phoneNumbers: List[String]): IO[Either[String, User]] =
+    def byPhones(phoneNumbers: List[String]): EitherT[IO, String, User] =
       user
         .listByPhones(phoneNumbers)
-        .map(_.flatMap(_.headOption.toRight("No user found")))
+        .flatMapEither(_.headOption.toRight("No user found"))
 
-    def getFirstOrgByUID(uid: String) =
+    def getFirstOrgByUID(
+        uid: String
+    ): EitherT[IO, String, OrganizationMemberShipListData] =
       user
         .listMemberships(uid)
-        .map(
-          _.flatMap(_.data.headOption.toRight("No org found"))
-        )
+        .flatMapEither(_.data.headOption.toRight("No org found"))
 
-    def getOrgByCustomerId(email: String, customerId: String) =
+    def getOrgByCustomerId(
+        email: String,
+        customerId: String
+    ): EitherT[IO, String, Organization] =
       user
         .byEmail(email)
-        .mapRight(_.id)
-        .flatMapRight(user.listMemberships)
-        .flatMapRight(
+        .map(_.id)
+        .flatMap(user.listMemberships)
+        .flatMapEither(
           _.data
             .find(_.organization.public_metadata.customerId == customerId) match
-            case Some(membership) => IO.pure(Right(membership.organization))
-            case None             => IO.pure(Left("No org found"))
+            case Some(membership) => Right(membership.organization)
+            case None             => Left("No org found")
         )
 
     def getPublicMetadata(
         userId: String
-    ): IO[Either[String, PublicMetadata]] =
+    ): EitherT[IO, String, PublicMetadata] =
       Http
         .get(s"/users/$userId")
         .header(authHeader)
@@ -229,13 +237,15 @@ object ClerkClient:
             decode[User](_).left.map(_.getMessage())
           )
         )
-        .mapRight(
+        .asEitherT
+        .map(
           _.public_metadata
-        ) |> attempt
+        )
+        .attempt
 
     def mergeAndUpdateMetadata(
         publicMetadata: PublicMetadata
-    )(userId: String) =
+    )(userId: String): EitherT[IO, String, User] =
       val body = MergeAndUpdateUserMetadataPayload(
         publicMetadata
       ).asJson.deepDropNullValues.noSpaces
@@ -250,12 +260,14 @@ object ClerkClient:
             decode[User](_).left.map(_.getMessage())
           )
         )
+        .asEitherT
+        .attempt
 
     def updateEmailAddress(
         emailId: String,
         verified: Boolean,
         primary: Boolean
-    ): IO[Either[String, UpdateEmailAddress]] =
+    ): EitherT[IO, String, UpdateEmailAddress] =
       val body = UpdateEmailAddress(verified, primary).asJson.noSpaces
       Http
         .patch(s"/email_addresses/$emailId")
@@ -268,11 +280,13 @@ object ClerkClient:
             decode[UpdateEmailAddress](_).left.map(_.getMessage())
           )
         )
+        .asEitherT
+        .attempt
 
     def listByEmail(
         emailAddress: String,
         limit: Int = 1
-    ): IO[Either[String, List[User]]] =
+    ): EitherT[IO, String, List[User]] =
       Http
         .get(s"/users?email_address=$emailAddress&limit=$limit")
         .header(authHeader)
@@ -282,12 +296,14 @@ object ClerkClient:
           _.body.flatMap(
             decode[List[User]](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
     def listByPhones(
         phoneNumbers: List[String],
         limit: Int = 1
-    ): IO[Either[String, List[User]]] =
+    ): EitherT[IO, String, List[User]] =
       Http
         .get(
           s"/users?limit=$limit&phone_number=${phoneNumbers.mkString("&phone_number=")}"
@@ -299,11 +315,13 @@ object ClerkClient:
           _.body.flatMap(
             decode[List[User]](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
     def listMemberships(
         userId: String
-    ): IO[Either[String, OrganizationMemberShipList]] =
+    ): EitherT[IO, String, OrganizationMemberShipList] =
       Http
         .get(s"/users/$userId/organization_memberships")
         .header(authHeader)
@@ -312,13 +330,15 @@ object ClerkClient:
           _.body.flatMap(
             decode[OrganizationMemberShipList](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
     def create(
         phoneNumber: String,
         email: String,
         password: String
-    ): IO[Either[String, UserCreatedData]] =
+    ): EitherT[IO, String, UserCreatedData] =
       val body =
         CreateUser(List(phoneNumber), List(email), password).asJson.noSpaces
       logger.info("Creating user... ")
@@ -332,7 +352,9 @@ object ClerkClient:
           _.body.flatMap(
             decode[UserCreatedData](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
   object session:
 
@@ -340,7 +362,7 @@ object ClerkClient:
         userId: String,
         limit: Int = 10,
         offset: Int = 0
-    ): IO[Either[String, List[Session]]] =
+    ): EitherT[IO, String, List[Session]] =
       Http
         .get(s"/sessions?limit=${limit}&offset=${offset}&user_id=${userId}")
         .header(authHeader)
@@ -349,9 +371,11 @@ object ClerkClient:
           _.body.flatMap(
             decode[List[Session]](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
   object org:
-    def delete(orgId: String) =
+    def delete(orgId: String): EitherT[IO, String, DeletionResponse] =
       Http
         .delete(s"/organizations/$orgId")
         .header(authHeader)
@@ -360,9 +384,11 @@ object ClerkClient:
           _.body.flatMap(
             decode[DeletionResponse](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
-    def get(orgId: String) =
+    def get(orgId: String): EitherT[IO, String, Organization] =
       Http
         .get(s"/organizations/$orgId")
         .header(authHeader)
@@ -371,31 +397,37 @@ object ClerkClient:
           _.body.flatMap(
             decode[Organization](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
-    def upsert(
+    def upsert[L, R](
         name: String,
         plan: Plan,
         customerId: String,
         preUpdate: (
             memberShip: OrganizationMemberShipListData
-        ) => IO[Either[Any, Any]] = _ => IO(Right(()))
+        ) => EitherT[IO, String, Unit] = _ => EitherT.rightT(())
     )(
         by: String
-    ): IO[Either[String, Organization]] =
-      user.listMemberships(by).flatMapRight {
-        _.data.find(m => m.organization.name == name) match
-          case Some(membership) =>
-            logger.info("Found membership, updating org...")
-            preUpdate(membership) !> updatePlan(
-              membership.organization.id,
-              plan,
-              (customerId)
-            )
-          case None =>
-            logger.info("No membership found, creating org...")
-            create(name, plan, customerId)(by)
-      }
+    ): EitherT[IO, String, Organization] =
+      user
+        .listMemberships(by)
+        .flatMap(
+          _.data.find(m => m.organization.name == name) match
+            case Some(membership) =>
+              logger.info("Found membership, updating org...")
+              preUpdate(membership).flatMap(_ =>
+                updatePlan(
+                  membership.organization.id,
+                  plan,
+                  customerId
+                )
+              )
+            case None =>
+              logger.info("No membership found, creating org...")
+              create(name, plan, customerId)(by)
+        )
 
     def create(
         name: String,
@@ -403,7 +435,7 @@ object ClerkClient:
         customerId: String
     )(
         by: String
-    ): IO[Either[String, Organization]] =
+    ): EitherT[IO, String, Organization] =
       val body = CreateOrganization(
         name = name,
         created_by = by,
@@ -425,7 +457,9 @@ object ClerkClient:
           _.body.flatMap(
             decode[Organization](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
     def mergeAndUpdateMetadata(
         organizationId: String,
@@ -433,7 +467,7 @@ object ClerkClient:
         customerId: Option[String] = None,
         googleDriveAccessToken: Option[String] = None,
         googleDriveRefreshToken: Option[String] = None
-    ): IO[Either[String, Organization]] =
+    ): EitherT[IO, String, Organization] =
       val body = MergeAndUpdateOrgMetadataPayload(
         public_metadata = OrganizationMetadataUpdate(
           plan,
@@ -453,13 +487,14 @@ object ClerkClient:
             decode[Organization](_).left.map(_.getMessage())
           )
         )
-        |> attempt
+        .asEitherT
+        .attempt
 
     def updatePlan(
         organizationId: String,
         plan: Plan,
         customerId: String
-    ): IO[Either[String, Organization]] =
+    ): EitherT[IO, String, Organization] =
       val body = UpdateOrganization(
         max_allowed_memberships = getMaxUsersByPlan(plan)
       ).asJson.noSpaces
@@ -478,13 +513,15 @@ object ClerkClient:
           _.body.flatMap(
             decode[Organization](_).left.map(_.getMessage())
           )
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
       List(req1, req2).parSequence.map(_.last)
 
   def setGDriveMetadata(userId: String)(
       googleDriveAccessToken: String,
       googleDriveRefreshToken: String
-  ): IO[Either[String, (String, String)]] =
+  ): EitherT[IO, String, (String, String)] =
     logger.info("Sending tokens to Clerk...")
 
     user
@@ -494,15 +531,14 @@ object ClerkClient:
           Some(googleDriveRefreshToken)
         )
       )(userId)
-      .mapRight: user =>
+      .map: user =>
         (
           user.public_metadata.googleDriveAccessToken,
           user.public_metadata.googleDriveRefreshToken
         )
-      .map(_.flatMap:
+      .flatMapEither:
         case (Some(x), Some(y)) =>
           logger.info("Tokens sent!")
           Right((x, y))
         case _ =>
           Left("Some information was not set")
-      ) |> attempt

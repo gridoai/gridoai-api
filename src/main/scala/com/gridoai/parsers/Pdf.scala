@@ -2,9 +2,14 @@ package com.gridoai.adapters
 
 import cats.effect.IO
 import cats.effect.Sync
+import cats.data.EitherT
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.text.PDFTextStripper
-import com.gridoai.parsers.{ExtractTextError, FileFormat}
+
+import com.gridoai.parsers.ExtractTextError
+import com.gridoai.parsers.FileFormat
+import com.gridoai.utils._
+
 trait PdfParser[F[_]]:
   def load(bytes: Array[Byte]): F[PDDocument]
   def getText(doc: PDDocument): F[String]
@@ -25,9 +30,10 @@ object PdfBoxParser extends PdfParser[IO]:
 
 def extractTextFromPdf(
     content: Array[Byte]
-): IO[Either[ExtractTextError, String]] = PdfBoxParser
+): EitherT[IO, ExtractTextError, String] = PdfBoxParser
   .load(content)
   .flatMap(doc => PdfBoxParser.getText(doc).map(text => (doc, text)))
   .flatMap((doc, text) => PdfBoxParser.close(doc).map(_ => text))
   .attempt
   .map(_.left.map(t => ExtractTextError(FileFormat.PDF, t.getMessage)))
+  .asEitherT
