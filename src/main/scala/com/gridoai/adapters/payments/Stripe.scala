@@ -7,7 +7,6 @@ import com.stripe._, param.CustomerCreateParams
 import java.util.HashMap
 import cats.effect.kernel.Sync
 import cats.implicits._
-import cats.syntax.all._
 import cats.effect.IO
 import cats.data.EitherT
 import cats.Monad
@@ -53,63 +52,69 @@ def createCustomerPortalSession(
     customerId: String,
     baseUrl: String
 ): EitherT[IO, String, String] =
-  Sync[IO]
-    .blocking {
-      val params = SessionCreateParams
-        .builder()
-        .setCustomer(customerId)
-        .setReturnUrl(baseUrl)
-        .build()
+  (Sync[IO]
+    .blocking:
+      try
+        val params = SessionCreateParams
+          .builder()
+          .setCustomer(customerId)
+          .setReturnUrl(baseUrl)
+          .build()
 
-      val session = Session.create(params)
-      session.getUrl
-    }
-    .attempt
-    .asEitherT
-    .attempt
+        val session = Session.create(params)
+        session.getUrl.asRight
+      catch
+        case e: java.lang.Exception =>
+          s"Session creation failed: $e".asLeft
+  ).asEitherT.attempt
 
-def deleteCustomerUnsafe[F[_]: Monad](
+def deleteCustomerUnsafe[F[_]: Sync](
     oldCustomerId: String
-)(using Sync[F]): EitherT[F, String, Customer] =
-  Sync[F]
-    .blocking(client.customers().delete(oldCustomerId))
-    .attempt
+): EitherT[F, String, Customer] =
+  (Sync[F]
+    .blocking:
+      try
+        client.customers().delete(oldCustomerId).asRight
+      catch
+        case e: java.lang.Exception =>
+          s"Customer deletion failed: $e".asLeft
+  )
     .asEitherT
     .attempt
 
-def deleteCustomer[F[_]](
+def deleteCustomer[F[_]: Sync](
     oldCustomerId: String,
     maybeNewCustomerID: Option[String]
-)(using Sync[F]): EitherT[F, String, String] =
+): EitherT[F, String, String] =
   logger.info(s"Deleting customer ${oldCustomerId} with ${maybeNewCustomerID}")
   maybeNewCustomerID match
     case None =>
       deleteCustomerUnsafe[F](oldCustomerId).map(_ => oldCustomerId)
     case Some(value) => deleteCustomer[F](oldCustomerId, value)
 
-def deleteCustomer[F[_]](oldCustomerId: String, newCustomerID: String)(using
-    SyncInstance: Sync[F]
-): EitherT[F, String, String] =
+def deleteCustomer[F[_]: Sync](oldCustomerId: String, newCustomerID: String): EitherT[F, String, String] =
   if oldCustomerId != newCustomerID then
     deleteCustomerUnsafe[F](oldCustomerId).map(_ => newCustomerID)
-  else SyncInstance.pure(Right(newCustomerID)).asEitherT
+  else EitherT.rightT[F, String](newCustomerID)
 
-def deleteCustomerOfMembership[F[_]](newCustomerID: String)(
+def deleteCustomerOfMembership[F[_]: Sync](newCustomerID: String)(
     membership: OrganizationMemberShipListData
-)(using Sync[F]): EitherT[F, String, Unit] =
-  deleteCustomer(
+): EitherT[F, String, Unit] =
+  deleteCustomer[F](
     membership.organization.public_metadata.customerId,
     newCustomerID
   ).map(_ => ())
 
-def fetchPlanOfSubscription[F[_]](
+def fetchPlanOfSubscription[F[_]: Sync](
     subscriptionId: String
-)(using Sync[F]) = Sync[F]
-  .blocking {
-    Subscription.retrieve(subscriptionId)
-  }
-  .attempt
-  .asEitherT
+): EitherT[F, String, Plan] =
+  (Sync[F].blocking:
+    try
+      Subscription.retrieve(subscriptionId).asRight
+    catch
+      case e: java.lang.Exception =>
+        s"Subscription fetch failed: $e".asLeft
+  ).asEitherT
   .attempt
   .flatMapEither(getSubscriptionPlan(_).toRight("No plan found"))
 
@@ -132,7 +137,7 @@ def handleCheckoutCompleted(
     orgNameField.map(_.getText.getValue)
   )
 
-  necessaryData match
+  (necessaryData match
     case (None, Some(email), Some(orgName)) =>
       logger.info("Got no client reference id, fetching by email...")
       planPromise.flatMap: plan =>
@@ -147,7 +152,6 @@ def handleCheckoutCompleted(
               preUpdate = deleteCustomerOfMembership[IO](customerId)
             )
           )
-          .map(_ => ())
 
     case (Some(id), Some(email), Some(orgName)) =>
       planPromise
@@ -158,7 +162,6 @@ def handleCheckoutCompleted(
             customerId,
             preUpdate = deleteCustomerOfMembership[IO](customerId)
           )(id)
-        .map(_ => ())
 
     case (Some(clientId), Some(email), None) =>
       clerk.user
@@ -168,8 +171,8 @@ def handleCheckoutCompleted(
             customerId = Some(customerId)
           )
         )(clientId)
-        .map(_ => ())
-    case _ => EitherT.leftT(s"Missing data: ${necessaryData}")
+    case _ => EitherT.leftT[IO, Unit](s"Missing data: ${necessaryData}")
+  ).map(_ => ())
 
 def cancelOrgPlan(orgId: String): EitherT[IO, String, Unit] =
   clerk.org.mergeAndUpdateMetadata(orgId, plan = (Some(Plan.Free))).map(_ => ())
@@ -201,7 +204,7 @@ def cancelPlanByMail(
   logger.info(s"Cancelling plan ${plan} for ${email}")
   plan match
     case Plan.Individual => cancelUserPlanByEmail(email)
-    case Plan.Free       => EitherT.leftT("Cannot cancel free plan")
+    case Plan.Free       => EitherT.leftT[IO, Unit]("Cannot cancel free plan")
     case _               => cancelOrgSubscriptionByEmail(email, customerId)
 
 def getSubscriptionPlan(sub: Subscription): Option[Plan] =
@@ -228,7 +231,7 @@ def handleSubscriptionUpdate(
   necessaryData match
     case (Some(_), Some(email), Some(plan)) =>
       cancelPlanByMail(email, customerId, (plan))
-    case _ => EitherT.leftT(s"Missing data: ${necessaryData}")
+    case _ => EitherT.leftT[IO, Unit](s"Missing data: ${necessaryData}")
 
 def handleDeleted(
     eventObj: StripeObject
@@ -243,12 +246,12 @@ def handleDeleted(
   ) match
     case (Some(email), Some(planId)) =>
       cancelPlanByMail(email, customer.getId, (planId))
-    case _ => EitherT.leftT(s"Missing data: ${customer}")
+    case _ => EitherT.leftT[IO, Unit](s"Missing data: ${customer}")
 
 def handleEvent(
     eventRaw: String,
     sigHeader: String
-) = Sync[IO]
+): EitherT[IO, String, String] = Sync[IO]
   .blocking {
     val event = Webhook.constructEvent(
       eventRaw,
@@ -269,11 +272,12 @@ def handleEvent(
       // Checkout completed: update, renew or create
       case "checkout.session.completed" =>
         handleCheckoutCompleted(stripeObject)
-      case _ => EitherT.leftT("Unhandled event type: " + event.getType)
+      case _ =>
+        EitherT.leftT[IO, Unit]("Unhandled event type: " + event.getType)
 
   }
   .flatten
-  .attemptTap(x => IO(logger.info(x.toString())))
+  .attemptTap(x => IO(logger.info(x.toString)))
   .asEitherT
-  .flatMap(_ => Either.rightT("OK"))
+  .map(_ => "OK")
   .attempt

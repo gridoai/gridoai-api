@@ -30,9 +30,8 @@ enum FileUploadError:
   case UnknownError(m: String)
   case UnauthorizedError(m: String)
 
-val fileUploadEndpoint: SecuredEndpoint[FileUpload, List[
-  Either[FileUploadError, String]
-] | String, Unit, Any] =
+val fileUploadEndpoint
+    : SecuredEndpoint[FileUpload, List[FileUploadError] | String, Unit, Any] =
   auth.securedWithBearer.post
     .name("File Upload")
     .in("upload")

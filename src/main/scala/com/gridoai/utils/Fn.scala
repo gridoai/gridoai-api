@@ -143,6 +143,12 @@ def partitionEithers[E, T](list: List[Either[E, T]]): Either[List[E], List[T]] =
   val (lefts, rights) = list.partitionMap(identity)
   if (lefts.isEmpty) Right(rights) else Left(lefts)
 
+extension [E, T, F[_]](x: List[EitherT[F, E, T]])
+  def partitionEitherTs(implicit
+      F: Monad[F]
+  ): EitherT[F, List[E], List[T]] =
+    x.traverse(_.value).map(partitionEithers).asEitherT
+
 def executeByParts[T, E, V](
     f: List[T] => EitherT[IO, E, List[V]],
     partitionSize: Int

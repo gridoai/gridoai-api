@@ -46,46 +46,45 @@ def notifySearchProgress[L, R](queries: List[String], userId: String)(
 )(implicit
     ns: NotificationService[IO]
 ): EitherT[IO, L, R] =
-  (for
-    _ <- notifySearch(
+  EitherT:
+    notifySearch(
       SearchReport(queries = queries, status = SearchStatus.Started),
       userId
-    ).start
-    res <- io
-    - <- notifySearch(
-      SearchReport(queries = queries, status = SearchStatus.Success),
-      userId
-    ).start
-  yield res).leftFlatMap: e =>
-    for
-      _ <- notifySearch(
-        SearchReport(queries = queries, status = SearchStatus.Failure),
-        userId
-      ).start
-      err = e
-    yield err
+    ).value.start >>
+      io.value
+        .flatMapRight: res =>
+          notifySearch(
+            SearchReport(queries = queries, status = SearchStatus.Success),
+            userId
+          ).value.start >> IO.pure(res.asRight)
+        .flatMapLeft: e =>
+          notifySearch(
+            SearchReport(queries = queries, status = SearchStatus.Failure),
+            userId
+          ).value.start >> IO.pure(e.asLeft)
 
 def notifyUploadProgress[L, R](id: String)(
     io: => EitherT[IO, L, R]
 )(implicit
     ns: NotificationService[IO]
-): EitherT[IO, String, Unit] =
-  (for
-    _ <- notifyUpload(
+): EitherT[IO, L, Unit] =
+  EitherT:
+    notifyUpload(
       UploadStatus.Processing,
       id
-    )
-    res <- io
-    _ <- notifyUpload(
-      UploadStatus.Success,
-      id
-    )
-  yield res)
-    .leftFlatMap(e =>
-      notifyUpload(
-        UploadStatus.Failure,
-        id
-      )
-    )
-    .start
-    >> EitherT.rightT(())
+    ).value >>
+      io.value
+        .flatMapRight(_ =>
+          notifyUpload(
+            UploadStatus.Success,
+            id
+          ).value
+        )
+        .flatMapLeft(e =>
+          notifyUpload(
+            UploadStatus.Failure,
+            id
+          ).value
+        )
+        .start
+      >> IO.pure(Right(()))

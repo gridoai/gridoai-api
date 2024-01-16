@@ -81,17 +81,16 @@ object GoogleClient:
 
     buildGoogleAuthorizationCodeFlow(scopes)
       .pure[IO]
-      .flatMapRight: flow =>
+      .asEitherT
+      .flatMap: flow =>
         logger.info("Google authorization code flow builded.")
         logger.info("Sending request to get token...")
-        flowAndCodeToTokens(flow, code, redirectUri).value.map(_.flatMap: t =>
+        flowAndCodeToTokens(flow, code, redirectUri).flatMapEither: t =>
           logger.info("Tokens got!")
           Option(t.getRefreshToken) match
             case Some(refreshToken) =>
               Right((t.getAccessToken, refreshToken))
             case None => Left("Missing refresh token")
-        )
-      .asEitherT
 
   def refreshToken(
       refreshToken: String

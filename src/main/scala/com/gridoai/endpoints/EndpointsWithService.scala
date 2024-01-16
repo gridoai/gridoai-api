@@ -1,20 +1,25 @@
 package com.gridoai.endpoints
 
+import cats.effect.IO
+import cats.data.EitherT
+import sttp.tapir.server.ServerEndpoint
+import sttp.tapir.swagger.bundle.SwaggerInterpreter
+
 import com.gridoai.models.DocDB
 import com.gridoai.models.MessageDB
 import com.gridoai.services.doc.*
 import com.gridoai.services.doc.GDrive.*
-import cats.effect.IO
-import sttp.tapir.server.ServerEndpoint
 import com.gridoai.services.payments.createBillingSession
 import com.gridoai.adapters.stripe
 import com.gridoai.adapters.whatsapp.Whatsapp
 import com.gridoai.services.messageInterface.handleWebhook
 import com.gridoai.services.notifications.createNotificationServiceToken
-import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.notifications.WhatsAppNotificationService
 import com.gridoai.adapters.emailApi.EmailAPI
+
+implicit def toFEither[A, B, F[_]](a: EitherT[F, A, B]): F[Either[A, B]] =
+  a.value
 
 class withService(implicit
     db: DocDB[IO],
@@ -27,20 +32,16 @@ class withService(implicit
     searchEndpoint.serverLogic(searchDoc _)
 
   def webHooksStripeEndpoint =
-    webhooksStripe.serverLogic(
-      stripe.handleEvent _
-    )
+    webhooksStripe.serverLogic[IO](stripe.handleEvent _)
 
   def webHooksWhatsappChallengeEndpoint =
-    webhooksWhatsappChallenge.serverLogic(
-      Whatsapp.handleChallenge(_).value
+    webhooksWhatsappChallenge.serverLogic[IO](
+      Whatsapp.handleChallenge _
     )
 
   def webHooksWhatsappEndpoint =
     implicit val ns: NotificationService[IO] = WhatsAppNotificationService[IO]
-    webhooksWhatsapp.serverLogic(
-      handleWebhook _
-    )
+    webhooksWhatsapp.serverLogic[IO](handleWebhook _)
 
   def healthCheck =
     healthCheckEndpoint.serverLogic(_ => IO.pure(Right("OK")))
@@ -56,7 +57,7 @@ class withService(implicit
 
   def authNotification =
     notificationAuthEndpoint.serverLogic(authData =>
-      _ => createNotificationServiceToken(authData)
+      _ => createNotificationServiceToken(authData).value
     )
 
   def listDocs =
@@ -66,7 +67,7 @@ class withService(implicit
     authGDriveEndpoint.serverLogic(GDrive.auth _)
 
   def importGDriveDocs =
-    importGDriveEndpoint.serverLogic(GDrive.importDocs)
+    importGDriveEndpoint.serverLogic(GDrive.importDocs _)
 
   def askLLM =
     askEndpoint.serverLogic(ask _)

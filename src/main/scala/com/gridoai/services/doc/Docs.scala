@@ -131,7 +131,7 @@ def extractAndCleanText(
 ): EitherT[IO, ExtractTextError, String] =
   extractText(name, body, format).map(filterNonUtf8)
 
-type FileUpErr = List[Either[FileUploadError, String]]
+type FileUpErr = List[FileUploadError]
 type FileUpOutput = List[String]
 
 def parseFileForPersistence(
@@ -157,7 +157,7 @@ def saveUploadedDocs(auth: AuthData)(
 ): EitherT[IO, FileUpErr, FileUpOutput] =
   createDocs(auth)(payloads, Source.Upload)
     .map(_.map(_.uid.toString))
-    .leftMap(e => List(FileUploadError.DocumentCreationError(e).asLeft))
+    .leftMap(e => List(FileUploadError.DocumentCreationError(e)))
 
 def uploadDocuments(auth: AuthData)(source: FileUpload)(using
     db: DocDB[IO],
@@ -165,15 +165,16 @@ def uploadDocuments(auth: AuthData)(source: FileUpload)(using
 ): EitherT[IO, FileUpErr, Unit] =
   limitRole(
     auth.role,
-    (Left(List(Left(UnauthorizedError(authErrorMsg(Some(auth.role))))))
-      .pure[IO])
+    Left(List(UnauthorizedError(authErrorMsg(auth.role.some))))
+      .pure[IO]
       .asEitherT
   ):
     logger.info(s"Uploading files... ${source.files.length}")
 
     notifyUploadProgress(auth.userId):
       source.files
-        .traverse(parseFileForPersistence)
+        .map(parseFileForPersistence)
+        .partitionEitherTs
         .flatMap(saveUploadedDocs(auth))
 
 def listDocuments(auth: AuthData)(

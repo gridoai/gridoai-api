@@ -162,7 +162,7 @@ class DocumentModel extends CatsEffectSuite {
         case ((docId, orgId, role), expected) =>
           val result = DocsDB.deleteDocument(docId, orgId, role)
           assertIO(
-            result.mapLeft(_.split(" ", 2).last),
+            result.leftMap(_.split(" ", 2).last),
             expected,
             s"Failed for $docId, $orgId, $role"
           )

@@ -71,9 +71,10 @@ object EmbaasClient:
           _.body.flatMap(decode[EmbeddingResponse](_))
         )
         .timeoutTo(20.seconds, IO.pure(Left("Embaas API Timeout")))
+        .asEitherT
 
       response
-        .mapRight: r =>
+        .map: r =>
           r.data
             .sortBy(_.index)
             .map(d =>
@@ -81,6 +82,5 @@ object EmbaasClient:
             )
             .traceFn: e =>
               s"input batch size: ${texts.length}, output batch size: ${e.length}"
-        .mapLeft(_.toString)
-        .asEitherT
+        .leftMap(_.toString)
         .attempt
