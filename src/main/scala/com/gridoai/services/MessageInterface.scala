@@ -156,7 +156,7 @@ def authFlow(from: String, to: String, message: String = "")(implicit
           case WhatsAppState.Authenticated =>
             logger.info(s"Failed to find the user: $e")
             Whatsapp.sendMessage(to, from, deletedUserMessage)
-        .mapRight(_ => None)
+        .map(_ => None)
 
 def sendVerificationCode(
     email: String,

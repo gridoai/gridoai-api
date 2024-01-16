@@ -21,8 +21,7 @@ import sttp.tapir.integ.cats.effect.CatsMonadError
 import sttp.tapir.server.stub.TapirStubInterpreter
 import sttp.tapir.server.ServerEndpoint
 import com.gridoai.models.PostgresClient
-import com.gridoai.utils.|>
-import com.gridoai.utils.mapRight
+import com.gridoai.utils._
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.notifications.MockedNotificationService
 import com.gridoai.utils.LRUCache
@@ -116,7 +115,7 @@ class API extends CatsEffectSuite {
     assertIO(
       authenticatedRequest
         .trace("document search response")
-        .mapRight(_.isEmpty),
+        .map(_.isEmpty),
       Right(false)
     )
   }

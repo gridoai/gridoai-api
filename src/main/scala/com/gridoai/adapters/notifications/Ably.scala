@@ -27,27 +27,31 @@ class AblyNotificationService[F[_]: Async]() extends NotificationService[F]:
       topic: String,
       channelName: String,
       content: String
-  ): EitherT[F, String, Unit] =
-    val channel = ablyClient.channels.get(channelName)
-    Async[F]
-      .async_ : callback =>
-        try
-          channel.publishAsync(
-            topic,
-            content,
-            new CompletionListener():
-              override def onSuccess(): Unit =
-                logger.info(s"Notification sent to $channelName")
-                callback(Right(Right(())))
+  ): EitherT[F, String, Unit] = sendNt(topic, channelName, content).asEitherT
 
-              override def onError(reason: ErrorInfo): Unit =
-                logger.error(
-                  s"Notification failed to send to $channelName: ${reason.message}"
-                )
-                callback(Left(new Exception(reason.message)))
-          )
-        catch case ex => Left(ex.getMessage)
-    // .asEitherT
+  def sendNt(
+      topic: String,
+      channelName: String,
+      content: String
+  ): F[Either[String, Unit]] =
+    val channel = ablyClient.channels.get(channelName)
+    Async[F].async_ : callback =>
+      try
+        channel.publishAsync(
+          topic,
+          content,
+          new CompletionListener():
+            override def onSuccess(): Unit =
+              logger.info(s"Notification sent to $channelName")
+              callback(Right(Right(())))
+
+            override def onError(reason: ErrorInfo): Unit =
+              logger.error(
+                s"Notification failed to send to $channelName: ${reason.message}"
+              )
+              callback(Left(new Exception(reason.message)))
+        )
+      catch case ex => Left(ex.getMessage)
 
 def generateToken[F[_]: Sync](clientId: String) =
   Sync[F]
@@ -55,7 +59,8 @@ def generateToken[F[_]: Sync](clientId: String) =
       try
         val tokenParams = TokenParams()
         tokenParams.clientId = clientId
-        tokenParams.capability = s"""{"$clientId:*":["publish","subscribe"]}"""
+        tokenParams.ttl = 86400000 // 1 day
+        tokenParams.capability = s"""{"$clientId:*":["subscribe"]}"""
         val authOptions = AuthOptions()
         val tokenRequest =
           ablyClient.auth.requestToken(tokenParams, null)
