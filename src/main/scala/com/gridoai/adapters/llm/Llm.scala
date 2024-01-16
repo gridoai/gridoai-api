@@ -1,15 +1,13 @@
 package com.gridoai.adapters.llm
 
 import cats.effect.IO
-import com.gridoai.domain.Message
-import com.gridoai.domain.Chunk
-import com.gridoai.domain.LLMModel
-import com.gridoai.domain.Action
+import cats.data.EitherT
+import com.gridoai.domain._
 import com.gridoai.adapters.openAiClientBackend
+import com.gridoai.adapters.syncCatsBackend
 import com.gridoai.adapters.llm.chatGPT.ChatGPTClient
 import com.gridoai.adapters.llm.palm2.Paml2Client
 import com.gridoai.adapters.llm.mocked.MockLLM
-import com.gridoai.adapters.syncCatsBackend
 
 trait LLM[F[_]]:
   def calculateChunkTokenQuantity(chunk: Chunk): Int
@@ -22,24 +20,24 @@ trait LLM[F[_]]:
       queries: List[String],
       chunks: List[Chunk],
       options: List[Action]
-  ): F[Either[String, Action]]
+  ): EitherT[F, String, Action]
   def ask(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): F[Either[String, String]]
+  ): EitherT[F, String, String]
   def answer(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): F[Either[String, String]]
+  ): EitherT[F, String, String]
   def buildQueriesToSearchDocuments(
       messages: List[Message],
       lastQueries: List[String],
       lastChunks: List[Chunk]
-  ): F[Either[String, List[String]]]
+  ): EitherT[F, String, List[String]]
 
 def getLLMByName(llm: LLMModel): LLM[IO] =
   llm match

@@ -1,15 +1,16 @@
 package com.gridoai.models
 
+import cats.implicits._
+import cats.Monad
+import cats.data.EitherT
+import org.slf4j.LoggerFactory
+import java.util.UUID
+
 import com.gridoai.domain.Message
 import com.gridoai.utils._
 import com.gridoai.domain.AskResponse
 import com.gridoai.domain.MessageFrom
 import com.gridoai.domain.WhatsAppState
-
-import cats.implicits._
-import cats.Monad
-import org.slf4j.LoggerFactory
-import java.util.UUID
 
 trait MessageDB[F[_]]:
 
@@ -18,34 +19,34 @@ trait MessageDB[F[_]]:
       orgId: String,
       userId: String,
       conversationId: String
-  ): F[Either[String, List[Message]]]
+  ): EitherT[F, String, List[Message]]
 
   def appendMessage(orgId: String, userId: String, conversationId: String)(
       message: Message
-  ): F[Either[String, Message]]
+  ): EitherT[F, String, Message]
 
   def updateLastMessage(orgId: String, userId: String, conversationId: String)(
       message: Message
-  ): F[Either[String, Message]]
+  ): EitherT[F, String, Message]
 
   def getWhatsAppMessageIds(
       phoneNumber: String
-  ): F[Either[String, List[String]]]
+  ): EitherT[F, String, List[String]]
 
   def appendWhatsAppMessageId(
       phoneNumber: String,
       timestamp: Long,
       id: String
-  ): F[Either[String, String]]
+  ): EitherT[F, String, String]
 
   def getWhatsAppState(
       phoneNumber: String
-  ): F[Either[String, WhatsAppState]]
+  ): EitherT[F, String, WhatsAppState]
 
   def setWhatsAppState(
       phoneNumber: String,
       state: WhatsAppState
-  ): F[Either[String, Unit]]
+  ): EitherT[F, String, Unit]
 
 val logger = LoggerFactory.getLogger(getClass.getName)
 
@@ -55,20 +56,20 @@ def ignoreMessageByCache[F[_]: Monad](
     id: String
 )(implicit
     messageDb: MessageDB[F]
-): F[Either[String, Option[List[String]]]] = synchronized:
+): EitherT[F, String, Option[List[String]]] = synchronized:
   messageDb
     .getWhatsAppMessageIds(phoneNumber)
-    .flatMapRight: receivedIds =>
+    .flatMap: receivedIds =>
       if (receivedIds contains id)
         logger.info(
           "The message was already received, so it will be ignored."
         )
-        None.asRight.pure[F]
+        EitherT.rightT(None)
       else
         logger.info("The message is new.")
         messageDb
           .appendWhatsAppMessageId(phoneNumber, timestamp, id)
-          .mapRight(_ => Some(receivedIds :+ id))
+          .map(_ => Some(receivedIds :+ id))
 
 def storeMessage[F[_]: Monad](
     orgId: String,
@@ -76,10 +77,10 @@ def storeMessage[F[_]: Monad](
     message: Message
 )(implicit
     messageDb: MessageDB[F]
-): F[Either[String, List[Message]]] = synchronized:
+): EitherT[F, String, List[Message]] = synchronized:
   messageDb
     .getMessages(orgId, userId, "whatsapp")
-    .flatMapRight:
+    .flatMap:
       case oldMessages :+ Message(
             MessageFrom.User,
             lastMessage,
@@ -95,12 +96,12 @@ def storeMessage[F[_]: Monad](
         )
         messageDb
           .updateLastMessage(orgId, userId, "whatsapp")(updatedMessage)
-          .mapRight(_ => oldMessages :+ updatedMessage)
+          .map(_ => oldMessages :+ updatedMessage)
       case oldMessages =>
         logger.info("Appending new message...")
         messageDb
           .appendMessage(orgId, userId, "whatsapp")(message)
-          .mapRight(_ => oldMessages :+ message)
+          .map(_ => oldMessages :+ message)
 
 def checkOutOfSyncResult[F[_]: Monad](
     orgId: String,
@@ -111,10 +112,10 @@ def checkOutOfSyncResult[F[_]: Monad](
     response: AskResponse
 )(implicit
     messageDb: MessageDB[F]
-): F[Either[String, AskResponse]] = synchronized:
+): EitherT[F, String, AskResponse] = synchronized:
   messageDb
     .getWhatsAppMessageIds(phoneNumber)
-    .flatMapRight: newIds =>
+    .flatMap: newIds =>
       if (newIds == initialIds)
         logger.info(
           "No new message identified. Registering and sending the answer."
@@ -123,7 +124,7 @@ def checkOutOfSyncResult[F[_]: Monad](
           .appendMessage(orgId, userId, "whatsapp")(
             Message(MessageFrom.Bot, response.message)
           )
-          .mapRight(_ => response)
+          .map(_ => response)
       else
         logger.info("New message identified. Ignoring results...")
-        Left("New message identified").pure[F]
+        EitherT.leftT("New message identified")

@@ -1,15 +1,14 @@
 package com.gridoai.adapters.whatsapp
 
-import com.gridoai.utils.*
 import cats.effect.IO
 import cats.implicits._
-import com.gridoai.adapters.*
-import com.gridoai.domain.*
-import io.circe.generic.auto.*
-import io.circe.parser.*
-import io.circe.*
-import io.circe.syntax.*
-import sttp.model.{Header, MediaType}
+import cats.data.EitherT
+import io.circe.generic.auto._
+import io.circe.parser._
+import io.circe._
+import io.circe.syntax._
+import sttp.model.Header
+import sttp.model.MediaType
 import io.circe.derivation.Configuration
 import io.circe.derivation.ConfiguredEnumCodec
 import org.slf4j.LoggerFactory
@@ -18,6 +17,10 @@ import scala.util.Using
 import java.net.HttpURLConnection
 import cats.effect.kernel.Sync
 import sttp.client3._
+
+import com.gridoai.utils._
+import com.gridoai.adapters._
+import com.gridoai.domain._
 
 val WHATSAPP_ACCESS_TOKEN =
   sys.env.getOrElse("WHATSAPP_ACCESS_TOKEN", "")
@@ -141,7 +144,7 @@ object Whatsapp:
       from: String,
       to: String,
       message: String
-  ): IO[Either[String, Unit]] =
+  ): EitherT[IO, String, Unit] =
     val body = SendMessageRequest(to, Text(message)).asJson.noSpaces
     Http
       .post(s"$from/messages?access_token=$WHATSAPP_ACCESS_TOKEN")
@@ -153,9 +156,11 @@ object Whatsapp:
         response.body.flatMap(
           decode[SendMessageResponse](_).left.map(_.getMessage())
         )
-      .mapRight(_ => ()) |> attempt
+      .asEitherT
+      .map(_ => ())
+      .attempt
 
-  def retrieveMediaUrl(mediaId: String): IO[Either[String, String]] =
+  def retrieveMediaUrl(mediaId: String): EitherT[IO, String, String] =
     Http
       .get(mediaId)
       .headers(
@@ -169,9 +174,11 @@ object Whatsapp:
         response.body.flatMap(
           decode[RetrieveMediaUrlResponse](_).left.map(_.getMessage())
         )
-      .mapRight(_.url) |> attempt
+      .asEitherT
+      .map(_.url)
+      .attempt
 
-  def downloadMedia(url: String): IO[Either[String, Array[Byte]]] =
+  def downloadMedia(url: String): EitherT[IO, String, Array[Byte]] =
     HttpClient(url)
       .get("")
       .headers(
@@ -185,15 +192,19 @@ object Whatsapp:
       )
       .response(asByteArray)
       .sendReq()
-      .map(_.body) |> attempt
+      .map(_.body)
+      .asEitherT
+      .attempt
 
   def handleChallenge(
       verify_token: String,
       challenge: String
-  ): IO[Either[String, String]] =
-    IO.pure:
-      if (verify_token == WHATSAPP_VERIFY_TOKEN) Right(challenge)
-      else Left("Invalid VERIFY TOKEN")
+  ): EitherT[IO, String, String] =
+    IO
+      .pure:
+        if (verify_token == WHATSAPP_VERIFY_TOKEN) Right(challenge)
+        else Left("Invalid VERIFY TOKEN")
+      .asEitherT
 
   def parseWebhook(
       payload: WebhookPayload

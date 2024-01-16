@@ -1,5 +1,12 @@
 package com.gridoai.services.messageInterface
 
+import cats.effect.IO
+import cats.implicits._
+import cats.data.EitherT
+import java.util.UUID
+import scala.util.Random
+import org.slf4j.LoggerFactory
+
 import com.gridoai.utils._
 import com.gridoai.adapters.whatsapp.Whatsapp
 import com.gridoai.adapters.notifications.MockedNotificationService
@@ -9,8 +16,6 @@ import com.gridoai.adapters.clerk.ClerkClient
 import com.gridoai.services.doc.buildAnswer
 import com.gridoai.services.doc.extractAndCleanText
 import com.gridoai.services.doc.createOrUpdateFiles
-import cats.effect.IO
-import cats.implicits._
 import com.gridoai.auth.AuthData
 import com.gridoai.domain._
 import com.gridoai.models.DocDB
@@ -18,10 +23,7 @@ import com.gridoai.models.MessageDB
 import com.gridoai.models.checkOutOfSyncResult
 import com.gridoai.models.ignoreMessageByCache
 import com.gridoai.models.storeMessage
-import org.slf4j.LoggerFactory
 import com.gridoai.parsers.FileFormat
-import java.util.UUID
-import scala.util.Random
 
 val logger = LoggerFactory.getLogger(getClass.getName)
 
@@ -37,12 +39,13 @@ def handleWebhook(
     messageDb: MessageDB[IO],
     ns: NotificationService[IO],
     emailApi: EmailAPI[IO]
-): IO[Either[String, Unit]] =
+): EitherT[IO, String, Unit] =
   Whatsapp
     .parseWebhook(payload)
     .pure[IO]
-    .flatMapRight:
-      case MessageInterfacePayload.StatusChanged => IO.pure(Right("Ignored"))
+    .asEitherT
+    .flatMap:
+      case MessageInterfacePayload.StatusChanged => EitherT.rightT(())
       case MessageInterfacePayload.FileUpload(
             from,
             to,
@@ -51,8 +54,8 @@ def handleWebhook(
             mimeType
           ) =>
         logger.info("File received via WhatsApp...")
-        authFlow(from, to).flatMapRight:
-          case None => ().asRight.pure[IO]
+        authFlow(from, to).flatMap:
+          case None => EitherT.rightT(())
           case Some(auth) =>
             handleUpload(auth, from, to, mediaId, filename, mimeType)
 
@@ -64,11 +67,11 @@ def handleWebhook(
             timestamp
           ) =>
         logger.info("Message received via WhatsApp...")
-        ignoreMessageByCache[IO](from, timestamp, id).flatMapRight:
-          case None => ().asRight.pure[IO]
+        ignoreMessageByCache[IO](from, timestamp, id).flatMap:
+          case None => EitherT.rightT(())
           case Some(ids) =>
-            authFlow(from, to, message).flatMapRight:
-              case None => ().asRight.pure[IO]
+            authFlow(from, to, message).flatMap:
+              case None => EitherT.rightT(())
               case Some(auth) =>
                 handleMessage(auth, from, to, ids)(
                   Message(MessageFrom.User, message, id, timestamp)
@@ -77,93 +80,82 @@ def handleWebhook(
 def authFlow(from: String, to: String, message: String = "")(implicit
     messageDb: MessageDB[IO],
     emailApi: EmailAPI[IO]
-): IO[Either[String, Option[AuthData]]] =
+): EitherT[IO, String, Option[AuthData]] =
   getAuthData(from)
-    .mapRight(_.some)
-    .flatMapLeft: e =>
+    .map(_.some)
+    .leftFlatMap: e =>
       logger.info("User not found.")
       messageDb
         .getWhatsAppState(from)
-        .flatMapRight:
+        .flatMap:
           case WhatsAppState.NotAuthenticated =>
             logger.info("User not authenticated yet.")
-            Whatsapp
-              .sendMessage(to, from, askEmailMessage)
-              .flatMapRight(_ =>
-                messageDb
-                  .setWhatsAppState(from, WhatsAppState.WaitingEmail)
-              )
+            for
+              _ <- Whatsapp.sendMessage(to, from, askEmailMessage)
+              x <- messageDb.setWhatsAppState(from, WhatsAppState.WaitingEmail)
+            yield x
           case WhatsAppState.WaitingEmail =>
             val email = message.strip
             if (!isEmailValid(email))
               logger.info(s"Invalid email: $email")
-              Whatsapp
-                .sendMessage(to, from, askEmailMessage)
+              Whatsapp.sendMessage(to, from, askEmailMessage)
             else
               logger.info(
                 s"User provided a valid email ($email), verifying if already exists..."
               )
-              ClerkClient.user
-                .byEmail(email)
-                .flatMapRight(_ =>
-                  Whatsapp
-                    .sendMessage(
-                      to,
-                      from,
-                      s"Você já tem uma conta. Acesse gridoai.com e adicione sincronize seu número de celular! 😊"
-                    )
+              (for
+                _ <- ClerkClient.user.byEmail(email)
+                x <- Whatsapp.sendMessage(
+                  to,
+                  from,
+                  s"Você já tem uma conta. Acesse gridoai.com e adicione sincronize seu número de celular! 😊"
                 )
-                .flatMapLeft: e =>
-                  if (e != "No user found") e.asLeft.pure[IO]
-                  else sendVerificationCode(email, from, to)
+              yield x).leftFlatMap: e =>
+                if (e != "No user found") EitherT.leftT(e)
+                else sendVerificationCode(email, from, to)
           case WhatsAppState.WaitingVerificationCode(email, code, expiration) =>
             if (expiration < System.currentTimeMillis)
-              Whatsapp
-                .sendMessage(
+              for
+                _ <- Whatsapp.sendMessage(
                   to,
                   from,
                   "Seu código expirou. Vou te enviar outro."
                 )
-                .flatMapRight(_ => sendVerificationCode(email, from, to))
+                x <- sendVerificationCode(email, from, to)
+              yield x
             else if (code != message.strip)
-              Whatsapp
-                .sendMessage(
-                  to,
-                  from,
-                  "Código incorreto. Tente novamente."
-                )
+              Whatsapp.sendMessage(
+                to,
+                from,
+                "Código incorreto. Tente novamente."
+              )
             else
               val password = Random.alphanumeric.take(10).mkString
-              Whatsapp
-                .sendMessage(
+              (for
+                _ <- Whatsapp.sendMessage(
                   to,
                   from,
                   "Obrigado, estou criando sua conta... ⌛"
                 )
-                .flatMapRight(_ =>
-                  ClerkClient.user.create(from, email, password)
+                _ <- ClerkClient.user.create(from, email, password)
+                _ <- Whatsapp.sendMessage(
+                  to,
+                  from,
+                  s"Conta criada com a senha $password! Me faça uma pergunta para testar. 😊"
                 )
-                .flatMapRight(_ =>
-                  Whatsapp.sendMessage(
-                    to,
-                    from,
-                    s"Conta criada com a senha $password! Me faça uma pergunta para testar. 😊"
-                  )
+                x <- messageDb.setWhatsAppState(
+                  from,
+                  WhatsAppState.Authenticated
                 )
-                .flatMapRight(_ =>
-                  messageDb
-                    .setWhatsAppState(from, WhatsAppState.Authenticated)
+              yield x).leftFlatMap: e =>
+                Whatsapp.sendMessage(
+                  to,
+                  from,
+                  s"Tive um problema e não consegui criar sua conta. 😔\n Erro: $e"
                 )
-                .flatMapLeft: e =>
-                  Whatsapp.sendMessage(
-                    to,
-                    from,
-                    s"Tive um problema e não consegui criar sua conta. 😔\n Erro: $e"
-                  )
           case WhatsAppState.Authenticated =>
             logger.info(s"Failed to find the user: $e")
-            Whatsapp
-              .sendMessage(to, from, deletedUserMessage)
+            Whatsapp.sendMessage(to, from, deletedUserMessage)
         .mapRight(_ => None)
 
 def sendVerificationCode(
@@ -173,35 +165,29 @@ def sendVerificationCode(
 )(implicit
     emailApi: EmailAPI[IO],
     messageDb: MessageDB[IO]
-): IO[Either[String, Unit]] =
+): EitherT[IO, String, Unit] =
   val code = (1 to 6).map(_ => Random.nextInt(10)).mkString
   val expiration = System.currentTimeMillis + 1000 * 60 * 10
   val emailMessage = s"$code é seu código de verificação"
-  emailApi
-    .sendEmail(email, emailMessage, emailMessage)
-    .flatMapRight(_ =>
-      Whatsapp
-        .sendMessage(
-          to,
-          from,
-          "Enviei um código de verificação para seu email. Digite ele aqui."
-        )
+  (for
+    _ <- emailApi.sendEmail(email, emailMessage, emailMessage)
+    _ <- Whatsapp.sendMessage(
+      to,
+      from,
+      "Enviei um código de verificação para seu email. Digite ele aqui."
     )
-    .flatMapRight(_ =>
-      messageDb
-        .setWhatsAppState(
-          from,
-          WhatsAppState
-            .WaitingVerificationCode(email, code, expiration)
-        )
+    x <- messageDb.setWhatsAppState(
+      from,
+      WhatsAppState
+        .WaitingVerificationCode(email, code, expiration)
     )
-    .flatMapLeft: e =>
-      Whatsapp
-        .sendMessage(
-          to,
-          from,
-          s"Tive um problema e não consegui te enviar o código de verificação por email. 😔\nContate o suporte com o seguinte erro:\n$e"
-        )
+  yield x).leftFlatMap: e =>
+    Whatsapp
+      .sendMessage(
+        to,
+        from,
+        s"Tive um problema e não consegui te enviar o código de verificação por email. 😔\nContate o suporte com o seguinte erro:\n$e"
+      )
 
 def handleUpload(
     auth: AuthData,
@@ -213,41 +199,39 @@ def handleUpload(
 )(implicit
     docDb: DocDB[IO],
     messageDb: MessageDB[IO]
-): IO[Either[String, Unit]] =
-  Whatsapp
-    .sendMessage(
+): EitherT[IO, String, Unit] =
+  (for
+    _ <- Whatsapp.sendMessage(
       to,
       from,
       "Recebi seu arquivo, vou tentar processá-lo... ⌛"
     )
-    .flatMapRight(_ => Whatsapp.retrieveMediaUrl(mediaId))
-    .traceRight(url => s"download url: $url")
-    .flatMapRight(Whatsapp.downloadMedia)
-    .flatMapRight: body =>
-      extractAndCleanText(
-        filename,
-        body,
-        Some(FileFormat.fromString(mimeType))
-      )
-    .mapLeft(_.toString)
-    .mapRight: content =>
-      List(
-        Document(
-          uid = UUID.randomUUID(),
-          name = filename,
-          source = Source.WhatsApp(mediaId),
-          content = content
+    url <- Whatsapp.retrieveMediaUrl(mediaId)
+    _ = println(s"download url: $url")
+    body <- Whatsapp.downloadMedia(url)
+    docs <- extractAndCleanText(
+      filename,
+      body,
+      Some(FileFormat.fromString(mimeType))
+    ).leftMap(_.toString)
+      .map: content =>
+        List(
+          Document(
+            uid = UUID.randomUUID(),
+            name = filename,
+            source = Source.WhatsApp(mediaId),
+            content = content
+          )
         )
-      )
-    .flatMapRight(createOrUpdateFiles(auth))
-    .flatMapRight(_ => Whatsapp.sendMessage(to, from, "Consegui! 🥳"))
-    .flatMapLeft: e =>
-      logger.info(e)
-      Whatsapp.sendMessage(
-        to,
-        from,
-        "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
-      )
+    _ <- createOrUpdateFiles(auth)(docs)
+    x <- Whatsapp.sendMessage(to, from, "Consegui! 🥳")
+  yield x).leftFlatMap: e =>
+    logger.info(e)
+    Whatsapp.sendMessage(
+      to,
+      from,
+      "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
+    )
 
 def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
     message: Message
@@ -255,24 +239,22 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
     docDb: DocDB[IO],
     messageDb: MessageDB[IO],
     ns: NotificationService[IO]
-): IO[Either[String, Unit]] =
-  storeMessage[IO](auth.orgId, auth.userId, message)
-    .flatMapRight: messages =>
-      buildAnswer(auth)(messages, true, None, false)
-    .flatMapRight(
-      checkOutOfSyncResult[IO](
-        auth.orgId,
-        auth.userId,
-        from,
-        ids
-      )
+): EitherT[IO, String, Unit] =
+  for
+    messages <- storeMessage[IO](auth.orgId, auth.userId, message)
+    response <- buildAnswer(auth)(messages, true, None, false)
+    validatedResponse <- checkOutOfSyncResult[IO](
+      auth.orgId,
+      auth.userId,
+      from,
+      ids
+    )(response)
+    x <- Whatsapp.sendMessage(
+      to,
+      from,
+      validatedResponse |> formatMessage
     )
-    .flatMapRight: response =>
-      Whatsapp.sendMessage(
-        to,
-        from,
-        response |> formatMessage
-      )
+  yield x
 
 def formatMessage(askResponse: AskResponse): String =
   if (askResponse.sources.isEmpty) askResponse.message
@@ -297,10 +279,10 @@ def calcPhoneVariants(phoneNumber: String): List[String] =
 
 def getAuthData(
     phoneNumber: String
-): IO[Either[String, AuthData]] =
+): EitherT[IO, String, AuthData] =
   ClerkClient.user
     .byPhones(phoneNumber |> calcPhoneVariants)
-    .mapRight: user =>
+    .map: user =>
       AuthData(
         orgId = user.id,
         role = "admin",

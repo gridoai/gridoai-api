@@ -1,9 +1,12 @@
 package com.gridoai.adapters.llm.mocked
 
-import cats.*
-import cats.implicits.*
-import com.gridoai.domain.*
-import com.gridoai.adapters.llm.*
+import cats._
+import cats.implicits._
+import cats.data.EitherT
+
+import com.gridoai.domain._
+import com.gridoai.adapters.llm._
+import com.gridoai.utils._
 
 class MockLLM[F[_]: Applicative] extends LLM[F]:
 
@@ -18,28 +21,28 @@ class MockLLM[F[_]: Applicative] extends LLM[F]:
       queries: List[String],
       chunks: List[Chunk],
       options: List[Action]
-  ): F[Either[String, Action]] =
-    options.head.asRight.pure[F]
+  ): EitherT[F, String, Action] =
+    EitherT.rightT(options.head)
 
   def answer(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): F[Either[String, String]] =
-    Applicative[F].pure(Right("The response message."))
+  ): EitherT[F, String, String] =
+    EitherT.rightT("The response message.")
 
   def ask(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): F[Either[String, String]] =
-    Applicative[F].pure(Right("The response message."))
+  ): EitherT[F, String, String] =
+    EitherT.rightT("The response message.")
 
   def buildQueriesToSearchDocuments(
       messages: List[Message],
       lastQueries: List[String],
       lastChunks: List[Chunk]
-  ): F[Either[String, List[String]]] =
-    Applicative[F].pure(Right(List("The response message.")))
+  ): EitherT[F, String, List[String]] =
+    EitherT.rightT(List("The response message."))

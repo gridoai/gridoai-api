@@ -1,17 +1,18 @@
 package com.gridoai.adapters.embeddingApi
 
 import cats.effect.IO
+import cats.implicits._
+import cats.Monad
+import cats.data.EitherT
+
 import com.gridoai.domain.Embedding
 import com.gridoai.domain.Chunk
 import com.gridoai.adapters.HttpClient
-import com.gridoai.utils.fallbackEitherM
-import cats.implicits._
-import cats.Monad
-import com.gridoai.utils.|>
+import com.gridoai.utils._
 
 trait EmbeddingAPI[F[_]]:
-  def embedChats(texts: List[String]): F[Either[String, List[Embedding]]]
-  def embedChunks(chunks: List[Chunk]): F[Either[String, List[Embedding]]]
+  def embedChats(texts: List[String]): EitherT[F, String, List[Embedding]]
+  def embedChunks(chunks: List[Chunk]): EitherT[F, String, List[Embedding]]
 
 extension [F[_]: Monad](e: EmbeddingAPI[F])
   def withFallback(fallback: EmbeddingAPI[F]): EmbeddingAPI[F] =

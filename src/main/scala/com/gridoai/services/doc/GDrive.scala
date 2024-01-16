@@ -1,18 +1,20 @@
 package com.gridoai.services.doc
 
-import com.gridoai.domain.*
-import com.gridoai.auth.*
-import com.gridoai.models.*
-import com.gridoai.utils.*
-import com.gridoai.adapters.fileStorage.*
+import cats.effect.IO
+import cats.implicits._
+import cats.data.EitherT
+import java.util.UUID
+import org.slf4j.LoggerFactory
+
+import com.gridoai.domain._
+import com.gridoai.auth._
+import com.gridoai.models._
+import com.gridoai.utils._
+import com.gridoai.adapters.fileStorage._
 import com.gridoai.adapters.GoogleClient
 import com.gridoai.adapters.clerk.ClerkClient
 import com.gridoai.adapters.clerk.PublicMetadata
-import cats.effect.IO
-import cats.implicits.*
 import com.gridoai.parsers.FileFormat
-import java.util.UUID
-import org.slf4j.LoggerFactory
 import com.gridoai.endpoints.RefreshTokenPayload
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.services.notifications.notifyUploadProgress
@@ -22,10 +24,10 @@ object GDrive:
   def auth(auth: AuthData)(
       code: String,
       redirectUri: String
-  ): IO[Either[String, (String, String)]] =
+  ): EitherT[IO, String, (String, String)] =
     limitRole(
       auth.role,
-      Left(authErrorMsg(Some(auth.role))).pure[IO]
+      Left(authErrorMsg(Some(auth.role))).pure[IO].asEitherT
     ):
       logger.info("Authenticating gdrive...")
       GoogleClient
@@ -34,26 +36,24 @@ object GDrive:
           redirectUri,
           SCOPES
         )
-        .flatMapRight(ClerkClient.setGDriveMetadata(auth.userId))
+        .flatMap(ClerkClient.setGDriveMetadata(auth.userId))
 
-  def fetchUserTokens(auth: AuthData): IO[Either[String, (String, String)]] =
+  def fetchUserTokens(auth: AuthData): EitherT[IO, String, (String, String)] =
     ClerkClient.user
       .getPublicMetadata(auth.userId)
-      .flatMapRight:
-        case PublicMetadata(Some(x), Some(y), _, _) => Right((x, y)).pure[IO]
-        case _ => Left("Make Google Drive authentication first").pure[IO]
+      .flatMapEither:
+        case PublicMetadata(Some(x), Some(y), _, _) => Right((x, y))
+        case _ => Left("Make Google Drive authentication first")
 
   def partitionFilesFolders(
       gdriveClient: FileStorage[IO],
       fileIds: List[String]
-  ): IO[Either[String, (List[String], List[String])]] =
+  ): EitherT[IO, String, (List[String], List[String])] =
     fileIds
       .traverse(fileId =>
-        gdriveClient.isFolder(fileId).mapRight(isFolder => (fileId, isFolder))
+        gdriveClient.isFolder(fileId).map(isFolder => (fileId, isFolder))
       )
-      .map(partitionEithers)
-      .mapLeft(_.mkString(","))
-      .mapRight(elements =>
+      .map(elements =>
         (elements.filter(_._2).map(_._1), elements.filter(!_._2).map(_._1))
       )
 
@@ -62,44 +62,39 @@ object GDrive:
       newFiles: List[String]
   )(
       files: List[FileMeta]
-  ): IO[Either[String, List[FileMeta]]] =
+  ): EitherT[IO, String, List[FileMeta]] =
     if newFiles.nonEmpty then
       gdriveClient
         .fileInfo(newFiles)
-        .mapRight(filesMeta => filesMeta ++ files)
-    else Right(files).pure[IO]
+        .map(filesMeta => filesMeta ++ files)
+    else EitherT.rightT(files)
 
   def downloadAndParseFiles(auth: AuthData, gdriveClient: FileStorage[IO])(
       files: List[FileMeta]
-  )(using db: DocDB[IO]): IO[Either[String, List[String]]] =
+  )(using db: DocDB[IO]): EitherT[IO, String, List[String]] =
     gdriveClient
       .downloadFiles(files)
-      .flatMapRight(
-        _.traverse(parseFileForPersistence)
-          .map(partitionEithers)
-          .mapLeft(_.mkString(","))
-      )
-      .flatMapRight(createOrUpdateFiles(auth))
-      .mapRight(_.map(_.name))
+      .flatMap(_.traverse(parseFileForPersistence))
+      .flatMap(createOrUpdateFiles(auth))
+      .map(_.map(_.name))
 
   def getAndAddDocs(auth: AuthData, fileIds: List[String])(
       gdriveClient: FileStorage[IO]
   )(using db: DocDB[IO]) =
-    partitionFilesFolders(gdriveClient, fileIds).flatMapRight:
-      (folders, files) =>
-        findAllFilesInFolders(gdriveClient, folders)
-          !> appendFiles(gdriveClient, files)
-          !> downloadAndParseFiles(auth, gdriveClient)
+    partitionFilesFolders(gdriveClient, fileIds).flatMap: (folders, files) =>
+      findAllFilesInFolders(gdriveClient, folders)
+        !> appendFiles(gdriveClient, files)
+        !> downloadAndParseFiles(auth, gdriveClient)
 
   def importDocs(auth: AuthData)(
       fileIds: List[String]
   )(implicit
       db: DocDB[IO],
       ns: NotificationService[IO]
-  ): IO[Either[String, Unit]] =
+  ): EitherT[IO, String, Unit] =
     limitRole(
       auth.role,
-      Left(authErrorMsg(Some(auth.role))).pure[IO]
+      Left(authErrorMsg(Some(auth.role))).pure[IO].asEitherT
     ):
       logger.info("importing data from gdrive...")
       notifyUploadProgress(auth.userId):
@@ -109,28 +104,28 @@ object GDrive:
 
   def refreshAndSetToken(refreshToken: String, userId: String) = GoogleClient
     .refreshToken(refreshToken)
-    .flatMapRight(ClerkClient.setGDriveMetadata(userId))
+    .flatMap(ClerkClient.setGDriveMetadata(userId))
 
   def refreshToken(auth: AuthData)(
       refreshTokenPayload: RefreshTokenPayload
-  ): IO[Either[String, (String, String)]] =
+  ): EitherT[IO, String, (String, String)] =
     limitRole(
       auth.role,
-      Left(authErrorMsg(Some(auth.role))).pure[IO]
+      Left(authErrorMsg(Some(auth.role))).pure[IO].asEitherT
     ):
       logger.info("refreshing gdrive token...")
       refreshAndSetToken(refreshTokenPayload.refreshToken, auth.userId)
 
   def parseFileForPersistence(
       file: File
-  ): IO[Either[String, Document]] =
+  ): EitherT[IO, String, Document] =
     extractAndCleanText(
       file.meta.name,
       file.content,
       parseGoogleMimeTypes(file.meta.mimeType, file.meta.name)
     )
-      .mapLeft(_.toString)
-      .mapRight(content =>
+      .leftMap(_.toString)
+      .map(content =>
         Document(
           uid = UUID.randomUUID(),
           name = file.meta.name,
@@ -164,11 +159,11 @@ object GDrive:
   def findAllFilesInFolders(
       gdriveClient: FileStorage[IO],
       folders: List[String]
-  ): IO[Either[String, List[FileMeta]]] =
+  ): EitherT[IO, String, List[FileMeta]] =
     if folders.nonEmpty then
       gdriveClient
         .listFiles(folders)
-        .flatMapRight: elements =>
+        .flatMap: elements =>
           val validFiles = elements.filter(supportedMimes contains _.mimeType)
           logger.info(s"find ${validFiles.length} valid files!")
           validFiles.foreach(f => logger.info(s"file: ${f.name}"))
@@ -179,24 +174,24 @@ object GDrive:
           logger.info(s"find ${files.length} files!")
           logger.info(s"find ${newFolders.length} folders!")
           if newFolders.nonEmpty then
-            findAllFilesInFolders(gdriveClient, newFolders.map(_.id)).mapRight(
+            findAllFilesInFolders(gdriveClient, newFolders.map(_.id)).map(
               newFiles => files ++ newFiles
             )
-          else Right(files).pure[IO]
-    else Right(List()).pure[IO]
+          else EitherT.rightT(files)
+    else EitherT.rightT(List.empty)
 
   def getClient(userId: String)(
       accessToken: String,
       refreshToken: String
-  ): IO[Either[String, FileStorage[IO]]] =
+  ): EitherT[IO, String, FileStorage[IO]] =
     val initialGDriveClient = getFileStorage("gdrive")(accessToken)
     initialGDriveClient
       .listFiles(List("root"))
       .flatMap:
-        case Right(_) => Right(initialGDriveClient).pure[IO]
+        case Right(_) => EitherT.rightT(initialGDriveClient)
         case Left(_) =>
           logger.info("Trying to refresh token...")
           refreshAndSetToken(refreshToken, userId)
-            .mapRight((newAccessToken, _) =>
+            .map((newAccessToken, _) =>
               getFileStorage("gdrive")(newAccessToken)
             )

@@ -1,20 +1,22 @@
 package com.gridoai.models
 
-import doobie.*
-import doobie.implicits.*
-import cats.*
-import cats.effect.*
-import cats.syntax.list.*
-import doobie.postgres.*
-import doobie.postgres.implicits.*
+import doobie._
+import doobie.implicits._
+import cats._
+import cats.effect._
+import cats.syntax.list._
+import cats.data.EitherT
+import doobie.postgres._
+import doobie.postgres.implicits._
 import com.pgvector.PGvector
 import cats.implicits._
 import cats.effect.implicits.concurrentParTraverseOps
-
-import com.gridoai.domain.*
-import com.gridoai.utils.*
 import com.zaxxer.hikari.HikariConfig
 import doobie.hikari.HikariTransactor
+
+import com.gridoai.domain._
+import com.gridoai.utils._
+
 case class DocRow(
     uid: UID,
     name: String,
@@ -161,14 +163,14 @@ object PostgresClient {
         doc: DocumentPersistencePayload,
         orgId: String,
         role: String
-    ) =
-      addDocuments(List(doc), orgId, role).mapRight(_.head)
+    ): EitherT[F, String, Document] =
+      addDocuments(List(doc), orgId, role).map(_.head)
 
     def addDocuments(
         docs: List[DocumentPersistencePayload],
         orgId: String,
         role: String
-    ): F[Either[String, List[Document]]] =
+    ): EitherT[F, String, List[Document]] =
       docs.toNel match
         case Some(documents) =>
           val documentRows = documents.map(_.doc.toDocRow(orgId, role))
@@ -203,15 +205,15 @@ object PostgresClient {
                   ?, ?, ?, ?, ?, ?, ?, ?, ?::$POSTGRES_SCHEMA.embedding_model, ?, ?, ?
                 )"""
             ).updateMany(chunkRows)
-          yield docs.map(_.doc)).transact[F](xa).map(Right(_)) |> attempt
-        case None => Right(List()).pure[F]
+          yield docs.map(_.doc)).transact[F](xa).map(Right(_)).asEitherT.attempt
+        case None => EitherT.rightT(List())
 
     def listDocuments(
         orgId: String,
         role: String,
         start: Int,
         end: Int
-    ): F[Either[String, PaginatedResponse[List[Document]]]] =
+    ): EitherT[F, String, PaginatedResponse[List[Document]]] =
       traceMappable("listDocuments"):
         sql"""
        select uid, name, source, content, organization, roles, count(*) over() as total_count 
@@ -230,13 +232,15 @@ object PostgresClient {
               .traverse(_._1.toDocument)
               .map: documents =>
                 PaginatedResponse(documents, totalCount)
-          ) |> attempt
+          )
+          .asEitherT
+          .attempt
 
     def deleteDocument(
         uid: UID,
         orgId: String,
         role: String
-    ): F[Either[String, Unit]] =
+    ): EitherT[F, String, Unit] =
       (for
         deletedChunks <-
           sql"delete from $chunksTable where document_uid = $uid and document_organization = ${orgId} ".update.run
@@ -248,13 +252,15 @@ object PostgresClient {
           if (deletedDocuments == 0) Left("No document was deleted")
           else if (deletedChunks == 0) Left("No chunk was deleted")
           else Right(())
-        ) |> attempt
+        )
+        .asEitherT
+        .attempt
 
     def listDocumentsBySource(
         sources: List[Source],
         orgId: String,
         role: String
-    ): F[Either[String, List[Document]]] =
+    ): EitherT[F, String, List[Document]] =
       sources.map(_.toString).toNel match
         case Some(sourceStrings) =>
           sql"""
@@ -268,8 +274,10 @@ object PostgresClient {
             .query[DocRow]
             .to[List]
             .transact[F](xa)
-            .map(_.traverse(_.toDocument)) |> attempt
-        case None => Right(List()).pure[F]
+            .map(_.traverse(_.toDocument))
+            .asEitherT
+            .attempt
+        case None => EitherT.rightT(List())
 
     def getNearChunks(
         embeddings: List[Embedding],
@@ -278,7 +286,7 @@ object PostgresClient {
         limit: Int,
         orgId: String,
         role: String
-    ): F[Either[String, List[List[SimilarChunk]]]] =
+    ): EitherT[F, String, List[List[SimilarChunk]]] =
       traceMappable("getNearDocuments"):
         println("Getting near docs ")
         embeddings
@@ -316,9 +324,9 @@ object PostgresClient {
               .to[List]
               .transact[F](xa)
               .map(_.traverse(_.toChunk))
-              |> attempt
           .map(partitionEithers)
-          .mapLeft(_.mkString(","))
+          .asEitherT
+          .leftMap(_.mkString(","))
 
   }
 }

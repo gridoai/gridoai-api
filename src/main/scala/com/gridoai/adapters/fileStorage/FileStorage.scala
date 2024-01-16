@@ -1,6 +1,7 @@
 package com.gridoai.adapters.fileStorage
 
 import cats.effect.IO
+import cats.data.EitherT
 
 case class FileMeta(
     id: String,
@@ -10,12 +11,12 @@ case class FileMeta(
 case class File(meta: FileMeta, content: Array[Byte])
 
 trait FileStorage[F[_]]:
-  def listFiles(folderIds: List[String]): F[Either[String, List[FileMeta]]]
+  def listFiles(folderIds: List[String]): EitherT[F, String, List[FileMeta]]
   def downloadFiles(
       files: List[FileMeta]
-  ): F[Either[String, List[File]]]
-  def isFolder(fileId: String): F[Either[String, Boolean]]
-  def fileInfo(fileIds: List[String]): F[Either[String, List[FileMeta]]]
+  ): EitherT[F, String, List[File]]
+  def isFolder(fileId: String): EitherT[F, String, Boolean]
+  def fileInfo(fileIds: List[String]): EitherT[F, String, List[FileMeta]]
 
 def getFileStorageByName(
     name: String

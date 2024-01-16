@@ -1,7 +1,9 @@
 package com.gridoai.adapters.embeddingApi
 
-import com.gridoai.domain.*
 import cats.effect.IO
+
+import com.gridoai.domain._
+import com.gridoai.utils._
 
 object Mocked extends EmbeddingAPI[IO]:
   private val mockResponse = Embedding(
@@ -12,6 +14,6 @@ object Mocked extends EmbeddingAPI[IO]:
   def embedChats(
       texts: List[String]
   ) =
-    IO.pure(Right(texts.map(_ => mockResponse)))
+    IO.pure(Right(texts.map(_ => mockResponse))).asEitherT
   def embedChunks(chunks: List[Chunk]) =
-    IO.pure(Right(chunks.map(_ => mockResponse)))
+    IO.pure(Right(chunks.map(_ => mockResponse))).asEitherT
