@@ -55,7 +55,6 @@ def searchDoc(
           )
         )
         .map(_.flatten)
-        .leftMap(_.mkString(","))
     yield resChunks
 
 def rerankChunks(
