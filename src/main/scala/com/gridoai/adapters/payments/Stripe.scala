@@ -66,19 +66,20 @@ def createCustomerPortalSession(
       catch
         case e: java.lang.Exception =>
           s"Session creation failed: $e".asLeft
-  ).asEitherT.attempt
+    )
+    .asEitherT
+    .attempt
 
 def deleteCustomerUnsafe[F[_]: Sync](
     oldCustomerId: String
 ): EitherT[F, String, Customer] =
   (Sync[F]
     .blocking:
-      try
-        client.customers().delete(oldCustomerId).asRight
+      try client.customers().delete(oldCustomerId).asRight
       catch
         case e: java.lang.Exception =>
           s"Customer deletion failed: $e".asLeft
-  )
+    )
     .asEitherT
     .attempt
 
@@ -92,7 +93,10 @@ def deleteCustomer[F[_]: Sync](
       deleteCustomerUnsafe[F](oldCustomerId).map(_ => oldCustomerId)
     case Some(value) => deleteCustomer[F](oldCustomerId, value)
 
-def deleteCustomer[F[_]: Sync](oldCustomerId: String, newCustomerID: String): EitherT[F, String, String] =
+def deleteCustomer[F[_]: Sync](
+    oldCustomerId: String,
+    newCustomerID: String
+): EitherT[F, String, String] =
   if oldCustomerId != newCustomerID then
     deleteCustomerUnsafe[F](oldCustomerId).map(_ => newCustomerID)
   else EitherT.rightT[F, String](newCustomerID)
@@ -108,15 +112,16 @@ def deleteCustomerOfMembership[F[_]: Sync](newCustomerID: String)(
 def fetchPlanOfSubscription[F[_]: Sync](
     subscriptionId: String
 ): EitherT[F, String, Plan] =
-  (Sync[F].blocking:
-    try
-      Subscription.retrieve(subscriptionId).asRight
-    catch
-      case e: java.lang.Exception =>
-        s"Subscription fetch failed: $e".asLeft
-  ).asEitherT
-  .attempt
-  .flatMapEither(getSubscriptionPlan(_).toRight("No plan found"))
+  (Sync[F]
+    .blocking:
+      try Subscription.retrieve(subscriptionId).asRight
+      catch
+        case e: java.lang.Exception =>
+          s"Subscription fetch failed: $e".asLeft
+    )
+    .asEitherT
+    .attempt
+    .flatMapEither(getSubscriptionPlan(_).toRight("No plan found"))
 
 def handleCheckoutCompleted(
     eventObj: StripeObject
@@ -251,33 +256,30 @@ def handleDeleted(
 def handleEvent(
     eventRaw: String,
     sigHeader: String
-): EitherT[IO, String, String] = Sync[IO]
-  .blocking {
-    val event = Webhook.constructEvent(
-      eventRaw,
-      sigHeader,
-      STRIPE_WEBHOOK_KEY
+): EitherT[IO, String, String] =
+  (Sync[IO]
+    .blocking:
+      val event = Webhook.constructEvent(
+        eventRaw,
+        sigHeader,
+        STRIPE_WEBHOOK_KEY
+      )
+
+      val stripeObject = event.getDataObjectDeserializer.getObject.get
+
+      val eventType = event.getType
+
+      logger.info(s"Event type: ${eventType}")
+      eventType match
+        case "customer.subscription.deleted" => handleDeleted(stripeObject)
+        // Cancel, renew, update
+        case "customer.subscription.updated" =>
+          handleSubscriptionUpdate(stripeObject)
+        // Checkout completed: update, renew or create
+        case "checkout.session.completed" =>
+          handleCheckoutCompleted(stripeObject)
+        case _ =>
+          EitherT(IO.pure(Left("Unhandled event type: " + event.getType)))
+            .map(_ => ())
     )
-
-    val stripeObject = event.getDataObjectDeserializer.getObject.get
-
-    val eventType = event.getType
-
-    logger.info(s"Event type: ${eventType}")
-    eventType match
-      case "customer.subscription.deleted" => handleDeleted(stripeObject)
-      // Cancel, renew, update
-      case "customer.subscription.updated" =>
-        handleSubscriptionUpdate(stripeObject)
-      // Checkout completed: update, renew or create
-      case "checkout.session.completed" =>
-        handleCheckoutCompleted(stripeObject)
-      case _ =>
-        EitherT.leftT[IO, Unit]("Unhandled event type: " + event.getType)
-
-  }
-  .flatten
-  .attemptTap(x => IO(logger.info(x.toString)))
-  .asEitherT
-  .map(_ => "OK")
-  .attempt
+    .flatMap(_.value).asEitherT.map(_ => "OK")
