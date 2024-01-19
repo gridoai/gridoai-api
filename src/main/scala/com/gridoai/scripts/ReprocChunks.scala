@@ -106,4 +106,4 @@ def reproc() =
           org,
           roles.head
         )
-        .unsafeRunSync()
+        .value.unsafeRunSync()

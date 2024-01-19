@@ -187,11 +187,9 @@ object GDrive:
     val initialGDriveClient = getFileStorage("gdrive")(accessToken)
     initialGDriveClient
       .listFiles(List("root"))
-      .flatMap:
-        case Right(_) => EitherT.rightT(initialGDriveClient)
-        case Left(_) =>
-          logger.info("Trying to refresh token...")
-          refreshAndSetToken(refreshToken, userId)
-            .map((newAccessToken, _) =>
-              getFileStorage("gdrive")(newAccessToken)
-            )
+      .map(_ => initialGDriveClient)
+      .leftFlatMap(_ =>
+        logger.info("Trying to refresh token...")
+        refreshAndSetToken(refreshToken, userId)
+          .map((newAccessToken, _) => getFileStorage("gdrive")(newAccessToken))
+      )
