@@ -19,23 +19,18 @@ import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.emailApi.EmailAPI
 import com.gridoai.adapters.emailApi.ResendClient
 
-object Main extends IOApp {
-  def run(args: List[String]): IO[ExitCode] =
+object Main extends IOApp:
+  def run(args: List[String]) =
     if args get 0 contains "openapi" then
       endpoints.dumpSchema()
       IO.pure(ExitCode.Success)
     else
-      PostgresClient
-        .getTransactor[IO]
-        .use: transactor =>
-          RedisClient
-            .getRedis[IO]
-            .use: redis =>
-              given docDb: DocDB[IO] = PostgresClient[IO](transactor)
-              given messageDb: MessageDB[IO] = RedisClient[IO](redis)
-              given ns: NotificationService[IO] = AblyNotificationService[IO]
-              given emailApi: EmailAPI[IO] = ResendClient[IO]
-
-              endpoints.http4s.runHttp4s
-
-}
+      (for
+        transactor <- PostgresClient.getTransactor[IO]
+        redis <- RedisClient.getRedis[IO]
+      yield (transactor, redis)).use: (transactor, redis) =>
+        given docDb: DocDB[IO] = PostgresClient[IO](transactor)
+        given messageDb: MessageDB[IO] = RedisClient[IO](redis)
+        given ns: NotificationService[IO] = AblyNotificationService[IO]
+        given emailApi: EmailAPI[IO] = ResendClient[IO]
+        endpoints.http4s.runHttp4s
