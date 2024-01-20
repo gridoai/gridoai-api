@@ -10,6 +10,7 @@ import cats.effect.kernel.Ref
 import fs2.concurrent.SignallingRef
 import fs2.concurrent.Topic
 import cats.effect.kernel.Async
+import collection.mutable._
 
 trait NotificationService[F[_]]:
   def sendNotification(
@@ -17,19 +18,6 @@ trait NotificationService[F[_]]:
       channel: String,
       content: String
   ): EitherT[F, String, Unit]
-
-import cats.effect.{Async, IO}
-
-import cats.effect.IO
-import cats.effect.std.Queue
-import cats.effect.unsafe.implicits.global
-import cats.syntax.all._
-import fs2.Stream
-
-import cats.effect.Async
-import cats.data.EitherT
-
-import collection.mutable._
 
 class MockedNotificationService[F[_]: Async]() extends NotificationService[F]:
   val logger = org.slf4j.LoggerFactory.getLogger(getClass)
