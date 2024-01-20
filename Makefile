@@ -34,3 +34,6 @@ repl:
 	
 loadtest-ask:
 	@artillery run loadtests/ask.yml
+
+test:
+	source test.env; scala-cli test . --watch
