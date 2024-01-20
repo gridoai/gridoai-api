@@ -8,9 +8,7 @@ import cats.effect.implicits._
 import cats.data.EitherT
 
 import cats.Monad
-extension [A](a: A) {
-  inline def |>[B](inline f: A => B): B = f(a)
-}
+extension [A](a: A) inline def |>[B](inline f: A => B): B = f(a)
 
 extension [E, T, F[_]: Monad](x: F[Either[E, T]])
   def mapRight[V](f: T => V) =
@@ -46,33 +44,6 @@ extension [E, T, F[_]](x: EitherT[F, E, T])
   ): EitherT[F, String, T] = EitherT:
     ae.attempt(x.value)
       .map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
-
-  def !>[V](f: T => EitherT[F, E, V])(implicit F: Monad[F]): EitherT[F, E, V] =
-    x.flatMap(f)
-
-  def flatMapEither[V](f: T => Either[E, V])(implicit
-      F: Monad[F]
-  ): EitherT[F, E, V] =
-    x.value.map(_.flatMap(f)).asEitherT
-
-  def mapEither[V](f: Either[E, T] => Either[E, V])(implicit
-      F: Monad[F]
-  ): EitherT[F, E, V] =
-    x.value.map(f).asEitherT
-
-def flattenIOEitherIOEither[E, T](
-    x: IO[Either[E, IO[Either[E, T]]]]
-): IO[Either[E, T]] =
-  x.flatMap:
-    case Left(error)    => IO.pure(Left(error))
-    case Right(innerIO) => innerIO
-
-def flattenIOEitherIO[E, T](
-    x: IO[Either[E, IO[T]]]
-): IO[Either[E, T]] =
-  x.flatMap:
-    case Left(error)    => IO.pure(Left(error))
-    case Right(innerIO) => innerIO.map(y => Right(y))
 
 /** Logs the time taken to process a value in a functor.
   *

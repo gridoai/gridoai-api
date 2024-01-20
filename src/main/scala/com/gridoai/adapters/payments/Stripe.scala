@@ -120,7 +120,7 @@ def fetchPlanOfSubscription[F[_]: Sync](
     )
     .asEitherT
     .attempt
-    .flatMapEither(getSubscriptionPlan(_).toRight("No plan found"))
+    .subflatMap(getSubscriptionPlan(_).toRight("No plan found"))
 
 def handleCheckoutCompleted(
     eventObj: StripeObject

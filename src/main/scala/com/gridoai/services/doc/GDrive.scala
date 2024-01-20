@@ -41,7 +41,7 @@ object GDrive:
   def fetchUserTokens(auth: AuthData): EitherT[IO, String, (String, String)] =
     ClerkClient.user
       .getPublicMetadata(auth.userId)
-      .flatMapEither:
+      .subflatMap:
         case PublicMetadata(Some(x), Some(y), _, _) => Right((x, y))
         case _ => Left("Make Google Drive authentication first")
 
@@ -83,8 +83,8 @@ object GDrive:
   )(using db: DocDB[IO]) =
     partitionFilesFolders(gdriveClient, fileIds).flatMap: (folders, files) =>
       findAllFilesInFolders(gdriveClient, folders)
-        !> appendFiles(gdriveClient, files)
-        !> downloadAndParseFiles(auth, gdriveClient)
+        >>= appendFiles(gdriveClient, files)
+        >>= downloadAndParseFiles(auth, gdriveClient)
 
   def importDocs(auth: AuthData)(
       fileIds: List[String]
@@ -99,8 +99,8 @@ object GDrive:
       logger.info("importing data from gdrive...")
       notifyUploadProgress(auth.userId):
         fetchUserTokens(auth)
-          !> getClient(auth.userId)
-          !> getAndAddDocs(auth, fileIds)
+          >>= getClient(auth.userId)
+          >>= getAndAddDocs(auth, fileIds)
 
   def refreshAndSetToken(refreshToken: String, userId: String) = GoogleClient
     .refreshToken(refreshToken)

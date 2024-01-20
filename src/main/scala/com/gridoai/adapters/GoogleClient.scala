@@ -85,7 +85,7 @@ object GoogleClient:
       .flatMap: flow =>
         logger.info("Google authorization code flow builded.")
         logger.info("Sending request to get token...")
-        flowAndCodeToTokens(flow, code, redirectUri).flatMapEither: t =>
+        flowAndCodeToTokens(flow, code, redirectUri).subflatMap: t =>
           logger.info("Tokens got!")
           Option(t.getRefreshToken) match
             case Some(refreshToken) =>
