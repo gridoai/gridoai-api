@@ -9,7 +9,7 @@ import scala.jdk.CollectionConverters._
 
 import com.gridoai.utils._
 
-object LocalFileStorage extends FileStorage[IO] {
+object LocalFileStorage extends FileStorage[IO]:
 
   def listFiles(paths: List[String]): EitherT[IO, String, List[FileMeta]] =
     paths
@@ -53,4 +53,3 @@ object LocalFileStorage extends FileStorage[IO] {
 
   def fileInfo(fileIds: List[String]): EitherT[IO, String, List[FileMeta]] =
     EitherT.rightT(fileIds.map(fileId => FileMeta(fileId, fileId, fileId)))
-}

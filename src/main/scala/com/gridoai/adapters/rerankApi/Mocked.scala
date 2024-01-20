@@ -11,7 +11,7 @@ import com.gridoai.utils.asEitherT
 import cats.Id
 import cats.effect.kernel.Sync
 
-class MockRerankAPI[F[_]: Sync] extends RerankAPI[F] {
+class MockRerankAPI[F[_]: Sync] extends RerankAPI[F]:
 
   def rerank(
       payload: RerankPayload
@@ -25,4 +25,3 @@ class MockRerankAPI[F[_]: Sync] extends RerankAPI[F] {
     // Return a successful result
     (Right(rerankedChunks))
   }.asEitherT
-}

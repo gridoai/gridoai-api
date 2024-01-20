@@ -80,14 +80,13 @@ object MockDocDB extends DocDB[IO]:
           row.chunk.chunk.documentUid == uid && row.orgId == orgId && row.role == role
         )
         .headOption
-      (documentToDelete, chunkToDelete) match {
+      (documentToDelete, chunkToDelete) match
         case (Some(doc), Some(chunk)) =>
           allDocuments -= doc
           allChunks -= chunk
           Right(())
         case _ =>
           Left("No document or no chunk was deleted")
-      }
     }.asEitherT
 
   def listDocumentsBySource(
