@@ -1,10 +1,10 @@
 package com.gridoai.test
 
+import munit.CatsEffectSuite
 import cats.effect.IO
 
 import com.gridoai.models.DocDB
 import com.gridoai.utils.*
-import munit.CatsEffectSuite
 import sttp.model.Part
 import sttp.model.MediaType
 import scala.jdk.CollectionConverters.*
@@ -16,6 +16,7 @@ import com.gridoai.services.doc.uploadDocuments
 import com.gridoai.domain.Plan
 import com.gridoai.adapters.notifications.MockedNotificationService
 import com.gridoai.adapters.notifications.NotificationService
+import cats.data.EitherT
 object fileMock:
   import java.nio.file.{Files, Paths}
   import sttp.client3.{StringBody}
@@ -57,7 +58,7 @@ object fileMock:
 class UploadApi extends CatsEffectSuite {
   given doobie.LogHandler[IO] = doobie.LogHandler.jdkLogHandler
   given db: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
-  given ns: NotificationService[IO] = MockedNotificationService[IO]
+  given ns: MockedNotificationService[IO] = MockedNotificationService[IO]
 
   import fileMock._
   test("Uploads a file") {
@@ -66,15 +67,15 @@ class UploadApi extends CatsEffectSuite {
       generateFilePartsOfDir("./src/test/resources/")
 
     println("sending request")
-    for {
+    (for {
       uploadResult <- uploadDocuments(
         AuthData("org1", "admin", "admin_1", Plan.Enterprise, None)
       )(FileUpload(fileUpload))
 
-      _ <- IO.println(uploadResult)
-      // Assert that the response status is OK
-      _ = assertEquals(uploadResult.isRight, true)
-    } yield ()
+      msg = ns.waitForNotification("admin_1:upload")
+      _ = println(msg)
+      _ = assert(!msg.isEmpty)
 
+    } yield ()).value
   }
 }
