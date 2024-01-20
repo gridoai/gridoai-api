@@ -1,5 +1,7 @@
 package com.gridoai.test
-
+import cats.data.EitherT
+implicit def eitherTisIO[A, B](eitherT: EitherT[IO, A, B]): IO[Either[A, B]] =
+  eitherT.value
 import cats.effect.IO
 import munit.CatsEffectSuite
 import doobie.implicits._
@@ -107,19 +109,18 @@ class DocumentModel extends CatsEffectSuite {
       )
     ).parSequence
 
-    assertIO(
-      results,
-      List(Right(List(doc1)), Right(List(doc2)), Right(List(doc3)))
-    )
+    results.value.map: v =>
+      assert(v == List(Right(List(doc1)), Right(List(doc2)), Right(List(doc3))))
+
   }
 
   test("Get near chunks") {
     for
       maybeChunks <-
         DocsDB.getNearChunks(List(mockEmbedding), None, 0, 10, "org1", "member")
-      _ <- IO.println(maybeChunks)
-      _ = assert(maybeChunks.isRight)
-      chunks = maybeChunks.getOrElse(List.empty)
+      _ = println(maybeChunks)
+      _ = assert(!maybeChunks.isEmpty)
+      chunks = maybeChunks
       _ = assert(
         chunks.head.forall(_.chunk.uid.toString() != doc2Id.toString())
       )
@@ -137,9 +138,9 @@ class DocumentModel extends CatsEffectSuite {
           "org2",
           "member"
         )
-      _ <- IO.println(maybeChunks)
-      _ = assert(maybeChunks.isRight)
-      chunks = maybeChunks.getOrElse(List.empty)
+      _ = println(maybeChunks)
+      _ = assert(!maybeChunks.isEmpty)
+      chunks = maybeChunks
       _ = assert(
         chunks.head.forall(_.chunk.uid.toString() != doc2Id.toString())
       )
@@ -162,7 +163,7 @@ class DocumentModel extends CatsEffectSuite {
         case ((docId, orgId, role), expected) =>
           val result = DocsDB.deleteDocument(docId, orgId, role)
           assertIO(
-            result.leftMap(_.split(" ", 2).last),
+            result.leftMap(_.split(" ", 2).last).value,
             expected,
             s"Failed for $docId, $orgId, $role"
           )
