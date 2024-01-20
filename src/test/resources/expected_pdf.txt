@@ -1,4 +1,3 @@
-EduProMax Docs 1
 EduProMax Docs
 Product Name: EduProMax
 Internal Documentation
@@ -25,7 +24,7 @@ multimedia content, and assessments, set deadlines, and track student progress.
 Interactive Learning Tools: The platform offers a range of interactive learning tools 
 such as virtual classrooms, discussion boards, and live chat functionalities to 
 facilitate real-time communication and collaboration between students and teachers.
-EduProMax Docs 2
+EduProMax Docs 1
 Personalized Learning Paths: EduProMax supports personalized learning paths, 
 enabling educators to tailor content and assessments based on individual student 
 needs, learning styles, and abilities.
@@ -56,7 +55,7 @@ EduProMax provides different user roles to ensure appropriate access and functio
 for various stakeholders:
 Administrator: Manages system settings, user roles, course catalog, and overall 
 system configuration.
-EduProMax Docs 3
+EduProMax Docs 2
 Educator/Teacher: Creates and manages courses, assigns and grades 
 assessments, and monitors student progress.
 Student: Accesses courses, completes assignments, participates in discussions, 
@@ -86,3 +85,4 @@ Integration with popular third-party educational tools and platforms to provide 
 seamless and integrated learning ecosystem.
 Note: This document is for internal use only and should not be shared externally without 
 proper authorization.
+EduProMax Docs 3
