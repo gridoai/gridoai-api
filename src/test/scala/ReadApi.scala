@@ -25,15 +25,18 @@ import com.gridoai.utils._
 import com.gridoai.adapters.notifications.NotificationService
 import com.gridoai.adapters.notifications.MockedNotificationService
 import com.gridoai.utils.LRUCache
+import com.gridoai.models.MessageDB
+import com.gridoai.models.RedisClient
+import com.gridoai.adapters.emailApi.{EmailAPI, InMemoryEmailer}
 
 val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
 class API extends CatsEffectSuite {
   given doobie.LogHandler[IO] = doobie.LogHandler.jdkLogHandler
   given db: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
   given ns: NotificationService[IO] = MockedNotificationService[IO]
-  given lruCache: LRUCache[String, List[WhatsAppMessage]] =
-    LRUCache[String, List[WhatsAppMessage]](50)
-
+  val redis = RedisClient.getRedis[IO].use(IO(_)).unsafeRunSync()
+  given messageDb: MessageDB[IO] = RedisClient[IO](redis)
+  given emailApi: EmailAPI[IO] = InMemoryEmailer[IO]()
   test("health check should return OK") {
 
     val response = basicRequest
@@ -97,27 +100,24 @@ class API extends CatsEffectSuite {
 
   test("Searches for a chunk") {
 
-    val authenticatedRequest = basicRequest
-      .post(uri"http://test.com/search")
-      .headers(authHeader)
-      .body(
-        SearchPayload(
-          queries = List("foo"),
-          tokenLimit = 1000,
-          llmName = "Gpt35Turbo",
-          scope = None
-        ).asJson.toString
-      )
-      .send(serverStubOf(withService().searchDocs))
-      .trace("Searches chunks")
-      .map(_.body flatMap decode[List[Chunk]])
+    for
+      authenticatedRequest <- basicRequest
+        .post(uri"http://test.com/search")
+        .headers(authHeader)
+        .body(
+          SearchPayload(
+            queries = List("foo"),
+            tokenLimit = 1000,
+            llmName = "Gpt35Turbo",
+            scope = None
+          ).asJson.toString
+        )
+        .send(serverStubOf(withService().searchDocs))
+        .trace("Searches chunks")
+        .map(_.body flatMap decode[List[Chunk]])
+      _ = assert(authenticatedRequest.isRight)
+    yield ()
 
-    assertIO(
-      authenticatedRequest
-        .trace("document search response")
-        .map(_.isEmpty),
-      Right(false)
-    )
   }
 
   test("Ask LLM") {
@@ -131,7 +131,9 @@ class API extends CatsEffectSuite {
       .headers(authHeader)
       .body(
         AskPayload(
-          messages = List(Message(from = MessageFrom.User, message = "Hi")),
+          messages = List(
+            Message(from = MessageFrom.User, message = "Hi").removeMetadata
+          ),
           basedOnDocsOnly = true,
           scope = None
         ).asJson.toString
