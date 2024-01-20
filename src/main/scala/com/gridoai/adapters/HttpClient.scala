@@ -17,7 +17,7 @@ val syncCatsBackend =
   catsBackend.unsafeRunSync()
 
 import java.net.URI
-def makeAzureURIOfOpenAI(originalURI: URI): URI = {
+def makeAzureURIOfOpenAI(originalURI: URI): URI =
   val newPath =
     s"/openai/deployments/API/${originalURI.getPath.replaceAll("/v1", "").stripPrefix("/")}"
   val newURI = new URI(
@@ -30,7 +30,6 @@ def makeAzureURIOfOpenAI(originalURI: URI): URI = {
     null
   )
   newURI
-}
 
 val openAiClientBackend = HttpClientCatsBackend
   .resource[IO](customizeRequest = sys.env.get("OPENAI_ENDPOINT") match

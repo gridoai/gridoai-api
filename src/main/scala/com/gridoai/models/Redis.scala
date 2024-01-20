@@ -26,7 +26,7 @@ val REDIS_PORT =
   sys.env.getOrElse("REDIS_PORT", "6379")
 val REDIS_PASSWORD = sys.env.getOrElse("REDIS_PASSWORD", "")
 
-object RedisClient {
+object RedisClient:
 
   def getRedis[F[_]: Async] =
     Redis[F].utf8(s"redis://default:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT")
@@ -44,7 +44,7 @@ object RedisClient {
 
   def apply[F[_]: Async](redis: RedisCommands[F, String, String]) =
     implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
-    new MessageDB[F] {
+    new MessageDB[F]:
       def getMessages(
           orgId: String,
           userId: String,
@@ -138,5 +138,3 @@ object RedisClient {
           .map(_.asRight)
           .asEitherT
           .attempt
-    }
-}

@@ -38,13 +38,12 @@ val client =
   Stripe.apiKey = STRIPE_SECRET_KEY
   com.stripe.StripeClient(STRIPE_SECRET_KEY)
 
-inline def getPlanById: String => Plan = {
+inline def getPlanById: String => Plan =
   case p if p == STRIPE_STARTER_PLAN_ID    => Plan.Starter
   case p if p == STRIPE_PRO_PLAN_ID        => Plan.Pro
   case p if p == STRIPE_INDIVIDUAL_PLAN_ID => Plan.Individual
   case p if p == STRIPE_ENTERPRISE_PLAN_ID => Plan.Enterprise
   case _                                   => Plan.Free
-}
 
 val logger = LoggerFactory.getLogger("Stripe")
 
@@ -282,4 +281,6 @@ def handleEvent(
           EitherT(IO.pure(Left("Unhandled event type: " + event.getType)))
             .map(_ => ())
     )
-    .flatMap(_.value).asEitherT.map(_ => "OK")
+    .flatMap(_.value)
+    .asEitherT
+    .map(_ => "OK")

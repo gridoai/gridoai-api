@@ -137,13 +137,13 @@ val documentsTable = pgObj("documents")
 val chunksTable = pgObj("chunks")
 val EmbeddingModelEnum = pgObj("embedding_model")
 
-object PostgresClient {
+object PostgresClient:
   def getSyncTransactor =
     import cats.effect.unsafe.implicits.global
     getTransactor[IO].use(IO.pure(_)).unsafeRunSync()
 
   def getTransactor[F[_]: Async] =
-    val config = {
+    val config =
       val configBase = new HikariConfig()
       configBase.setJdbcUrl(jdbcUrl)
       configBase.setPassword(POSTGRES_PASSWORD)
@@ -151,13 +151,12 @@ object PostgresClient {
       configBase.setDriverClassName("org.postgresql.Driver")
       configBase.setMaximumPoolSize(POSTGRES_POOL_SIZE)
       configBase
-    }
     HikariTransactor
       .fromHikariConfig[F](config)
 
   def apply[F[_]: Async](
       xa: Transactor[F]
-  ): DocDB[F] = new DocDB[F] {
+  ): DocDB[F] = new DocDB[F]:
 
     def addDocument(
         doc: DocumentPersistencePayload,
@@ -328,5 +327,3 @@ object PostgresClient {
           .asEitherT
           .leftMap(_.mkString(","))
 
-  }
-}

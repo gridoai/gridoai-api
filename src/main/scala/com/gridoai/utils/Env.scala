@@ -13,7 +13,7 @@ private val envFromFile: Map[String, String] =
     vars.toMap
   catch case _ => Map.empty
 
-def requireEnvImpl(name: Expr[String])(using Quotes): Expr[String] = {
+def requireEnvImpl(name: Expr[String])(using Quotes): Expr[String] =
   import quotes.reflect.*
   val envVarName = name.valueOrAbort
 
@@ -32,7 +32,6 @@ def requireEnvImpl(name: Expr[String])(using Quotes): Expr[String] = {
       throw new Exception(s"Required env var $$name is not set")
     )
   }
-}
 
 inline def getEnv(inline name: String) = sys.env
   .get(name)
