@@ -232,7 +232,7 @@ def mapDocumentsToDB[F[_]: Monad](
   logger.info("Got chunks, n: " + chunks.length)
   embeddingApi
     .embedChunks(chunks)
-    .flatMapEither(validateSize(chunks))
+    .subflatMap(validateSize(chunks))
     .map: embeddings =>
       logger.info("Got embeddings: " + embeddings.length)
       val embeddingChunk =

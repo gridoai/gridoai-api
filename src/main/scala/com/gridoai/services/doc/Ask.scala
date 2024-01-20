@@ -68,7 +68,7 @@ def buildAnswer(auth: AuthData)(
       lastChunks,
       searchesBeforeResponse
     )
-      !> runAction(lastQueries, lastChunks, searchesBeforeResponse)
+      >>= runAction(lastQueries, lastChunks, searchesBeforeResponse)
 
   def chooseAction(
       lastQueries: List[String],
@@ -167,7 +167,7 @@ def buildAnswer(auth: AuthData)(
             llmName = llmModel |> llmToStr,
             scope = scope
           )
-        ) !> askRecursively(
+        ) >>= askRecursively(
           newQueries,
           searchesBeforeResponse - 1
         )

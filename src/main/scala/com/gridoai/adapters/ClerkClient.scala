@@ -196,19 +196,19 @@ object ClerkClient:
     def byEmail(email: String): EitherT[IO, String, User] =
       user
         .listByEmail(email)
-        .flatMapEither(_.headOption.toRight("No user found"))
+        .subflatMap(_.headOption.toRight("No user found"))
 
     def byPhones(phoneNumbers: List[String]): EitherT[IO, String, User] =
       user
         .listByPhones(phoneNumbers)
-        .flatMapEither(_.headOption.toRight("No user found"))
+        .subflatMap(_.headOption.toRight("No user found"))
 
     def getFirstOrgByUID(
         uid: String
     ): EitherT[IO, String, OrganizationMemberShipListData] =
       user
         .listMemberships(uid)
-        .flatMapEither(_.data.headOption.toRight("No org found"))
+        .subflatMap(_.data.headOption.toRight("No org found"))
 
     def getOrgByCustomerId(
         email: String,
@@ -218,7 +218,7 @@ object ClerkClient:
         .byEmail(email)
         .map(_.id)
         .flatMap(user.listMemberships)
-        .flatMapEither(
+        .subflatMap(
           _.data
             .find(_.organization.public_metadata.customerId == customerId) match
             case Some(membership) => Right(membership.organization)
@@ -536,7 +536,7 @@ object ClerkClient:
           user.public_metadata.googleDriveAccessToken,
           user.public_metadata.googleDriveRefreshToken
         )
-      .flatMapEither:
+      .subflatMap:
         case (Some(x), Some(y)) =>
           logger.info("Tokens sent!")
           Right((x, y))
