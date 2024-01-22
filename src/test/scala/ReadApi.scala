@@ -28,15 +28,30 @@ import com.gridoai.utils.LRUCache
 import com.gridoai.models.MessageDB
 import com.gridoai.models.RedisClient
 import com.gridoai.adapters.emailApi.{EmailAPI, InMemoryEmailer}
+import munit.AnyFixture
 
 val authHeader = Header("Authorization", s"Bearer ${makeMockedToken}")
 class API extends CatsEffectSuite {
   given doobie.LogHandler[IO] = doobie.LogHandler.jdkLogHandler
-  given db: DocDB[IO] = PostgresClient[IO](PostgresClient.getSyncTransactor)
+
+  val munitDbFixture = ResourceSuiteLocalFixture(
+    "doc-db",
+    PostgresClient.getTransactor[IO].map(PostgresClient[IO](_))
+  )
+
+  val munitRedisFixture = ResourceSuiteLocalFixture(
+    "redis-client",
+    RedisClient.getRedis[IO].map(RedisClient[IO](_))
+  )
+
+  override def munitFixtures: Seq[AnyFixture[?]] =
+    List(munitDbFixture, munitRedisFixture)
+
+  given db: DocDB[IO] = munitDbFixture()
   given ns: NotificationService[IO] = MockedNotificationService[IO]
-  val redis = RedisClient.getRedis[IO].use(IO(_)).unsafeRunSync()
-  given messageDb: MessageDB[IO] = RedisClient[IO](redis)
+  given messageDb: MessageDB[IO] = munitRedisFixture()
   given emailApi: EmailAPI[IO] = InMemoryEmailer[IO]()
+
   test("health check should return OK") {
 
     val response = basicRequest
