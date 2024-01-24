@@ -47,17 +47,22 @@ def handleWebhook(
     .flatMap:
       case MessageInterfacePayload.StatusChanged => EitherT.rightT(())
       case MessageInterfacePayload.FileUpload(
+            id,
             from,
             to,
             mediaId,
             filename,
-            mimeType
+            mimeType,
+            timestamp
           ) =>
         logger.info("File received via WhatsApp...")
-        authFlow(from, to).flatMap:
+        ignoreMessageByCache[IO](from, timestamp, id).flatMap:
           case None => EitherT.rightT(())
-          case Some(auth) =>
-            handleUpload(auth, from, to, mediaId, filename, mimeType)
+          case Some(_) =>
+            authFlow(from, to).flatMap:
+              case None => EitherT.rightT(())
+              case Some(auth) =>
+                handleUpload(auth, from, to, mediaId, filename, mimeType)
 
       case MessageInterfacePayload.MessageReceived(
             id,
@@ -207,7 +212,7 @@ def handleUpload(
       "Recebi seu arquivo, vou tentar processá-lo... ⌛"
     )
     url <- Whatsapp.retrieveMediaUrl(mediaId)
-    _ = println(s"download url: $url")
+    _ = logger.info(s"download url: $url")
     body <- Whatsapp.downloadMedia(url)
     docs <- extractAndCleanText(
       filename,
@@ -226,7 +231,7 @@ def handleUpload(
     _ <- createOrUpdateFiles(auth)(docs)
     x <- Whatsapp.sendMessage(to, from, "Consegui! 🥳")
   yield x).leftFlatMap: e =>
-    logger.info(e)
+    logger.error(e)
     Whatsapp.sendMessage(
       to,
       from,

@@ -162,11 +162,13 @@ enum MessageInterfacePayload:
       timestamp: Long
   )
   case FileUpload(
+      id: String,
       from: String,
       to: String,
       mediaId: String,
       filename: String,
-      mimeType: String
+      mimeType: String,
+      timestamp: Long
   )
   case StatusChanged
 
