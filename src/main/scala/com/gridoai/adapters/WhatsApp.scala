@@ -64,7 +64,7 @@ object Whatsapp:
     case DocumentMessage(
         from: String,
         id: String,
-        timestamp: String,
+        timestamp: Long,
         document: Document,
         `type`: String
     )
@@ -83,7 +83,7 @@ object Whatsapp:
       for
         from <- c.downField("from").as[String]
         id <- c.downField("id").as[String]
-        timestamp <- c.downField("timestamp").as[String]
+        timestamp <- c.downField("timestamp").as[Long]
         document <- c.downField("document").as[Document]
         _type <- c.downField("type").as[String]
       yield MessageData.DocumentMessage(from, id, timestamp, document, _type)
@@ -227,14 +227,17 @@ object Whatsapp:
                     content = text.body,
                     timestamp = timestamp
                   )
-              case MessageData.DocumentMessage(from, id, _, document, _) =>
+              case MessageData
+                    .DocumentMessage(from, id, timestamp, document, _) =>
                 MessageInterfacePayload
                   .FileUpload(
+                    id = id,
                     from = from,
                     to = metadata.phone_number_id,
                     mediaId = document.id,
                     filename = document.filename,
-                    mimeType = document.mime_type
+                    mimeType = document.mime_type,
+                    timestamp = timestamp
                   )
         case Value.StatusValue(_, _, _) =>
           MessageInterfacePayload.StatusChanged.asRight
