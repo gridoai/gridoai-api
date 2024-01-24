@@ -8,6 +8,7 @@ import io.circe.parser._
 import io.circe._
 import io.circe.syntax._
 import org.slf4j.LoggerFactory
+import concurrent.duration.DurationInt
 
 import com.gridoai.utils._
 import com.gridoai.adapters._
@@ -89,6 +90,10 @@ object GridoAIML extends EmbeddingAPI[IO]:
         response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
+      .timeoutTo(
+        40.seconds,
+        IO.pure(Left("GridoAI ML API timed out after 40 seconds"))
+      )
       .asEitherT
       .map(
         _.message.map(vec =>
@@ -112,6 +117,10 @@ object GridoAIML extends EmbeddingAPI[IO]:
         response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
+      .timeoutTo(
+        15.seconds,
+        IO.pure(Left("GridoAI ML API timed out after 15 seconds"))
+      )
       .asEitherT
       .map(
         _.message.map(v =>
