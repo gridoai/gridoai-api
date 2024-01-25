@@ -24,6 +24,7 @@ import com.gridoai.models.checkOutOfSyncResult
 import com.gridoai.models.ignoreMessageByCache
 import com.gridoai.models.storeMessage
 import com.gridoai.parsers.FileFormat
+import com.gridoai.parsers.ExtractTextError
 
 val logger = LoggerFactory.getLogger(getClass.getName)
 
@@ -214,26 +215,31 @@ def handleUpload(
     url <- Whatsapp.retrieveMediaUrl(mediaId)
     _ = logger.info(s"download url: $url")
     body <- Whatsapp.downloadMedia(url)
-    doc <- extractAndCleanText(
+    content <- extractAndCleanText(
       filename,
       body,
       Some(FileFormat.fromString(mimeType))
     ).leftMap(_.toString)
-      .map: content =>
-        Document(
-          uid = UUID.randomUUID(),
-          name = filename,
-          source = Source.WhatsApp(mediaId),
-          content = content
-        )
+    doc = Document(
+      uid = UUID.randomUUID(),
+      name = filename,
+      source = Source.WhatsApp(mediaId),
+      content = content
+    )
     _ <- createOrUpdateFiles(auth)(List(doc))
-    x <- Whatsapp.sendMessage(to, from, "Consegui! 🥳")
+    x <- Whatsapp
+      .sendMessage(to, from, "Consegui! 🥳")
+      .leftWiden[String | ExtractTextError]
   yield x).leftFlatMap: e =>
-    logger.error(e)
+    logger.error(e.toString)
     Whatsapp.sendMessage(
       to,
       from,
-      "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
+      e match
+        case ExtractTextError(FileFormat.Plaintext, "Empty text") =>
+          "Ops, deu errado. 😔\nNão foi possível extrair os textos do seu arquivo."
+        case _ =>
+          "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
     )
 
 def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
