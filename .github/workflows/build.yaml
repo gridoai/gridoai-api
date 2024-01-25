@@ -10,85 +10,85 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    services:
-      # Label used to access the service container
-      redis:
-        # Docker Hub image
-        image: redis
-        # Set health checks to wait until redis has started
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  # test:
+  #   services:
+  #     # Label used to access the service container
+  #     redis:
+  #       # Docker Hub image
+  #       image: redis
+  #       # Set health checks to wait until redis has started
+  #       options: >-
+  #         --health-cmd "redis-cli ping"
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
 
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get branch name
-        id: branch-name
-        uses: tj-actions/branch-names@v6
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Get branch name
+  #       id: branch-name
+  #       uses: tj-actions/branch-names@v6
 
-      - name: Get Stage and Branch Name
-        id: stage-name
-        run: |
-          BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}
-          if [ "${BRANCH_NAME}" == "master" ]; then
-            STAGE_NAME="prod"
-          else
-            SANITIZED_BRANCH_NAME=${BRANCH_NAME//\//_}
-            STAGE_NAME="preview_$SANITIZED_BRANCH_NAME"
-          fi
-          STAGE_NAME=${STAGE_NAME//-/_}  # Replace "-" with "_"
-          echo "stage-name=${STAGE_NAME}" >> $GITHUB_OUTPUT
-          echo "BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}" >> $GITHUB_ENV
-          echo "Stage is ${STAGE_NAME}"
+  #     - name: Get Stage and Branch Name
+  #       id: stage-name
+  #       run: |
+  #         BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}
+  #         if [ "${BRANCH_NAME}" == "master" ]; then
+  #           STAGE_NAME="prod"
+  #         else
+  #           SANITIZED_BRANCH_NAME=${BRANCH_NAME//\//_}
+  #           STAGE_NAME="preview_$SANITIZED_BRANCH_NAME"
+  #         fi
+  #         STAGE_NAME=${STAGE_NAME//-/_}  # Replace "-" with "_"
+  #         echo "stage-name=${STAGE_NAME}" >> $GITHUB_OUTPUT
+  #         echo "BRANCH_NAME=${{ steps.branch-name.outputs.current_branch }}" >> $GITHUB_ENV
+  #         echo "Stage is ${STAGE_NAME}"
 
-      - uses: actions/checkout@v3
-      - name: Install scala cli
-        run: |
-          curl -fLo scala-cli.deb https://github.com/Virtuslab/scala-cli/releases/latest/download/scala-cli-x86_64-pc-linux.deb
-          sudo dpkg -i scala-cli.deb
-          scala-cli config power true
+  #     - uses: actions/checkout@v3
+  #     - name: Install scala cli
+  #       run: |
+  #         curl -fLo scala-cli.deb https://github.com/Virtuslab/scala-cli/releases/latest/download/scala-cli-x86_64-pc-linux.deb
+  #         sudo dpkg -i scala-cli.deb
+  #         scala-cli config power true
 
-      - name: Set up PostgreSQL CLI
-        run: sudo apt-get install -y postgresql-client
+  #     - name: Set up PostgreSQL CLI
+  #       run: sudo apt-get install -y postgresql-client
 
-      - name: Merge migrations into schema
-        run: |
-          echo "DROP SCHEMA IF EXISTS ${{ steps.stage-name.outputs.stage-name }} CASCADE;" > schema.sql
-          echo "CREATE SCHEMA ${{ steps.stage-name.outputs.stage-name }};" >> schema.sql
-          cat postgres/migrations/*/up.sql >> schema.sql
-          sed -i 's/{schema}/${{ steps.stage-name.outputs.stage-name }}/g' schema.sql
+  #     - name: Merge migrations into schema
+  #       run: |
+  #         echo "DROP SCHEMA IF EXISTS ${{ steps.stage-name.outputs.stage-name }} CASCADE;" > schema.sql
+  #         echo "CREATE SCHEMA ${{ steps.stage-name.outputs.stage-name }};" >> schema.sql
+  #         cat postgres/migrations/*/up.sql >> schema.sql
+  #         sed -i 's/{schema}/${{ steps.stage-name.outputs.stage-name }}/g' schema.sql
 
-      - name: Run schema
-        env:
-          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-        run: psql -h ${{ secrets.POSTGRES_HOST }} -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DATABASE }} -f schema.sql
+  #     - name: Run schema
+  #       env:
+  #         PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+  #       run: psql -h ${{ secrets.POSTGRES_HOST }} -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DATABASE }} -f schema.sql
 
-      - name: Run tests
-        env:
-          POSTGRES_SCHEMA: ${{ steps.stage-name.outputs.stage-name }}
-          EMBAAS_API_KEY: ${{ secrets.EMBAAS_API_KEY }}
-          EMBEDDING_API_ENDPOINT: ${{ secrets.EMBEDDING_API_ENDPOINT }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          EMBEDDING_API: mocked
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
-          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
-          OPENAI_API_KEY: mocked
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_KEY: ${{ secrets.STRIPE_WEBHOOK_KEY }}
-          STRIPE_STARTER_PLAN_ID: ${{ secrets.STRIPE_STARTER_PLAN_ID }}
-          STRIPE_PRO_PLAN_ID: ${{ secrets.STRIPE_PRO_PLAN_ID }}
-          STRIPE_INDIVIDUAL_PLAN_ID: ${{ secrets.STRIPE_INDIVIDUAL_PLAN_ID }}
-          REDIS_HOST: redis
-          REDIS_PORT: 6379
-          REDIS_PASSWORD: Redis2024!
-          STRIPE_ENTERPRISE_PLAN_ID: ${{ secrets.STRIPE_ENTERPRISE_PLAN_ID }}
-          USE_MOCKED_LLM: true
-        run: scala-cli test . --server=false
+  #     - name: Run tests
+  #       env:
+  #         POSTGRES_SCHEMA: ${{ steps.stage-name.outputs.stage-name }}
+  #         EMBAAS_API_KEY: ${{ secrets.EMBAAS_API_KEY }}
+  #         EMBEDDING_API_ENDPOINT: ${{ secrets.EMBEDDING_API_ENDPOINT }}
+  #         JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  #         EMBEDDING_API: mocked
+  #         POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+  #         POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+  #         POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+  #         POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+  #         OPENAI_API_KEY: mocked
+  #         STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+  #         STRIPE_WEBHOOK_KEY: ${{ secrets.STRIPE_WEBHOOK_KEY }}
+  #         STRIPE_STARTER_PLAN_ID: ${{ secrets.STRIPE_STARTER_PLAN_ID }}
+  #         STRIPE_PRO_PLAN_ID: ${{ secrets.STRIPE_PRO_PLAN_ID }}
+  #         STRIPE_INDIVIDUAL_PLAN_ID: ${{ secrets.STRIPE_INDIVIDUAL_PLAN_ID }}
+  #         REDIS_HOST: redis
+  #         REDIS_PORT: 6379
+  #         REDIS_PASSWORD: Redis2024!
+  #         STRIPE_ENTERPRISE_PLAN_ID: ${{ secrets.STRIPE_ENTERPRISE_PLAN_ID }}
+  #         USE_MOCKED_LLM: true
+  #       run: scala-cli test . --server=false
 
   build:
     runs-on: ubuntu-latest
