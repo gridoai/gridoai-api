@@ -214,21 +214,19 @@ def handleUpload(
     url <- Whatsapp.retrieveMediaUrl(mediaId)
     _ = logger.info(s"download url: $url")
     body <- Whatsapp.downloadMedia(url)
-    docs <- extractAndCleanText(
+    doc <- extractAndCleanText(
       filename,
       body,
       Some(FileFormat.fromString(mimeType))
     ).leftMap(_.toString)
       .map: content =>
-        List(
-          Document(
-            uid = UUID.randomUUID(),
-            name = filename,
-            source = Source.WhatsApp(mediaId),
-            content = content
-          )
+        Document(
+          uid = UUID.randomUUID(),
+          name = filename,
+          source = Source.WhatsApp(mediaId),
+          content = content
         )
-    _ <- createOrUpdateFiles(auth)(docs)
+    _ <- createOrUpdateFiles(auth)(List(doc))
     x <- Whatsapp.sendMessage(to, from, "Consegui! 🥳")
   yield x).leftFlatMap: e =>
     logger.error(e)
