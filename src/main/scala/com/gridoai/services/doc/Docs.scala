@@ -128,7 +128,12 @@ def extractAndCleanText(
     body: Array[Byte],
     format: Option[FileFormat] = None
 ): EitherT[IO, ExtractTextError, String] =
-  extractText(name, body, format).map(filterNonUtf8)
+  extractText(name, body, format)
+    .map(filterNonUtf8)
+    .subflatMap: text =>
+      if (text.strip == "")
+        Left(ExtractTextError(FileFormat.Plaintext, "Empty text"))
+      else Right(text)
 
 type FileUpErr = List[FileUploadError]
 type FileUpOutput = List[String]
