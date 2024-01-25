@@ -63,7 +63,15 @@ def handleWebhook(
             authFlow(from, to).flatMap:
               case None => EitherT.rightT(())
               case Some(auth) =>
-                handleUpload(auth, from, to, mediaId, filename, mimeType)
+                EitherT:
+                  handleUpload(
+                    auth,
+                    from,
+                    to,
+                    mediaId,
+                    filename,
+                    mimeType
+                  ).value.start >> ().asRight.pure[IO]
 
       case MessageInterfacePayload.MessageReceived(
             id,

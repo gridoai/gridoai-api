@@ -91,8 +91,8 @@ object GridoAIML extends EmbeddingAPI[IO]:
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
       .timeoutTo(
-        40.seconds,
-        IO.pure(Left("GridoAI ML API timed out after 40 seconds"))
+        5.minutes,
+        IO.pure(Left("GridoAI ML API timed out after 5 minutes"))
       )
       .asEitherT
       .map(
