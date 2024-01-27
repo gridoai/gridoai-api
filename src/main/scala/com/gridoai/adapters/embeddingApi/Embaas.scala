@@ -63,6 +63,7 @@ object EmbaasClient:
       val request = EmbeddingRequest(texts, instruction)
       val response = httpClient
         .post("/v1/embeddings/")
+        .readTimeout(20.seconds)
         .body(request.asJson.noSpaces)
         .header(authHeader)
         .contentType(MediaType.ApplicationJson)
@@ -70,7 +71,6 @@ object EmbaasClient:
         .map(
           _.body.flatMap(decode[EmbeddingResponse](_))
         )
-        .timeoutTo(20.seconds, IO.pure(Left("Embaas API Timeout")))
         .asEitherT
 
       response
