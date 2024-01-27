@@ -40,6 +40,7 @@ object CohereClient:
       )
       val response = httpClient
         .post("/v1/rerank")
+        .readTimeout(20.seconds)
         .body(request.asJson.noSpaces)
         .header(authHeader)
         .contentType(MediaType.ApplicationJson)
@@ -47,7 +48,6 @@ object CohereClient:
         .map(
           _.body.flatMap(decode[RerankResponse](_))
         )
-        .timeoutTo(20.seconds, IO.pure(Left("Cohere API Timeout")))
         .asEitherT
         .attempt
 

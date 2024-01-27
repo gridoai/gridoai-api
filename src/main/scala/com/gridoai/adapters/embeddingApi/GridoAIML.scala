@@ -82,18 +82,15 @@ object GridoAIML extends EmbeddingAPI[IO]:
     val body = GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     HttpBatch
       .post("")
+      .readTimeout(5.minutes)
       .headers(Map("Content-Type" -> "application/json"))
       .body(body)
-      .sendReq()
+      .sendReq(retries = 0)
       .map: response =>
         logger.info(s"Partition of ${texts.length} texts received.")
         response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
-      .timeoutTo(
-        5.minutes,
-        IO.pure(Left("GridoAI ML API timed out after 5 minutes"))
-      )
       .asEitherT
       .map(
         _.message.map(vec =>
@@ -110,17 +107,14 @@ object GridoAIML extends EmbeddingAPI[IO]:
       GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     HttpSingle
       .post("")
+      .readTimeout(15.seconds)
       .headers(Map("Content-Type" -> "application/json"))
       .body(body)
-      .sendReq()
+      .sendReq(retries = 0)
       .map: response =>
         response.body.flatMap(
           decode[MessageResponse[List[List[Float]]]](_).left.map(_.getMessage())
         )
-      .timeoutTo(
-        15.seconds,
-        IO.pure(Left("GridoAI ML API timed out after 15 seconds"))
-      )
       .asEitherT
       .map(
         _.message.map(v =>
