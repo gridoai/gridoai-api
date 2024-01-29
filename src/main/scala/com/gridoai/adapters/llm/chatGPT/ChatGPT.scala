@@ -17,12 +17,12 @@ import com.gridoai.utils._
 
 val ENC_GPT35TURBO = Encodings
   .newDefaultEncodingRegistry()
-  .getEncodingForModel(ModelType.GPT_3_5_TURBO)
+  .getEncodingForModel(ModelType.GPT_3_5_TURBO_16K)
 
 object ChatGPTClient:
   val logger = LoggerFactory.getLogger(getClass.getName)
 
-  val maxInputTokens = 3_000
+  val maxInputTokens = 10_000
 
   def messageFromToRole: MessageFrom => ChatCompletion.Message.Role =
     case MessageFrom.Bot  => ChatCompletion.Message.Role.Assistant
@@ -48,8 +48,16 @@ object ChatGPTClient:
       case None => List()
     val chat = messages.map(messageToClientMessage)
     val fullSeq = (contextMessage ++ chat).toSeq
+    val inputTokens = fullSeq.map(_.content |> calculateTokenQuantity).sum
     logger.info(s"messages: $messages, context: ${context}")
-    (fullSeq, ChatCompletionSettings())
+    (
+      fullSeq,
+      ChatCompletionSettings(
+        model = "gpt-3.5-turbo-16k",
+        n = Some(1),
+        maxTokens = Some(16_000 - inputTokens)
+      )
+    )
 
   def calculateTokenQuantity = ENC_GPT35TURBO.countTokens
 
