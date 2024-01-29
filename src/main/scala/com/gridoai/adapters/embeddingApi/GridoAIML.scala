@@ -27,7 +27,7 @@ val embeddingApiEndpointBatch = sys.env.getOrElse(
 case class GridoAIMLEmbeddingRequest(
     texts: List[String],
     instruction: String,
-    model: String = "multilingual-e5-base-onnx"
+    model: String = "multilingual-e5-base"
 )
 
 case class MessageResponse[T](message: T)
