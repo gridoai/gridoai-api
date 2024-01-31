@@ -50,7 +50,6 @@ def mergeChunks(chunks: List[Chunk]): String =
   else ""
 
 def buildQueriesToSearchDocumentsPrompt(
-    messages: List[Message],
     lastQueries: List[String],
     lastChunks: List[Chunk]
 ): String =

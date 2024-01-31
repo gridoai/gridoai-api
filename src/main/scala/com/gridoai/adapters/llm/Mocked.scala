@@ -3,6 +3,7 @@ package com.gridoai.adapters.llm.mocked
 import cats._
 import cats.implicits._
 import cats.data.EitherT
+import fs2.Stream
 
 import com.gridoai.domain._
 import com.gridoai.adapters.llm._
@@ -29,16 +30,16 @@ class MockLLM[F[_]: Applicative] extends LLM[F]:
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): EitherT[F, String, String] =
-    EitherT.rightT("The response message.")
+  ): Stream[F, Either[String, String]] =
+    Stream(Right("The response message."))
 
   def ask(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): EitherT[F, String, String] =
-    EitherT.rightT("The response message.")
+  ): Stream[F, Either[String, String]] =
+    Stream(Right("The response message."))
 
   def buildQueriesToSearchDocuments(
       messages: List[Message],

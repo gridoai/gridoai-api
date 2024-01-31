@@ -107,7 +107,7 @@ object GridoAIML extends EmbeddingAPI[IO]:
       GridoAIMLEmbeddingRequest(texts, instruction).asJson.noSpaces
     HttpSingle
       .post("")
-      .readTimeout(15.seconds)
+      .readTimeout(30.seconds)
       .headers(Map("Content-Type" -> "application/json"))
       .body(body)
       .sendReq(retries = 0)

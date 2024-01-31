@@ -1,7 +1,10 @@
 package com.gridoai.adapters.llm
 
 import cats.effect.IO
+import cats.effect.Async
 import cats.data.EitherT
+import fs2.Stream
+
 import com.gridoai.domain._
 import com.gridoai.adapters.openAiClientBackend
 import com.gridoai.adapters.syncCatsBackend
@@ -26,13 +29,13 @@ trait LLM[F[_]]:
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): EitherT[F, String, String]
+  ): Stream[F, Either[String, String]]
   def answer(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): EitherT[F, String, String]
+  ): Stream[F, Either[String, String]]
   def buildQueriesToSearchDocuments(
       messages: List[Message],
       lastQueries: List[String],

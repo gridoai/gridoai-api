@@ -1,7 +1,5 @@
 package com.gridoai.adapters.llm.chatGPT
 
-import dev.maxmelnyk.openaiscala.models.text.completions.chat._
-import dev.maxmelnyk.openaiscala.client.OpenAIClient
 import sttp.client3._
 import cats.MonadError
 import cats.implicits._
@@ -9,6 +7,19 @@ import cats.data.EitherT
 import com.knuddels.jtokkit.Encodings
 import com.knuddels.jtokkit.api.ModelType
 import org.slf4j.LoggerFactory
+import java.util.ArrayList
+import collection.JavaConverters.seqAsJavaListConverter
+import com.azure.ai.openai.models.ChatRequestSystemMessage
+import com.azure.ai.openai.models.ChatRequestUserMessage
+import com.azure.ai.openai.models.ChatRequestAssistantMessage
+import com.azure.ai.openai.OpenAIClientBuilder
+import com.azure.core.credential.KeyCredential
+import com.azure.ai.openai.models.ChatCompletionsOptions
+import com.azure.ai.openai.models.ChatRequestMessage
+import fs2.interop.reactivestreams._
+import fs2.Stream
+import cats.effect.IO
+import cats.effect.Async
 
 import com.gridoai.adapters._
 import com.gridoai.adapters.llm._
@@ -24,40 +35,23 @@ object ChatGPTClient:
 
   val maxInputTokens = 10_000
 
-  def messageFromToRole: MessageFrom => ChatCompletion.Message.Role =
-    case MessageFrom.Bot  => ChatCompletion.Message.Role.Assistant
-    case MessageFrom.User => ChatCompletion.Message.Role.User
+  def messageToClientMessage(m: Message): ChatRequestMessage =
+    m.from match
+      case MessageFrom.Bot    => ChatRequestAssistantMessage(m.message)
+      case MessageFrom.User   => ChatRequestUserMessage(m.message)
+      case MessageFrom.System => ChatRequestSystemMessage(m.message)
 
-  def messageToClientMessage(m: Message): ChatCompletion.Message =
-    ChatCompletion.Message(
-      role = messageFromToRole(m.from),
-      content = m.message
-    )
-
-  def makePayloadWithContext(context: Option[String] = None)(
+  def makePayloadWithContext(context: String)(
       messages: List[Message]
-  ): (Seq[ChatCompletion.Message], ChatCompletionSettings) =
-    val contextMessage = context match
-      case Some(c) =>
-        List(
-          ChatCompletion.Message(
-            role = ChatCompletion.Message.Role.System,
-            content = c
-          )
-        )
-      case None => List()
-    val chat = messages.map(messageToClientMessage)
-    val fullSeq = (contextMessage ++ chat).toSeq
-    val inputTokens = fullSeq.map(_.content |> calculateTokenQuantity).sum
-    logger.info(s"messages: $messages, context: ${context}")
-    (
-      fullSeq,
-      ChatCompletionSettings(
-        model = "gpt-3.5-turbo-16k",
-        n = Some(1),
-        maxTokens = Some(16_000 - inputTokens)
+  ): List[Message] =
+    val contextMessage = List(
+      Message(
+        from = MessageFrom.System,
+        message = context
       )
     )
+    logger.info(s"messages: $messages, context: ${context}")
+    (contextMessage ++ messages)
 
   def calculateTokenQuantity = ENC_GPT35TURBO.countTokens
 
@@ -69,22 +63,38 @@ object ChatGPTClient:
       .map(calculateMessageTokenQuantity)
       .sum
 
-  def apply[F[_]](sttpBackend: SttpBackend[F, Any])(using
+  def apply[F[_]: Async](sttpBackend: SttpBackend[F, Any])(using
       MonadError[F, Throwable]
   ) = new LLM[F]:
-    val client = OpenAIClient(
-      getEnv("OPENAI_API_KEY"),
-      Some(getEnv("OPENAI_ORG_ID"))
-    )(sttpBackend)
+    val client = new OpenAIClientBuilder()
+      .credential(new KeyCredential(getEnv("OPENAI_API_KEY")))
+      .buildAsyncClient()
 
-    def getAnswerFromChat(
-        llmOutput: F[ChatCompletion]
-    ): EitherT[F, String, String] =
-      llmOutput
-        .map(_.choices.head.message.content)
-        .map(Right(_))
-        .asEitherT
-        .attempt
+    def createChatCompletion(maxTokens: Option[Int] = None)(
+        messages: List[Message]
+    ): Stream[F, Either[String, String]] =
+
+      val chatMessages = messages.map(messageToClientMessage).asJava
+      val options = ChatCompletionsOptions(chatMessages)
+      options.setMaxTokens(
+        maxTokens.getOrElse(
+          messages.map(_.message |> calculateTokenQuantity).sum
+        )
+      )
+
+      val chatCompletionsStream =
+        client.getChatCompletionsStream("gpt-3.5-turbo-1106", options)
+
+      chatCompletionsStream
+        .toStreamBuffered[F](1)
+        .map: chatCompletions =>
+          val delta =
+            chatCompletions.getChoices().get(0).getDelta();
+          if (delta.getContent() != null)
+            val content = delta.getContent()
+            println(content)
+            Right(content)
+          else Left("No content")
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
       chunk |> chunkToStr |> calculateTokenQuantity
@@ -107,7 +117,7 @@ object ChatGPTClient:
         basedOnDocsOnly: Boolean,
         messages: List[Message],
         searchedBefore: Boolean
-    ): EitherT[F, String, String] =
+    ): Stream[F, Either[String, String]] =
       askOrAnswer(chunks, basedOnDocsOnly, messages, searchedBefore, false)
 
     def ask(
@@ -115,7 +125,7 @@ object ChatGPTClient:
         basedOnDocsOnly: Boolean,
         messages: List[Message],
         searchedBefore: Boolean
-    ): EitherT[F, String, String] =
+    ): Stream[F, Either[String, String]] =
       askOrAnswer(chunks, basedOnDocsOnly, messages, searchedBefore, true)
 
     def askOrAnswer(
@@ -124,7 +134,7 @@ object ChatGPTClient:
         messages: List[Message],
         searchedBefore: Boolean,
         askUser: Boolean
-    ): EitherT[F, String, String] =
+    ): Stream[F, Either[String, String]] =
 
       val mergedChunks = mergeChunks(chunks)
       val context =
@@ -137,9 +147,8 @@ object ChatGPTClient:
       )
 
       messages
-        |> makePayloadWithContext(Some(context))
-        |> client.createChatCompletion
-        |> getAnswerFromChat
+        |> makePayloadWithContext(context)
+        |> createChatCompletion()
 
     def chooseAction(
         messages: List[Message],
@@ -148,18 +157,15 @@ object ChatGPTClient:
         options: List[Action]
     ): EitherT[F, String, Action] =
       val prompt = chooseActionPrompt(chunks, messages, options)
-      (
-        Seq(
-          ChatCompletion.Message(
-            role = ChatCompletion.Message.Role.System,
-            content = prompt
-          )
-        ),
-        ChatCompletionSettings(maxTokens = Some(1), n = Some(1))
+      List(
+        Message(
+          from = MessageFrom.System,
+          message = prompt
+        )
       )
-        |> client.createChatCompletion
-        |> getAnswerFromChat
-        |> (_.value.map(_.flatMap(strToAction(options))).asEitherT)
+        |> createChatCompletion(Some(1))
+        |> (_.compileOutput.leftMap(_.mkString(", ")).map(_.mkString))
+        |> (_.subflatMap(strToAction(options)))
 
     def buildQueriesToSearchDocuments(
         messages: List[Message],
@@ -168,26 +174,18 @@ object ChatGPTClient:
     ): EitherT[F, String, List[String]] =
       val prompt =
         buildQueriesToSearchDocumentsPrompt(
-          messages.dropRight(1),
           lastQueries,
           lastChunks
         )
 
-      val fullConversation = ChatCompletion.Message(
-        role = ChatCompletion.Message.Role.System,
-        content = prompt
-      ) :: (buildQueriesExample :+ Message(
+      logger.info(s"Prompt to build query: $prompt")
+      (buildQueriesExample :+ Message(
         from = MessageFrom.User,
         message = mergeMessages(messages)
-      )).map(messageToClientMessage)
-
-      logger.info(s"Prompt to build query: $prompt")
-      (
-        fullConversation,
-        ChatCompletionSettings(maxTokens = Some(1_000), n = Some(1))
-      )
-        |> client.createChatCompletion
-        |> getAnswerFromChat
+      ))
+        |> makePayloadWithContext(prompt)
+        |> createChatCompletion(Some(1_000))
+        |> (_.compileOutput.leftMap(_.mkString(", ")).map(_.mkString))
         |> (_.map(
           _.split("\n").map(_.trim).filter(!_.isEmpty).take(3).toList
         ))

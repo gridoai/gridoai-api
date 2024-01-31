@@ -1,11 +1,13 @@
 package com.gridoai.utils
 import cats.effect.IO
+import cats.effect.Async
 import cats.Functor
 import cats.implicits.toFunctorOps
 import cats.ApplicativeError
 import cats.implicits._
 import cats.effect.implicits._
 import cats.data.EitherT
+import fs2.Stream
 
 import cats.Monad
 extension [A](a: A) inline def |>[B](inline f: A => B): B = f(a)
@@ -44,6 +46,9 @@ extension [E, T, F[_]](x: EitherT[F, E, T])
   ): EitherT[F, String, T] = EitherT:
     ae.attempt(x.value)
       .map(_.flatten.left.map(_.toString().trace).addLocationToLeft)
+
+  def toStream: Stream[F, Either[E, T]] =
+    Stream.eval(x.value)
 
 /** Logs the time taken to process a value in a functor.
   *
@@ -151,3 +156,23 @@ def executeByPartsInParallel[T, E, V](
         case Some(error) => (Left(error))
         case None        => (Right(successes.flatten))
     .asEitherT
+
+extension [E, T, F[_]](x: Stream[F, Either[E, T]])
+  def subflatMap[V](f: T => Stream[F, Either[E, V]])(implicit
+      F: Monad[F]
+  ): Stream[F, Either[E, V]] =
+    x.flatMap:
+      case Right(r) => f(r)
+      case Left(l)  => Stream.eval(Left(l).pure[F])
+
+  def subMap[V](f: T => V)(implicit
+      F: Monad[F]
+  ): Stream[F, Either[E, V]] =
+    x.map(_.map(f))
+
+  def compileOutput(implicit
+      F: Async[F]
+  ): EitherT[F, List[E], List[T]] =
+    x.compile.toList
+      .map(partitionEithers)
+      .asEitherT
