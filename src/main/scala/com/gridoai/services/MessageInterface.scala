@@ -257,27 +257,36 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
     messageDb: MessageDB[IO],
     ns: NotificationService[IO]
 ): EitherT[IO, String, Unit] =
-  for
-    messages <- storeMessage[IO](auth.orgId, auth.userId, message)
-    response <- buildAnswer(auth)(messages, true, None, false).compileOutput
-      .leftMap(_.mkString(", "))
-      .map: r =>
+  storeMessage[IO](auth.orgId, auth.userId, message).flatMap: messages =>
+    buildAnswer(auth)(messages, true, None, false)
+      .groupAdjacentBy:
+        case Right(r) => r.message == "\n"
+        case Left(e)  => true
+      .filter(!_._1)
+      .map(_._2.toList |> partitionEithers)
+      .leftMap(_.mkString)
+      .subMap: r =>
         AskResponse(
           message = r.map(_.message).mkString,
           sources = r.flatMap(_.sources).distinct
         )
-    validatedResponse <- checkOutOfSyncResult[IO](
-      auth.orgId,
-      auth.userId,
-      from,
-      ids
-    )(response)
-    x <- Whatsapp.sendMessage(
-      to,
-      from,
-      validatedResponse |> formatMessage
-    )
-  yield x
+      .subevalMap: resFragment =>
+        for
+          validatedResponse <- checkOutOfSyncResult[IO](
+            auth.orgId,
+            auth.userId,
+            from,
+            ids
+          )(resFragment)
+          x <- Whatsapp.sendMessage(
+            to,
+            from,
+            validatedResponse |> formatMessage
+          )
+        yield x
+      .compileOutput
+      .leftMap(_.mkString(","))
+      .map(_.head)
 
 def formatMessage(askResponse: AskResponse): String =
   if (askResponse.sources.isEmpty) askResponse.message
