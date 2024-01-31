@@ -182,6 +182,18 @@ extension [E, T, F[_]](x: Stream[F, Either[E, T]])
   ): Stream[F, Either[E, V]] =
     x.map(_.map(f))
 
+  def leftMap[V](f: E => V)(implicit
+      F: Monad[F]
+  ): Stream[F, Either[V, T]] =
+    x.map(_.left.map(f))
+
+  def subevalMap[V](f: T => EitherT[F, E, V])(implicit
+      F: Monad[F]
+  ): Stream[F, Either[E, V]] =
+    x.evalMap:
+      case Right(r) => f(r).value
+      case Left(l)  => l.asLeft.pure[F]
+
   def compileOutput(implicit
       F: Async[F]
   ): EitherT[F, List[E], List[T]] =
