@@ -4,6 +4,7 @@ import cats.effect.IO
 import cats.implicits._
 import cats.data.EitherT
 import org.slf4j.LoggerFactory
+import fs2.Stream
 
 import com.gridoai.adapters.llm._
 import com.gridoai.domain._
@@ -34,7 +35,13 @@ def ask(auth: AuthData)(payload: AskPayload)(implicit
     payload.basedOnDocsOnly,
     payload.scope,
     payload.useActions
-  )
+  ).compileOutput
+    .leftMap(_.mkString(", "))
+    .map: r =>
+      AskResponse(
+        message = r.map(_.message).mkString,
+        sources = r.flatMap(_.sources).distinct
+      )
 
 def buildAnswer(auth: AuthData)(
     allMessages: List[Message],
@@ -44,7 +51,7 @@ def buildAnswer(auth: AuthData)(
 )(implicit
     db: DocDB[IO],
     ns: NotificationService[IO]
-): EitherT[IO, String, AskResponse] =
+): Stream[IO, Either[String, AskResponse]] =
   val llmModel = LLMModel.Gpt35Turbo
   val llm = getLLM(llmModel)
   val logger = LoggerFactory.getLogger(getClass.getName)
@@ -62,13 +69,14 @@ def buildAnswer(auth: AuthData)(
       searchesBeforeResponse: Int
   )(
       lastChunks: List[Chunk]
-  ): EitherT[IO, String, AskResponse] =
+  ): Stream[IO, Either[String, AskResponse]] =
     chooseAction(
       lastQueries,
       lastChunks,
       searchesBeforeResponse
+    ).toStream.subflatMap(
+      runAction(lastQueries, lastChunks, searchesBeforeResponse)
     )
-      >>= runAction(lastQueries, lastChunks, searchesBeforeResponse)
 
   def chooseAction(
       lastQueries: List[String],
@@ -101,7 +109,7 @@ def buildAnswer(auth: AuthData)(
       lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
-  )(action: Action): EitherT[IO, String, AskResponse] =
+  )(action: Action): Stream[IO, Either[String, AskResponse]] =
     (action match
       case Action.Ask    => doAskAction
       case Action.Answer => doAnswerAction
@@ -112,7 +120,7 @@ def buildAnswer(auth: AuthData)(
       lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
-  ): EitherT[IO, String, AskResponse] =
+  ): Stream[IO, Either[String, AskResponse]] =
     logger.info("AI decided to ask...")
     llm
       .ask(
@@ -121,7 +129,7 @@ def buildAnswer(auth: AuthData)(
         messages,
         !lastQueries.isEmpty
       )
-      .map: question =>
+      .subMap: question =>
         AskResponse(
           message = question,
           sources = lastChunks.map(_.documentName).distinct
@@ -131,7 +139,7 @@ def buildAnswer(auth: AuthData)(
       lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
-  ): EitherT[IO, String, AskResponse] =
+  ): Stream[IO, Either[String, AskResponse]] =
     logger.info("AI decided to answer...")
     llm
       .answer(
@@ -140,7 +148,7 @@ def buildAnswer(auth: AuthData)(
         messages,
         !lastQueries.isEmpty
       )
-      .map: answer =>
+      .subMap: answer =>
         AskResponse(
           message = answer,
           sources = lastChunks.map(_.documentName).distinct
@@ -150,11 +158,12 @@ def buildAnswer(auth: AuthData)(
       lastQueries: List[String],
       lastChunks: List[Chunk],
       searchesBeforeResponse: Int
-  ): EitherT[IO, String, AskResponse] =
+  ): Stream[IO, Either[String, AskResponse]] =
     logger.info("AI decided to search...")
     llm
       .buildQueriesToSearchDocuments(messages, lastQueries, lastChunks)
-      .flatMap: newQueries =>
+      .toStream
+      .subflatMap: newQueries =>
         logger.info(s"AI's queries: $newQueries")
         searchDoc(auth)(
           SearchPayload(
@@ -167,14 +176,16 @@ def buildAnswer(auth: AuthData)(
             llmName = llmModel |> llmToStr,
             scope = scope
           )
-        ) >>= askRecursively(
-          newQueries,
-          searchesBeforeResponse - 1
+        ).toStream.subflatMap(
+          askRecursively(
+            newQueries,
+            searchesBeforeResponse - 1
+          )
         )
 
   traceMappable("ask"):
     messages.last.from match
       case MessageFrom.Bot =>
-        EitherT.leftT("Last message should be from the user")
+        Stream(Left("Last message should be from the user"))
       case MessageFrom.User =>
         doSearchAction(List.empty, List.empty, 2)

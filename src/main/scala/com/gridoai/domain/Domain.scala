@@ -4,6 +4,7 @@ import io.circe.generic.semiauto._
 import scala.util.Try
 import java.util.UUID
 import io.circe.derivation.{Configuration, ConfiguredEnumCodec}
+import fs2.Stream
 
 object Plan:
   given Configuration =
@@ -22,7 +23,7 @@ def getMaxUsersByPlan: Plan => Option[Int] =
 type UID = UUID
 
 enum MessageFrom:
-  case Bot, User
+  case Bot, User, System
 
 enum EmbeddingModel:
   case TextEmbeddingsAda002, TextEmbeddingsBert002,
@@ -146,7 +147,10 @@ case class SearchReport(
     status: SearchStatus
 )
 
-case class AskResponse(message: String, sources: List[String])
+case class AskResponse(
+    message: String,
+    sources: List[String]
+)
 
 case class PaginatedResponse[T](data: T, total: Int)
 

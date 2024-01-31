@@ -259,7 +259,13 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
 ): EitherT[IO, String, Unit] =
   for
     messages <- storeMessage[IO](auth.orgId, auth.userId, message)
-    response <- buildAnswer(auth)(messages, true, None, false)
+    response <- buildAnswer(auth)(messages, true, None, false).compileOutput
+      .leftMap(_.mkString(", "))
+      .map: r =>
+        AskResponse(
+          message = r.map(_.message).mkString,
+          sources = r.flatMap(_.sources).distinct
+        )
     validatedResponse <- checkOutOfSyncResult[IO](
       auth.orgId,
       auth.userId,

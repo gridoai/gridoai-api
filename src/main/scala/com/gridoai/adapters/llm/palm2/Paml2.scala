@@ -1,4 +1,5 @@
 package com.gridoai.adapters.llm.palm2
+
 import cats.effect.IO
 import cats.data.EitherT
 import cats.implicits._
@@ -7,6 +8,7 @@ import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.syntax._
+import fs2.Stream
 
 import com.gridoai.adapters._
 import com.gridoai.adapters.llm._
@@ -127,7 +129,7 @@ object Paml2Client extends LLM[IO]:
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): EitherT[IO, String, String] =
+  ): Stream[IO, Either[String, String]] =
 
     val mergedChunks = chunks
       .map(chunk =>
@@ -141,14 +143,16 @@ object Paml2Client extends LLM[IO]:
     println(
       s"Total tokens in messages: ${calculateMessagesTokenQuantity(messages)}"
     )
-    (messages |> makePayloadWithContext(context) |> call).map(getAnswer)
+    (messages |> makePayloadWithContext(context) |> call)
+      .map(getAnswer)
+      .toStream
 
   def answer(
       chunks: List[Chunk],
       basedOnDocsOnly: Boolean,
       messages: List[Message],
       searchedBefore: Boolean
-  ): EitherT[IO, String, String] =
+  ): Stream[IO, Either[String, String]] =
 
     val mergedChunks = chunks
       .map(chunk =>
@@ -162,7 +166,9 @@ object Paml2Client extends LLM[IO]:
     println(
       s"Total tokens in messages: ${calculateMessagesTokenQuantity(messages)}"
     )
-    (messages |> makePayloadWithContext(context) |> call).map(getAnswer)
+    (messages |> makePayloadWithContext(context) |> call)
+      .map(getAnswer)
+      .toStream
 
   def chooseAction(
       messages: List[Message],
