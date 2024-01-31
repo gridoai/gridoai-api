@@ -96,6 +96,18 @@ def traceMappable[T, F[_]: Functor](label: String)(
       )
       ae.raiseError(e)
 
+def traceStream[T, F[_]: Async](label: String)(
+    x: Stream[F, T]
+)(implicit ae: ApplicativeError[F, Throwable]): Stream[F, T] =
+  val now = System.currentTimeMillis()
+  x.onFinalize(
+    Async[F].delay(
+      println(
+        s"[$label] Time: ${System.currentTimeMillis() - now}ms"
+      )
+    )
+  )
+
 /** Transforms a list of `Either[E, T]` into an `Either[List[E], List[T]]`.
   *
   * This function processes a list of `Either` values. If any of them are
