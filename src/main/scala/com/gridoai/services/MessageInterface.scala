@@ -286,7 +286,7 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
         yield x
       .compileOutput
       .leftMap(_.mkString(","))
-      .map(_.head)
+      .map(_ => ())
 
 def formatMessage(askResponse: AskResponse): String =
   if (askResponse.sources.isEmpty) askResponse.message

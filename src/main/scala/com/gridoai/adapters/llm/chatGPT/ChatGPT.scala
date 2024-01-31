@@ -83,7 +83,7 @@ object ChatGPTClient:
       )
 
       val chatCompletionsStream =
-        client.getChatCompletionsStream("gpt-3.5-turbo-1106", options)
+        client.getChatCompletionsStream("gpt-3.5-turbo-16k", options)
 
       chatCompletionsStream
         .toStreamBuffered[F](1)
