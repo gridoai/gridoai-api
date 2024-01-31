@@ -183,7 +183,7 @@ def buildAnswer(auth: AuthData)(
           )
         )
 
-  traceMappable("ask"):
+  traceStream("ask"):
     messages.last.from match
       case MessageFrom.Bot =>
         Stream(Left("Last message should be from the user"))
