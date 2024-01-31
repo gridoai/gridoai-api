@@ -87,14 +87,10 @@ object ChatGPTClient:
 
       chatCompletionsStream
         .toStreamBuffered[F](1)
-        .map: chatCompletions =>
-          val delta =
-            chatCompletions.getChoices().get(0).getDelta();
-          if (delta.getContent() != null)
-            val content = delta.getContent()
-            println(content)
-            Right(content)
-          else Left("No content")
+        .map(_.getChoices().get(0).getDelta().getContent())
+        .filter(_ != null)
+        .attempt
+        .leftMap(_.toString)
 
     def calculateChunkTokenQuantity(chunk: Chunk): Int =
       chunk |> chunkToStr |> calculateTokenQuantity
