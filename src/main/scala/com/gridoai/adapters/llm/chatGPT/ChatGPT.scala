@@ -78,7 +78,7 @@ object ChatGPTClient:
       val options = ChatCompletionsOptions(chatMessages)
       options.setMaxTokens(
         maxTokens.getOrElse(
-          messages.map(_.message |> calculateTokenQuantity).sum
+          16_000 - messages.map(_.message |> calculateTokenQuantity).sum
         )
       )
 
