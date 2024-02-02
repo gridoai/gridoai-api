@@ -6,6 +6,7 @@ import cats.data.EitherT
 import java.util.UUID
 import scala.util.Random
 import org.slf4j.LoggerFactory
+import fs2.Stream
 
 import com.gridoai.utils._
 import com.gridoai.adapters.whatsapp.Whatsapp
@@ -259,6 +260,21 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
 ): EitherT[IO, String, Unit] =
   storeMessage[IO](auth.orgId, auth.userId, message).flatMap: messages =>
     buildAnswer(auth)(messages, true, None, false)
+      .subflatMap: m =>
+        Stream.emits:
+          ((m.message.startsWith("\n"), m.message.endsWith("\n")) match
+            case (true, true) =>
+              ("\n" +: splitLineBreak(
+                m.message.stripSuffix("\n").stripPrefix("\n")
+              )) :+ "\n"
+            case (false, true) =>
+              splitLineBreak(m.message.stripSuffix("\n")) :+ "\n"
+            case (true, false) =>
+              "\n" +: splitLineBreak(m.message.stripPrefix("\n"))
+            case (false, false) =>
+              if (m.message.contains("\n")) splitLineBreak(m.message)
+              else List(m.message)
+          ).map(r => AskResponse(r, m.sources).asRight)
       .groupAdjacentBy:
         case Right(r) => r.message == "\n"
         case Left(e)  => true
@@ -278,20 +294,28 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
             from,
             ids
           )(resFragment)
-          x <- Whatsapp.sendMessage(
+          _ <- Whatsapp.sendMessage(
             to,
             from,
-            validatedResponse |> formatMessage
+            validatedResponse.message
           )
-        yield x
+        yield validatedResponse.sources
       .compileOutput
       .leftMap(_.mkString(","))
-      .map(_ => ())
+      .flatMap(s =>
+        Whatsapp.sendMessage(
+          to,
+          from,
+          s"📖: ${s.flatten.distinct.mkString(", ")}"
+        )
+      )
 
-def formatMessage(askResponse: AskResponse): String =
-  if (askResponse.sources.isEmpty) askResponse.message
-  else
-    s"${askResponse.message}\n\n📖: ${askResponse.sources.mkString(", ")}"
+def splitLineBreak(s: String): List[String] =
+  s.split("\n")
+    .filter(_ != "")
+    .flatMap(Array(_, "\n"))
+    .dropRight(1)
+    .toList
 
 def isEmailValid(email: String): Boolean =
   val regex =
