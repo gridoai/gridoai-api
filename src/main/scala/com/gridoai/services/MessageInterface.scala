@@ -258,7 +258,7 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
     messageDb: MessageDB[IO],
     ns: NotificationService[IO]
 ): EitherT[IO, String, Unit] =
-  for
+  (for
     messages <- storeMessage[IO](auth.orgId, auth.userId, message)
     sources <- (buildAnswer(auth)(
       messages,
@@ -287,7 +287,13 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
       from,
       s"📖: ${sources.flatten.distinct.mkString(", ")}"
     )
-  yield x
+  yield x).leftFlatMap: e =>
+    logger.error(e)
+    Whatsapp.sendMessage(
+      to,
+      from,
+      "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
+    )
 
 def groupStreamByParagraph(
     s: Stream[IO, Either[String, AskResponse]]
