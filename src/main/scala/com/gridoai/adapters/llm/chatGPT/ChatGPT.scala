@@ -66,9 +66,11 @@ object ChatGPTClient:
   def apply[F[_]: Async](sttpBackend: SttpBackend[F, Any])(using
       MonadError[F, Throwable]
   ) = new LLM[F]:
-    val client = new OpenAIClientBuilder()
-      .credential(new KeyCredential(getEnv("OPENAI_API_KEY")))
+    val client = OpenAIClientBuilder()
+      .credential(KeyCredential(getEnv("OPENAI_API_KEY")))
       .buildAsyncClient()
+
+    val model = getEnv("OPENAI_MODEL")
 
     def createChatCompletion(maxTokens: Option[Int] = None)(
         messages: List[Message]
@@ -83,7 +85,7 @@ object ChatGPTClient:
       )
 
       val chatCompletionsStream =
-        client.getChatCompletionsStream("gpt-3.5-turbo-16k", options)
+        client.getChatCompletionsStream(model, options)
 
       chatCompletionsStream
         .toStreamBuffered[F](1)
@@ -159,7 +161,7 @@ object ChatGPTClient:
           message = prompt
         )
       )
-        |> createChatCompletion(Some(1))
+        |> createChatCompletion(maxTokens = Some(1))
         |> (_.compileOutput.leftMap(_.mkString(", ")).map(_.mkString))
         |> (_.subflatMap(strToAction(options)))
 
@@ -180,7 +182,7 @@ object ChatGPTClient:
         message = mergeMessages(messages)
       ))
         |> makePayloadWithContext(prompt)
-        |> createChatCompletion(Some(1_000))
+        |> createChatCompletion(maxTokens = Some(1_000))
         |> (_.compileOutput.leftMap(_.mkString(", ")).map(_.mkString))
         |> (_.map(
           _.split("\n").map(_.trim).filter(!_.isEmpty).take(3).toList
