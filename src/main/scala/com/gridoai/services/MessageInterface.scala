@@ -258,34 +258,14 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
     messageDb: MessageDB[IO],
     ns: NotificationService[IO]
 ): EitherT[IO, String, Unit] =
-  storeMessage[IO](auth.orgId, auth.userId, message).flatMap: messages =>
-    buildAnswer(auth)(messages, true, None, false)
-      .subflatMap: m =>
-        Stream.emits:
-          ((m.message.startsWith("\n"), m.message.endsWith("\n")) match
-            case (true, true) =>
-              ("\n" +: splitLineBreak(
-                m.message.stripSuffix("\n").stripPrefix("\n")
-              )) :+ "\n"
-            case (false, true) =>
-              splitLineBreak(m.message.stripSuffix("\n")) :+ "\n"
-            case (true, false) =>
-              "\n" +: splitLineBreak(m.message.stripPrefix("\n"))
-            case (false, false) =>
-              if (m.message.contains("\n")) splitLineBreak(m.message)
-              else List(m.message)
-          ).map(r => AskResponse(r, m.sources).asRight)
-      .groupAdjacentBy:
-        case Right(r) => r.message == "\n"
-        case Left(e)  => true
-      .filter(!_._1)
-      .map(_._2.toList |> partitionEithers)
-      .leftMap(_.mkString)
-      .subMap: r =>
-        AskResponse(
-          message = r.map(_.message).mkString,
-          sources = r.flatMap(_.sources).distinct
-        )
+  for
+    messages <- storeMessage[IO](auth.orgId, auth.userId, message)
+    sources <- (buildAnswer(auth)(
+      messages,
+      true,
+      None,
+      false
+    ) |> groupStreamByParagraph)
       .subevalMap: resFragment =>
         for
           validatedResponse <- checkOutOfSyncResult[IO](
@@ -302,13 +282,46 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
         yield validatedResponse.sources
       .compileOutput
       .leftMap(_.mkString(","))
-      .flatMap(s =>
-        Whatsapp.sendMessage(
-          to,
-          from,
-          s"📖: ${s.flatten.distinct.mkString(", ")}"
-        )
+    x <- Whatsapp.sendMessage(
+      to,
+      from,
+      s"📖: ${sources.flatten.distinct.mkString(", ")}"
+    )
+  yield x
+
+def groupStreamByParagraph(
+    s: Stream[IO, Either[String, AskResponse]]
+): Stream[IO, Either[String, AskResponse]] =
+  s.subflatMap: m =>
+    Stream.emits:
+      splitMessageByLineBreak(m.message).map(r =>
+        AskResponse(r, m.sources).asRight
       )
+  .groupAdjacentBy:
+      case Right(r) => r.message == "\n"
+      case Left(e)  => true
+    .filter(!_._1)
+    .map(_._2.toList |> partitionEithers)
+    .leftMap(_.mkString)
+    .subMap: r =>
+      AskResponse(
+        message = r.map(_.message).mkString,
+        sources = r.flatMap(_.sources).distinct
+      )
+
+def splitMessageByLineBreak(s: String): List[String] =
+  (s.startsWith("\n"), s.endsWith("\n")) match
+    case (true, true) =>
+      ("\n" +: splitLineBreak(
+        s.stripSuffix("\n").stripPrefix("\n")
+      )) :+ "\n"
+    case (false, true) =>
+      splitLineBreak(s.stripSuffix("\n")) :+ "\n"
+    case (true, false) =>
+      "\n" +: splitLineBreak(s.stripPrefix("\n"))
+    case (false, false) =>
+      if (s.contains("\n")) splitLineBreak(s)
+      else List(s)
 
 def splitLineBreak(s: String): List[String] =
   s.split("\n")
