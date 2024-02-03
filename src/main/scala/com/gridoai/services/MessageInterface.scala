@@ -260,28 +260,7 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
 ): EitherT[IO, String, Unit] =
   (for
     messages <- storeMessage[IO](auth.orgId, auth.userId, message)
-    sources <- (buildAnswer(auth)(
-      messages,
-      true,
-      None,
-      false
-    ) |> groupStreamByParagraph)
-      .subevalMap: resFragment =>
-        for
-          validatedResponse <- checkOutOfSyncResult[IO](
-            auth.orgId,
-            auth.userId,
-            from,
-            ids
-          )(resFragment)
-          _ <- Whatsapp.sendMessage(
-            to,
-            from,
-            validatedResponse.message
-          )
-        yield validatedResponse.sources
-      .compileOutput
-      .leftMap(_.mkString(","))
+    sources <- buildAnswerAndRespond(auth, from, to, ids, messages)
     x <- Whatsapp.sendMessage(
       to,
       from,
@@ -294,6 +273,40 @@ def handleMessage(auth: AuthData, from: String, to: String, ids: List[String])(
       from,
       "Ops, deu errado. 😔\nTente entrar em contato com o suporte."
     )
+
+def buildAnswerAndRespond(
+    auth: AuthData,
+    from: String,
+    to: String,
+    ids: List[String],
+    messages: List[Message]
+)(implicit
+    docDb: DocDB[IO],
+    messageDb: MessageDB[IO],
+    ns: NotificationService[IO]
+) =
+  (buildAnswer(auth)(
+    messages,
+    true,
+    None,
+    false
+  ) |> groupStreamByParagraph)
+    .subevalMap: resFragment =>
+      for
+        validatedResponse <- checkOutOfSyncResult[IO](
+          auth.orgId,
+          auth.userId,
+          from,
+          ids
+        )(resFragment)
+        _ <- Whatsapp.sendMessage(
+          to,
+          from,
+          validatedResponse.message
+        )
+      yield validatedResponse.sources
+    .compileOutput
+    .leftMap(_.mkString(","))
 
 def groupStreamByParagraph(
     s: Stream[IO, Either[String, AskResponse]]
