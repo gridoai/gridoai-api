@@ -1,20 +1,23 @@
-## sbt project compiled with Scala 3
-
-### Usage
-
-This is a normal sbt project. You can compile code with `sbt compile`, run it with `sbt run`, and `sbt console` will start a Scala 3 REPL.
+## Set up
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- [Scala CLI](https://scala-cli.virtuslab.org/)
 
 ## Development
-Run `sbt` to get into the sbt console
-To restart the server every time a change is detected, run `~reStart`
+- Get the .env file
+- Start a local Postgres and Redis server using `make postgres-up`
+- (Optional) Start a local [gridoai-ml](https://github.com/gridoai/gridoai-ml) instance for faster and cheaper development
+- Run `make dev`
 
 ## Deploying
-- Set up google cloud credentials
-- Run `sbt deploy`
+- Set KEY_PATH to the path of your private key file
+- Run `make deploy`
 
 ## Testing
-- Set ENV=TEST
-- Run `sbt test`
-
-For more information on the sbt-dotty plugin, see the
-[scala3-example-project](https://github.com/scala/scala3-example-project/blob/main/README.md).
+- Create a test.env file
+  - USE_MOCK_LLM should be set to true
+  - Redis and Postgres connection strings should be set to the test containers
+  - Embedding api endpoint should be set to a local instance of gridoai-ml
+- Start the API server using `make dev`
+- Start the test containers using `docker compose up`
+- Run `make test` to run the tests
