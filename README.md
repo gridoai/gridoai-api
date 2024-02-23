@@ -7,7 +7,8 @@
 - Get the .env file
 - Start a local Postgres and Redis server using `make postgres-up`
 - (Optional) Start a local [gridoai-ml](https://github.com/gridoai/gridoai-ml) instance for faster and cheaper development
-- Start the litellm server using `litellm --config litellm-config.yaml --port 8000`
+- Start the litellm server using `litellm --config litellm-config.yaml`. This will print in which port the server is running.
+- Set the litellm endpoint in the .env file, e.g. `OPENAI_ENDPOINT=http://0.0.0.0:46822`
 - Run `make dev`
 
 ## Deploying
