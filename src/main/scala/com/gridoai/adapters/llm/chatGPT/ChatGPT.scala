@@ -63,11 +63,12 @@ object ChatGPTClient:
       .map(calculateMessageTokenQuantity)
       .sum
 
-  def apply[F[_]: Async](sttpBackend: SttpBackend[F, Any])(using
+  def apply[F[_]: Async]()(using
       MonadError[F, Throwable]
   ) = new LLM[F]:
     val client = OpenAIClientBuilder()
-      .credential(KeyCredential(getEnv("OPENAI_API_KEY")))
+      // Using a custom client because LiteLLM doesn't support the Azure endpoint format for all LLMs: https://github.com/BerriAI/litellm/issues/2159
+      .httpClient(customClient)
       .buildAsyncClient()
 
     val model = getEnv("OPENAI_MODEL")
