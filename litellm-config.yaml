@@ -1,0 +1,51 @@
+model_list:
+  - model_name: gemini-pro
+    litellm_params:
+      model: gemini/gemini-pro
+      api_key: os.environ/GEMINI_API_KEY
+      fallbacks: [gemini-pro-fallback]
+
+  - model_name: gemini-pro-fallback
+    litellm_params:
+      model: gemini/gemini-pro
+      api_key: os.environ/GEMINI_API_KEY_FALLBACK
+      fallbacks: [gpt-3.5-turbo-16k]
+
+  - model_name: gpt-3.5-turbo-16k
+    litellm_params:
+      model: gpt-3.5-turbo-16k
+      api_key: os.environ/OPENAI_API_KEY
+      fallbacks: [command-nightly, command-nightly-fallback]
+
+  - model_name: command-nightly
+    litellm_params:
+      model: command-nightly
+      api_key: os.environ/COHERE_API_KEY
+      fallbacks: [command-nightly-fallback]
+
+  - model_name: command-nightly-fallback
+    litellm_params:
+      model: command-nightly
+      api_key: os.environ/COHERE_API_KEY_FALLBACK
+      fallbacks: [openrouter-auto]
+
+  - model_name: openrouter-auto
+    litellm_params:
+      model: openrouter/auto
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: gemini-pro-vision
+    litellm_params:
+      model: gemini/gemini-pro-vision
+      api_key: os.environ/GEMINI_API_KEY
+      fallbacks: [gemini-pro-vision-fallback]
+
+  - model_name: gemini-pro-vision-fallback
+    litellm_params:
+      model: gemini/gemini-pro-vision
+      api_key: os.environ/GEMINI_API_KEY_FALLBACK
+
+  # - model_name: claude-2
+  #   litellm_params:
+  #     model: anthropic/claude-2
+  #     api_key: os.environ/ANTHROPIC_API_KEY
