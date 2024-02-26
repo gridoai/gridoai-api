@@ -44,7 +44,7 @@ trait LLM[F[_]]:
 
 def getLLMByName(llm: LLMModel): LLM[IO] =
   llm match
-    case LLMModel.Gpt35Turbo => ChatGPTClient(syncCatsBackend)
+    case LLMModel.Gpt35Turbo => ChatGPTClient()
     case LLMModel.Palm2      => Paml2Client
     case LLMModel.Mocked     => MockLLM[IO]
 

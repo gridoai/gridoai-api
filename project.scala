@@ -1,7 +1,7 @@
 //> using scala 3
 
 //> using option "-Xmax-inlines:80"
-
+//> using python
 //> using publish.organization "com.gridoai"
 //> using publish.name "gridoai-api"
 //> using publish.version "0.1.0-SNAPSHOT"
@@ -20,6 +20,7 @@
 
 // Java libraries
 
+//> using dep "com.azure:azure-ai-openai:1.0.0-beta.6"
 //> using dep "com.stripe:stripe-java:24.5.0"
 
 //> using dep "ch.qos.logback:logback-classic:1.4.11"
@@ -29,7 +30,7 @@
 //> using dep "org.apache.poi:poi-ooxml:5.2.4"
 //> using dep "org.apache.pdfbox:pdfbox:2.0.30"
 
-//> using dep "com.pgvector:pgvector:0.1.3"
+//> using dep "com.pgvector:pgvector:0.1.4"
 //> using dep "com.knuddels:jtokkit:0.6.1"
 // Google stuff
 //> using dep "com.google.auth:google-auth-library-oauth2-http:1.20.0"
@@ -40,7 +41,10 @@
 // Scala libraries
 //> using dep "org.scala-lang.modules::scala-java8-compat:1.0.2"
 //> using dep "org.typelevel::cats-core::2.10.0"
-//> using dep "org.typelevel::cats-effect:3.5.2"
+//> using dep "org.typelevel::cats-effect:3.5.3"
+
+//> using dep "co.fs2::fs2-reactive-streams:3.9.4"
+
 //> using test.dep "org.typelevel::munit-cats-effect:2.0.0-M1"
 //> using dep "io.circe::circe-core:0.14.6"
 //> using dep "io.circe::circe-generic:0.14.6"
