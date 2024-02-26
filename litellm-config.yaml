@@ -19,13 +19,13 @@ model_list:
 
   - model_name: command-nightly
     litellm_params:
-      model: command-nightly
+      model: command
       api_key: os.environ/COHERE_API_KEY
       fallbacks: [openrouter-auto]
 
   - model_name: command-nightly
     litellm_params:
-      model: command-nightly
+      model: command
       api_key: os.environ/COHERE_API_KEY_FALLBACK
       fallbacks: [openrouter-auto]
 
@@ -43,8 +43,3 @@ model_list:
     litellm_params:
       model: gemini/gemini-pro-vision
       api_key: os.environ/GEMINI_API_KEY_FALLBACK
-
-  # - model_name: claude-2
-  #   litellm_params:
-  #     model: anthropic/claude-2
-  #     api_key: os.environ/ANTHROPIC_API_KEY
