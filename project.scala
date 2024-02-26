@@ -90,4 +90,6 @@
 //> using dep "dev.profunktor:redis4cats-effects_3:1.5.2"
 //> using dep "com.resend:resend-java:2.2.1"
 
-//> using dep "com.azure:azure-ai-openai:1.0.0-beta.6"
+//> using dep "dev.langchain4j:langchain4j-open-ai:0.27.1"
+//> using dep "dev.langchain4j:langchain4j:0.27.1"
+
